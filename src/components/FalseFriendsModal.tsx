@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Search, Lightbulb, Check } from 'lucide-react';
+import { X, AlertTriangle, Search, Lightbulb, Check, Volume2 } from 'lucide-react';
 import { FALSE_FRIENDS } from '../data/falseFriends';
+import { soundEngine } from '../utils/audio';
 
 interface FalseFriendsModalProps {
   isOpen: boolean;
@@ -15,6 +16,11 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
   const [activeLang, setActiveLang] = useState<'all' | 'german' | 'english'>('all');
 
   if (!isOpen) return null;
+
+  const handleSpeak = (text: string, lang: string) => {
+    soundEngine.playClickSound();
+    soundEngine.speak(text, lang, true);
+  };
 
   const filteredItems = FALSE_FRIENDS.filter((item) => {
     if (activeLang !== 'all' && item.languageId !== activeLang) {
@@ -47,13 +53,16 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
                 False Friends & Deceptive Cognates
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Words that look identical in English and German but carry radically different meanings.
+                Visual cards & audio pronunciation to prevent catastrophic language misunderstandings.
               </p>
             </div>
           </div>
 
           <button
-            onClick={onClose}
+            onClick={() => {
+              soundEngine.playClickSound();
+              onClose();
+            }}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
@@ -75,7 +84,10 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
 
           <div className="flex items-center gap-1.5 self-start sm:self-auto">
             <button
-              onClick={() => setActiveLang('all')}
+              onClick={() => {
+                soundEngine.playClickSound();
+                setActiveLang('all');
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
                 activeLang === 'all'
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
@@ -85,7 +97,10 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
               All
             </button>
             <button
-              onClick={() => setActiveLang('german')}
+              onClick={() => {
+                soundEngine.playClickSound();
+                setActiveLang('german');
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
                 activeLang === 'german'
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
@@ -95,7 +110,10 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
               🇩🇪 German Traps
             </button>
             <button
-              onClick={() => setActiveLang('english')}
+              onClick={() => {
+                soundEngine.playClickSound();
+                setActiveLang('english');
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
                 activeLang === 'english'
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
@@ -107,7 +125,7 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
           </div>
         </div>
 
-        {/* List of False Friends */}
+        {/* List of False Friends with Audio & Photos */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {filteredItems.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-sm">
@@ -118,40 +136,82 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
               {filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm space-y-3"
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm overflow-hidden flex flex-col justify-between"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-base font-extrabold text-slate-900 dark:text-white">
-                      {item.word}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                      Trap
-                    </span>
-                  </div>
+                  {/* Photo if present */}
+                  {item.imageUrl && (
+                    <div className="relative h-28 w-full overflow-hidden bg-slate-900">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.word}
+                        className="w-full h-full object-cover opacity-85"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+                      <div className="absolute top-2 right-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-600/90 text-white shadow">
+                          High Hazard
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="text-xs space-y-1">
-                    <div className="text-rose-600 dark:text-rose-400 font-medium">
-                      ❌ Confused with: <strong>{item.confusedWith}</strong>
-                    </div>
-                    <div className="text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                      <span>Actual meaning: <strong>{item.actualMeaning}</strong></span>
-                    </div>
-                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-base font-extrabold text-slate-900 dark:text-white">
+                          {item.word}
+                        </span>
+                        {/* Audio pronunciation button for the word */}
+                        <button
+                          onClick={() => handleSpeak(item.word, item.languageId)}
+                          title={`Listen to pronunciation (${item.languageId})`}
+                          className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[11px] space-y-1">
-                    <div className="text-slate-600 dark:text-slate-300">
-                      <strong>Say instead:</strong> {item.correctAlternative}
+                      {!item.imageUrl && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                          Trap
+                        </span>
+                      )}
                     </div>
-                    <div className="text-slate-500 dark:text-slate-400 italic">
-                      {item.mistakeExample}
-                    </div>
-                  </div>
 
-                  {/* Memory Hack */}
-                  <div className="flex items-start gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
-                    <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
-                    <span><strong>Hack:</strong> {item.memoryHack}</span>
+                    <div className="text-xs space-y-1">
+                      <div className="text-rose-600 dark:text-rose-400 font-medium">
+                        ❌ Confused with: <strong>{item.confusedWith}</strong>
+                      </div>
+                      <div className="text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>Actual meaning: <strong>{item.actualMeaning}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[11px] space-y-1">
+                      <div className="text-slate-700 dark:text-slate-200 flex items-center justify-between">
+                        <div>
+                          <strong>Say instead:</strong> {item.correctAlternative}
+                        </div>
+                        <button
+                          onClick={() => handleSpeak(item.correctAlternative.split('->')[0].trim(), item.languageId)}
+                          className="p-1 text-slate-400 hover:text-sky-600 transition-colors"
+                          title="Listen to correct alternative"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 italic">
+                        {item.mistakeExample}
+                      </div>
+                    </div>
+
+                    {/* Memory Hack */}
+                    <div className="flex items-start gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                      <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                      <span><strong>Hack:</strong> {item.memoryHack}</span>
+                    </div>
                   </div>
                 </div>
               ))}

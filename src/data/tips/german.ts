@@ -8,6 +8,7 @@ export const GERMAN_TIPS: TipItem[] = [
     languageId: 'german',
     level: 'A1',
     category: 'grammar',
+    diagramType: 'german-gender',
     summary: 'Do not guess German genders! Over 80% of German nouns reveal their gender (der, die, or das) by their ending suffixes.',
     goldenRule: 'Never memorize a noun alone. Memorize it with its article and color-code your notes (Blue for Der, Red for Die, Green for Das).',
     tactics: [
@@ -53,6 +54,7 @@ export const GERMAN_TIPS: TipItem[] = [
     languageId: 'german',
     level: 'A1',
     category: 'pronunciation',
+    diagramType: 'mouth-phonetics',
     summary: 'German pronunciation is remarkably phonetic and consistent once you unlock the Ich-Laut [ç], the Ach-Laut [x], and the three Umlauts (ä, ö, ü).',
     goldenRule: 'Umlauts are shaped by your tongue inside your mouth while holding your lips rounded like an O or U.',
     tactics: [
@@ -97,6 +99,7 @@ export const GERMAN_TIPS: TipItem[] = [
     languageId: 'german',
     level: 'A2',
     category: 'grammar',
+    diagramType: 'two-way-prepositions',
     summary: 'The 9 two-way prepositions (an, auf, hinter, in, neben, über, unter, vor, zwischen) take Akkusativ for movement and Dativ for stationary location.',
     goldenRule: 'Ask "Wohin?" (Where to? -> Akkusativ movement). Ask "Wo?" (Where at? -> Dativ location).',
     tactics: [
@@ -182,6 +185,8 @@ export const GERMAN_TIPS: TipItem[] = [
     languageId: 'german',
     level: 'B2',
     category: 'speaking',
+    imageUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=700&q=80',
+    imageCaption: 'Authentic social banter in Berlin cafes',
     summary: 'Modal particles (doch, ja, mal, halt, eben, denn, bloß) carry zero grammatical weight, but they communicate emotion, attitude, and social rapport.',
     goldenRule: 'Sprinkle modal particles into your speech to instantly sound like you have lived in Germany for 10 years.',
     tactics: [

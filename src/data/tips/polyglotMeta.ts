@@ -7,6 +7,8 @@ export const META_TIPS: TipItem[] = [
     languageId: 'meta',
     level: 'ALL',
     category: 'pronunciation',
+    imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=700&q=80',
+    imageCaption: 'Active shadowing with audio on outdoor walks',
     summary: 'Pioneered by linguist Prof. Alexander Arguelles, shadowing trains your vocal tract and ear simultaneously by repeating audio a split-second behind a native speaker.',
     goldenRule: 'Do not wait for a sentence to finish before speaking. Echo the native voice 200–500 milliseconds behind, mimicking pitch, rhythm, and tone.',
     tactics: [

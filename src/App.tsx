@@ -6,6 +6,7 @@ import {
   getLanguage
 } from './data';
 import { CEFRLevel, Category } from './types';
+import { soundEngine } from './utils/audio';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { LevelRoadmap } from './components/LevelRoadmap';
@@ -27,6 +28,14 @@ export const App: React.FC = () => {
     }
     return false;
   });
+
+  // Sound state
+  const [isMuted, setIsMuted] = useState<boolean>(() => soundEngine.getMuted());
+
+  const handleToggleMute = () => {
+    const newMuted = soundEngine.toggleMute();
+    setIsMuted(newMuted);
+  };
 
   // Filter States
   const [activeLanguageId, setActiveLanguageId] = useState<string>('all');
@@ -146,6 +155,7 @@ export const App: React.FC = () => {
         languages={LANGUAGES}
         activeLanguageId={activeLanguageId}
         onSelectLanguage={(id) => {
+          soundEngine.playClickSound();
           setActiveLanguageId(id);
           setActiveLevel('ALL');
         }}
@@ -157,6 +167,8 @@ export const App: React.FC = () => {
         onOpenRandomTip={() => setIsRandomTipOpen(true)}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        isMuted={isMuted}
+        onToggleMute={handleToggleMute}
       />
 
       {/* Hero Section */}
@@ -170,7 +182,10 @@ export const App: React.FC = () => {
       {/* CEFR Level Roadmap Bar */}
       <LevelRoadmap
         activeLevel={activeLevel}
-        onSelectLevel={setActiveLevel}
+        onSelectLevel={(lvl) => {
+          soundEngine.playClickSound();
+          setActiveLevel(lvl);
+        }}
         tipsCountByLevel={tipsCountByLevel}
       />
 

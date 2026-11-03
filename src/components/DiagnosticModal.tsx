@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Award, Compass, ArrowRight, RotateCcw } from 'lucide-react';
 import { DIAGNOSTIC_QUESTIONS, calculateDiagnosticLevel, CEFR_LEVELS } from '../data';
 import { CEFRLevel } from '../types';
+import { soundEngine } from '../utils/audio';
 
 interface DiagnosticModalProps {
   isOpen: boolean;
@@ -24,12 +25,14 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({
   const isFinished = currentStep >= DIAGNOSTIC_QUESTIONS.length;
 
   const handleSelectOption = (level: CEFRLevel) => {
+    soundEngine.playClickSound();
     const updated = { ...answers, [currentQuestion.id]: level };
     setAnswers(updated);
 
     if (currentStep + 1 < DIAGNOSTIC_QUESTIONS.length) {
       setCurrentStep(currentStep + 1);
     } else {
+      soundEngine.playSuccessChime();
       const finalLevel = calculateDiagnosticLevel(updated);
       setCalculatedLevel(finalLevel);
       setCurrentStep(DIAGNOSTIC_QUESTIONS.length);
@@ -37,6 +40,7 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({
   };
 
   const handleReset = () => {
+    soundEngine.playClickSound();
     setCurrentStep(0);
     setAnswers({});
     setCalculatedLevel(null);

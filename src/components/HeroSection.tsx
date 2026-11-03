@@ -1,6 +1,7 @@
 import React from 'react';
-import { Sparkles, Compass, Zap, ArrowRight } from 'lucide-react';
+import { Sparkles, Compass, Zap, ArrowRight, Volume2 } from 'lucide-react';
 import { Language } from '../types';
+import { soundEngine } from '../utils/audio';
 
 interface HeroSectionProps {
   currentLanguage?: Language;
@@ -15,6 +16,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenExtensibility,
   totalTipsCount,
 }) => {
+  const handlePlaySoundFeature = (sound: string) => {
+    soundEngine.playClickSound();
+    // Speak a helpful representative word for that sound
+    if (sound.includes('Schwa')) {
+      soundEngine.speak('banana, photograph, today', 'english');
+    } else if (sound.includes('TH')) {
+      soundEngine.speak('think, three, this, that', 'english');
+    } else if (sound.includes('Umlaut')) {
+      soundEngine.speak('Küche, schön, Käse', 'german');
+    } else if (sound.includes('Ich-Laut')) {
+      soundEngine.speak('ich, nicht, Buch, Bach', 'german');
+    } else if (sound.includes('Knacklaut')) {
+      soundEngine.speak('Vereinbaren, Spiegelei', 'german');
+    } else {
+      soundEngine.speak(sound, currentLanguage?.id || 'english');
+    }
+  };
+
   return (
     <section className="relative overflow-hidden pt-8 pb-10 border-b border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-b from-sky-50/50 via-white to-transparent dark:from-slate-900/40 dark:via-slate-950 dark:to-transparent">
       {/* Decorative gradient blur */}
@@ -39,13 +58,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
               Tired of endless vocab drills without conversational flow? LinguaVerve delivers high-leverage 
-              tactical blueprints, pronunciation hacks, and grammatical cheat-codes for <strong>English</strong>, <strong>German</strong>, and beyond.
+              tactical blueprints, pronunciation audio, visual mental models, and grammatical cheat-codes for <strong>English</strong>, <strong>German</strong>, and beyond.
             </p>
 
             {/* Quick Action Badges */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <button
-                onClick={onOpenDiagnostic}
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  onOpenDiagnostic();
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/20 hover:shadow-sky-500/30 transition-all group"
               >
                 <Compass className="w-4 h-4 group-hover:rotate-45 transition-transform" />
@@ -54,7 +76,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </button>
 
               <button
-                onClick={onOpenExtensibility}
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  onOpenExtensibility();
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all"
               >
                 <Zap className="w-4 h-4 text-amber-500" />
@@ -63,67 +88,113 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
           </div>
 
-          {/* Current Language Snapshot Card */}
+          {/* Current Language Snapshot Card with Photo & Audio */}
           <div className="w-full lg:w-96 flex-shrink-0">
             {currentLanguage && currentLanguage.id !== 'all' ? (
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none space-y-3.5 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-3xl">{currentLanguage.flag}</span>
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        {currentLanguage.name}
-                        <span className="text-xs text-slate-400 font-normal">({currentLanguage.nativeName})</span>
-                      </h3>
-                      <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">{currentLanguage.tagline}</p>
+              <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden space-y-3 relative group">
+                
+                {/* Visual Photo Header */}
+                {currentLanguage.imageUrl && (
+                  <div className="relative h-28 w-full overflow-hidden">
+                    <img
+                      src={currentLanguage.imageUrl}
+                      alt={currentLanguage.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                    <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-xs text-white">
+                      <span className="font-semibold text-xs drop-shadow">
+                        📸 {currentLanguage.imageCaption}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/50 backdrop-blur-sm border border-white/20">
+                        {currentLanguage.difficultyRating.split(' ')[0]}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {currentLanguage.difficultyRating.split(' ')[0]}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-normal">
-                  {currentLanguage.description}
-                </p>
-
-                {/* Key phonetic features */}
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Sonic Target Vectors
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {currentLanguage.soundFeatures.map((sound, i) => (
-                      <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/60">
-                        {sound}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Estimated C1 Investment */}
-                {currentLanguage.estimatedHoursToC1 > 0 && (
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
-                    <span>Est. Hours to C1:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">~{currentLanguage.estimatedHoursToC1} hours</span>
-                  </div>
                 )}
+
+                <div className="p-4 pt-1 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{currentLanguage.flag}</span>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-sm">
+                          {currentLanguage.name}
+                          <span className="text-xs text-slate-400 font-normal">({currentLanguage.nativeName})</span>
+                        </h3>
+                        <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">{currentLanguage.tagline}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-normal">
+                    {currentLanguage.description}
+                  </p>
+
+                  {/* Key phonetic features with audio click */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Phonetic Vectors (Click to Hear)
+                      </span>
+                      <span className="text-[10px] text-sky-500 flex items-center gap-1">
+                        <Volume2 className="w-3 h-3" />
+                        <span>Interactive</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentLanguage.soundFeatures.map((sound, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handlePlaySoundFeature(sound)}
+                          title={`Click to listen to ${sound}`}
+                          className="text-[11px] font-mono px-2 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/60 transition-colors flex items-center gap-1 group/btn"
+                        >
+                          <Volume2 className="w-3 h-3 text-sky-500 group-hover/btn:scale-110 transition-transform" />
+                          <span>{sound}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Estimated C1 Investment */}
+                  {currentLanguage.estimatedHoursToC1 > 0 && (
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
+                      <span>Est. Hours to C1:</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">~{currentLanguage.estimatedHoursToC1} hours</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl space-y-3 relative">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">🌐</span>
-                  <div>
-                    <h3 className="font-bold text-white">Full Polyglot Index</h3>
-                    <p className="text-xs text-sky-300">Tactics for English, German & Universal Meta</p>
+              <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white shadow-xl overflow-hidden relative group">
+                <div className="relative h-28 w-full overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80"
+                    alt="Polyglot Index"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+                  <div className="absolute bottom-2 left-3 text-xs font-semibold drop-shadow">
+                    🌐 Global Polyglot Knowledge Engine
                   </div>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Browse cross-language tactical insights or pick a specific language above. Each level represents concrete behavioral milestones.
-                </p>
-                <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
-                  <span className="text-slate-400">Tactical Knowledge Base:</span>
-                  <span className="font-bold text-sky-400">{totalTipsCount} Curated Blueprints</span>
+
+                <div className="p-4 pt-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🧠</span>
+                    <div>
+                      <h3 className="font-bold text-white text-sm">Universal Language Suite</h3>
+                      <p className="text-xs text-sky-300">English, German & Polyglot Meta Tactics</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Visual mental models and native speech synthesis available across all {totalTipsCount} curated blueprints.
+                  </p>
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
+                    <span className="text-slate-400">Total Active Blueprints:</span>
+                    <span className="font-bold text-sky-400">{totalTipsCount} with Audio</span>
+                  </div>
                 </div>
               </div>
             )}

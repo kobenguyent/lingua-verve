@@ -9,11 +9,18 @@ import {
   Lightbulb, 
   Clock, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  Volume2,
+  Gauge
 } from 'lucide-react';
 import { TipItem } from '../types';
 import { CEFR_LEVELS } from '../data/levels';
 import { LANGUAGES } from '../data/languages';
+import { soundEngine } from '../utils/audio';
+import { PrepositionPyramid } from './diagrams/PrepositionPyramid';
+import { GermanGenderCards } from './diagrams/GermanGenderCards';
+import { TwoWayPrepositionsVisual } from './diagrams/TwoWayPrepositionsVisual';
+import { PhoneticsVisualizer } from './diagrams/PhoneticsVisualizer';
 
 interface TipCardProps {
   tip: TipItem;
@@ -32,19 +39,43 @@ export const TipCard: React.FC<TipCardProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [slowAudio, setSlowAudio] = useState(false);
+  const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
 
   const levelInfo = CEFR_LEVELS.find((l) => l.id === tip.level);
   const languageInfo = LANGUAGES.find((lang) => lang.id === tip.languageId);
 
   const handleCopy = () => {
+    soundEngine.playClickSound();
     navigator.clipboard.writeText(`${tip.title} - ${tip.goldenRule}\n\nVia LinguaVerve Polyglot Blueprint`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleToggleBookmarkWithSound = () => {
+    soundEngine.playClickSound();
+    onToggleBookmark(tip.id);
+  };
+
+  const handleToggleMasteredWithSound = () => {
+    if (!isMastered) {
+      soundEngine.playSuccessChime();
+    } else {
+      soundEngine.playClickSound();
+    }
+    onToggleMastered(tip.id);
+  };
+
+  const handleSpeakText = (text: string) => {
+    soundEngine.playClickSound();
+    setCurrentlySpeaking(text);
+    soundEngine.speak(text, tip.languageId, slowAudio);
+    setTimeout(() => setCurrentlySpeaking(null), 3500);
+  };
+
   return (
     <article 
-      className={`rounded-2xl transition-all duration-200 border bg-white dark:bg-slate-900/90 shadow-sm hover:shadow-md ${
+      className={`rounded-2xl transition-all duration-200 border bg-white dark:bg-slate-900/90 shadow-sm hover:shadow-md overflow-hidden ${
         isMastered
           ? 'border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/20 dark:bg-emerald-950/10'
           : isBookmarked
@@ -52,6 +83,26 @@ export const TipCard: React.FC<TipCardProps> = ({
           : 'border-slate-200/90 dark:border-slate-800'
       }`}
     >
+      {/* Optional Photo Header for high-impact visual tips */}
+      {tip.imageUrl && (
+        <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-slate-900 group">
+          <img
+            src={tip.imageUrl}
+            alt={tip.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+          {tip.imageCaption && (
+            <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs text-white/90">
+              <span className="font-medium drop-shadow-md backdrop-blur-sm bg-black/40 px-2 py-0.5 rounded-md">
+                📸 {tip.imageCaption}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="p-5 sm:p-6 space-y-4">
         
         {/* Header Tags & Metadata */}
@@ -81,7 +132,7 @@ export const TipCard: React.FC<TipCardProps> = ({
             </span>
           </div>
 
-          {/* Time Commitment & Action Buttons */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-1.5 ml-auto">
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 mr-1">
               <Clock className="w-3 h-3" />
@@ -99,7 +150,7 @@ export const TipCard: React.FC<TipCardProps> = ({
 
             {/* Bookmark Button */}
             <button
-              onClick={() => onToggleBookmark(tip.id)}
+              onClick={handleToggleBookmarkWithSound}
               title={isBookmarked ? 'Remove from Saved' : 'Save for Later'}
               className={`p-1.5 rounded-lg transition-colors ${
                 isBookmarked
@@ -112,7 +163,7 @@ export const TipCard: React.FC<TipCardProps> = ({
 
             {/* Mastered Button */}
             <button
-              onClick={() => onToggleMastered(tip.id)}
+              onClick={handleToggleMasteredWithSound}
               title={isMastered ? 'Mark as In-Progress' : 'Mark as Mastered'}
               className={`p-1.5 rounded-lg transition-colors ${
                 isMastered
@@ -146,14 +197,34 @@ export const TipCard: React.FC<TipCardProps> = ({
           </div>
         </div>
 
+        {/* Visual Diagrams (If Applicable) */}
+        {tip.diagramType === 'preposition-pyramid' && <PrepositionPyramid />}
+        {tip.diagramType === 'german-gender' && <GermanGenderCards />}
+        {tip.diagramType === 'two-way-prepositions' && <TwoWayPrepositionsVisual />}
+        {tip.diagramType === 'mouth-phonetics' && <PhoneticsVisualizer languageId={tip.languageId} />}
+
         {/* Expand/Collapse Toggle */}
-        <div className="pt-1">
+        <div className="pt-1 flex items-center justify-between">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline"
           >
-            <span>{isExpanded ? 'Hide Tactical Steps & Examples' : 'Show Tactical Steps & Examples'}</span>
+            <span>{isExpanded ? 'Hide Tactical Steps & Audio' : 'Show Tactical Steps & Audio'}</span>
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Audio Pace Toggle */}
+          <button
+            onClick={() => setSlowAudio(!slowAudio)}
+            title="Toggle normal speed vs 0.75x slow speed for audio pronunciation"
+            className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border transition-colors ${
+              slowAudio
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-bold'
+                : 'text-slate-400 border-transparent hover:text-slate-600'
+            }`}
+          >
+            <Gauge className="w-3 h-3" />
+            <span>{slowAudio ? '🐢 0.75x Slow' : '⚡ 1.0x Normal'}</span>
           </button>
         </div>
 
@@ -177,23 +248,46 @@ export const TipCard: React.FC<TipCardProps> = ({
               </ul>
             </div>
 
-            {/* Real World Examples */}
+            {/* Real World Examples with Audio Speaker */}
             {tip.examples && tip.examples.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Target Examples:
+                  Target Examples (Click to Listen):
                 </span>
                 <div className="space-y-2">
-                  {tip.examples.map((ex, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-xs sm:text-sm">
-                      <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">
-                        {ex.source}
+                  {tip.examples.map((ex, idx) => {
+                    const phraseToSpeak = ex.source.split('(')[0].replace(/vs\./gi, '').trim();
+                    const isSpeakingThis = currentlySpeaking === phraseToSpeak;
+
+                    return (
+                      <div 
+                        key={idx} 
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-xs sm:text-sm flex items-start justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+                            {ex.source}
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            {ex.explanation}
+                          </div>
+                        </div>
+
+                        {/* Speaker Button */}
+                        <button
+                          onClick={() => handleSpeakText(phraseToSpeak)}
+                          title={`Listen to pronunciation (${tip.languageId})`}
+                          className={`p-2 rounded-xl border shrink-0 transition-all ${
+                            isSpeakingThis
+                              ? 'bg-sky-600 text-white border-sky-600 ring-2 ring-sky-300 scale-105'
+                              : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-sky-50 dark:hover:bg-slate-600 border-slate-200 dark:border-slate-600'
+                          }`}
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                        {ex.explanation}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

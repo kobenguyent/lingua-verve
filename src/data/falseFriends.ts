@@ -9,7 +9,8 @@ export const FALSE_FRIENDS: FalseFriendItem[] = [
     actualMeaning: 'Poison or venom',
     mistakeExample: '❌ "Danke für das Gift!" (Thank you for the poison!)',
     correctAlternative: 'Das Geschenk (present / gift)',
-    memoryHack: 'Think of "toxic gift". In German, giving someone Gift will land you in prison.'
+    memoryHack: 'Think of "toxic gift". In German, giving someone Gift will land you in prison.',
+    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80'
   },
   {
     id: 'ff-bekommen',
@@ -29,7 +30,8 @@ export const FALSE_FRIENDS: FalseFriendItem[] = [
     actualMeaning: 'Current / topical / up-to-date',
     mistakeExample: '❌ "Das ist der aktuelle Grund." (thinking it means "the actual reason")',
     correctAlternative: 'tatsächlich / eigentlich (actual / real) -> "der tatsächliche Grund"',
-    memoryHack: 'Aktuell = at this very moment (current news / Zeitgeschehen).'
+    memoryHack: 'Aktuell = at this very moment (current news / Zeitgeschehen).',
+    imageUrl: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=600&q=80'
   },
   {
     id: 'ff-chef',
@@ -39,7 +41,8 @@ export const FALSE_FRIENDS: FalseFriendItem[] = [
     actualMeaning: 'Boss / supervisor / managing director',
     mistakeExample: '❌ "Er kocht gut, er ist Chef." (thinking he is a culinary chef)',
     correctAlternative: 'der Koch / die Köchin (cook / culinary chef)',
-    memoryHack: 'The Chief Executive (CEO) is your Chef at the office.'
+    memoryHack: 'The Chief Executive (CEO) is your Chef at the office.',
+    imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=600&q=80'
   },
   {
     id: 'ff-praegnant',

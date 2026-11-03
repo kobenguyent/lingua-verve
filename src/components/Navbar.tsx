@@ -8,7 +8,9 @@ import {
   PlusCircle, 
   Moon, 
   Sun,
-  Sparkles
+  Sparkles,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { Language } from '../types';
 
@@ -24,6 +26,8 @@ interface NavbarProps {
   onOpenRandomTip: () => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -38,6 +42,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenRandomTip,
   isDarkMode,
   onToggleDarkMode,
+  isMuted = false,
+  onToggleMute,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -153,11 +159,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
 
+            {/* Audio Effects Toggle */}
+            {onToggleMute && (
+              <button
+                onClick={onToggleMute}
+                aria-label={isMuted ? 'Unmute sounds' : 'Mute sounds'}
+                title={isMuted ? 'Sound effects muted' : 'Sound effects active'}
+                className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-colors"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-sky-500" />}
+              </button>
+            )}
+
             {/* Dark Mode Toggle */}
             <button
               onClick={onToggleDarkMode}
               aria-label="Toggle theme"
-              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-colors"
             >
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>

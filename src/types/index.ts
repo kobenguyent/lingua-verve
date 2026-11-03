@@ -23,6 +23,8 @@ export interface Language {
   keyTraps: string[];
   soundFeatures: string[];
   status: 'active' | 'preview';
+  imageUrl?: string;
+  imageCaption?: string;
 }
 
 export interface LevelDetail {
@@ -45,6 +47,7 @@ export interface TipExample {
   source: string;
   target?: string;
   explanation: string;
+  audioPrompt?: string;
 }
 
 export interface ResourceTool {
@@ -54,6 +57,12 @@ export interface ResourceTool {
   note: string;
   free?: boolean;
 }
+
+export type VisualDiagramType = 
+  | 'preposition-pyramid' 
+  | 'german-gender' 
+  | 'two-way-prepositions' 
+  | 'mouth-phonetics';
 
 export interface TipItem {
   id: string;
@@ -69,6 +78,9 @@ export interface TipItem {
   timeCommitment: string;
   recommendedTools?: ResourceTool[];
   tags: string[];
+  imageUrl?: string;
+  imageCaption?: string;
+  diagramType?: VisualDiagramType;
 }
 
 export interface FalseFriendItem {
@@ -80,6 +92,7 @@ export interface FalseFriendItem {
   mistakeExample: string;
   correctAlternative: string;
   memoryHack: string;
+  imageUrl?: string;
 }
 
 export interface DiagnosticQuestion {

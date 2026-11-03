@@ -8,6 +8,7 @@ export const ENGLISH_TIPS: TipItem[] = [
     languageId: 'english',
     level: 'A1',
     category: 'pronunciation',
+    diagramType: 'mouth-phonetics',
     summary: 'English is stress-timed, not syllable-timed. Over 60% of unstressed vowels in English collapse into the lazy "uh" sound known as the Schwa.',
     goldenRule: 'Never pronounce every vowel clearly. Stressed syllables are loud and clear; unstressed syllables become the lazy Schwa /ə/.',
     tactics: [
@@ -93,6 +94,7 @@ export const ENGLISH_TIPS: TipItem[] = [
     languageId: 'english',
     level: 'A2',
     category: 'grammar',
+    diagramType: 'preposition-pyramid',
     summary: 'Mastering IN, ON, and AT for both Time and Space using a simple inverted pyramid rule.',
     goldenRule: 'Think from General to Specific: IN is broad/enclosed, ON is a surface/street/day, AT is a precise point or exact time.',
     tactics: [
@@ -116,6 +118,8 @@ export const ENGLISH_TIPS: TipItem[] = [
     languageId: 'english',
     level: 'B1',
     category: 'vocabulary',
+    imageUrl: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=700&q=80',
+    imageCaption: 'Deconstruct words through conceptual metaphors',
     summary: 'Phrasal verbs seem random until you realize the preposition/particle carries a systematic conceptual metaphor.',
     goldenRule: 'Look at the particle, not just the root verb. UP often means "completion" or "visibility"; OUT means "expansion" or "extinction".',
     tactics: [
