@@ -7,6 +7,8 @@ title = "LinguaVerve Secret Scanning Policy"
 description = "Ignore build outputs, dependencies, structural AST graphs, and test fixtures"
 paths = [
   '''^dist/''',
+  '''^dist-macos/''',
+  '''^macos/\.build/''',
   '''^node_modules/''',
   '''^package-lock\.json$''',
   '''^graphify-out/''',

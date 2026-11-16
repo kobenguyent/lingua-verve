@@ -33,9 +33,11 @@ jobs:
 
       - name: Run Betterleaks Secret Gate
         run: |
-          curl -sSfL https://github.com/betterleaks/betterleaks/releases/latest/download/betterleaks_Linux_x86_64.tar.gz | tar -xz betterleaks
-          ./betterleaks dir . -v
-          rm -f ./betterleaks
+          curl -sSfL -o /tmp/betterleaks.tar.gz https://github.com/betterleaks/betterleaks/releases/download/v1.10.1/betterleaks_1.10.1_linux_x64.tar.gz
+          echo "c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e  /tmp/betterleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/betterleaks.tar.gz -C /tmp betterleaks
+          /tmp/betterleaks dir . --config .betterleaks.toml -v
+          rm -f /tmp/betterleaks.tar.gz /tmp/betterleaks
 
       - name: Run Automated Test Suite
         run: npm run test
