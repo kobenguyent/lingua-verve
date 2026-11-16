@@ -148,7 +148,7 @@ export const App: React.FC = () => {
   const currentLanguage = activeLanguageId !== 'all' ? getLanguage(activeLanguageId) : undefined;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#FAF9F6] text-slate-900 dark:bg-[#0B0E14] dark:text-slate-100 transition-colors">
       
       {/* Top Navigation */}
       <Navbar

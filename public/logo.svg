@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="LinguaVerve official logo">
+  <defs>
+    <radialGradient id="lv-bg" cx="50%" cy="32%" r="68%">
+      <stop offset="0%" stop-color="#1A2846" />
+      <stop offset="58%" stop-color="#0C1221" />
+      <stop offset="100%" stop-color="#060911" />
+    </radialGradient>
+    <linearGradient id="lv-orbit" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.75" />
+      <stop offset="55%" stop-color="#F5D16B" stop-opacity="0.88" />
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.25" />
+    </linearGradient>
+    <linearGradient id="lv-ivory" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#E0EAF5" />
+    </linearGradient>
+    <linearGradient id="lv-gold" x1="0%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FEEDAC" />
+      <stop offset="52%" stop-color="#EFBE46" />
+      <stop offset="100%" stop-color="#C28622" />
+    </linearGradient>
+  </defs>
+
+  <!-- Official Apple-proportioned squircle tile -->
+  <rect x="64" y="64" width="896" height="896" rx="202" fill="url(#lv-bg)" stroke="#F2CC6B" stroke-opacity="0.34" stroke-width="6" />
+
+  <!-- Subtle astronomical meridian rings -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="#F0F5FF" stroke-opacity="0.09" stroke-width="3" />
+  <circle cx="512" cy="512" r="258" fill="none" stroke="#38BDF8" stroke-opacity="0.15" stroke-width="2.5" />
+
+  <!-- Tilted meridian orbit -->
+  <ellipse cx="512" cy="518" rx="330" ry="114" transform="rotate(24 512 518)" fill="none" stroke="url(#lv-orbit)" stroke-width="9" />
+
+  <!-- Editorial Ivory L (SVG y grows downward) -->
+  <path d="M 284 312 H 348 V 646 H 468 L 488 700 H 304 Q 284 700 284 680 Z" fill="url(#lv-ivory)" />
+
+  <!-- Burnished Champagne-Gold V -->
+  <path d="M 418 312 H 488 L 578 600 L 668 312 H 738 L 605 700 H 551 Z" fill="url(#lv-gold)" />
+
+  <!-- Sky-Cyan 4-Point Phonetic Spark -->
+  <path d="M 578 334 Q 582 354 602 358 Q 582 362 578 382 Q 574 362 554 358 Q 574 354 578 334 Z" fill="#59D1FF" />
+</svg>

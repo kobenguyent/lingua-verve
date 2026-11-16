@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import curriculumJson from '../../macos/Sources/LinguaVerveCore/Resources/curriculum.json';
 import { 
   CEFR_LEVELS, 
   ENGLISH_TIPS, 
   GERMAN_TIPS, 
   ALL_TIPS, 
+  FALSE_FRIENDS,
+  DIAGNOSTIC_QUESTIONS,
+  LANGUAGES,
   filterTips, 
   calculateDiagnosticLevel,
   getLanguage
@@ -147,5 +151,15 @@ describe('Diagnostic Level Calculator Tests', () => {
       q4: 'C2',
     };
     expect(calculateDiagnosticLevel(answers)).toBe('C2');
+  });
+});
+
+describe('macOS Native Curriculum JSON Sync Parity', () => {
+  it('should keep macos/Sources/LinguaVerveCore/Resources/curriculum.json in sync with src/data/', () => {
+    expect(curriculumJson.languages.length).toBe(LANGUAGES.length);
+    expect(curriculumJson.levels.length).toBe(CEFR_LEVELS.length);
+    expect(curriculumJson.tips.length).toBe(ALL_TIPS.length);
+    expect(curriculumJson.falseFriends.length).toBe(FALSE_FRIENDS.length);
+    expect(curriculumJson.diagnosticQuestions.length).toBe(DIAGNOSTIC_QUESTIONS.length);
   });
 });

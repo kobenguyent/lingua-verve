@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, Search, Lightbulb, Check, Volume2 } from 'lucide-react';
 import { FALSE_FRIENDS } from '../data/falseFriends';
 import { soundEngine } from '../utils/audio';
+import { ModalDialog } from './ModalDialog';
 
 interface FalseFriendsModalProps {
   isOpen: boolean;
@@ -39,31 +40,33 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+    <ModalDialog isOpen={isOpen} onClose={onClose} labelledBy="false-friends-title" maxWidthClass="max-w-3xl">
+      <div className="w-full max-h-[88vh] flex flex-col">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-6 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 dark:text-white text-lg">
-                False Friends & Deceptive Cognates
-              </h3>
+              <h2 id="false-friends-title" className="font-bold text-slate-900 dark:text-white text-lg">
+                False Friends &amp; Deceptive Cognates
+              </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Visual cards & audio pronunciation to prevent catastrophic language misunderstandings.
+                Visual cards &amp; audio pronunciation to prevent catastrophic language misunderstandings.
               </p>
             </div>
           </div>
 
           <button
+            type="button"
+            aria-label="Close dialog"
             onClick={() => {
               soundEngine.playClickSound();
               onClose();
             }}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -179,7 +182,7 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
                       )}
                     </div>
 
-                    <div className="text-xs space-y-1">
+                    <div className="text-[13px] space-y-1.5">
                       <div className="text-rose-600 dark:text-rose-400 font-medium">
                         ❌ Confused with: <strong>{item.confusedWith}</strong>
                       </div>
@@ -189,7 +192,7 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[11px] space-y-1">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
                       <div className="text-slate-700 dark:text-slate-200 flex items-center justify-between">
                         <div>
                           <strong>Say instead:</strong> {item.correctAlternative}
@@ -199,7 +202,7 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
                           className="p-1 text-slate-400 hover:text-sky-600 transition-colors"
                           title="Listen to correct alternative"
                         >
-                          <Volume2 className="w-3 h-3" />
+                          <Volume2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                       <div className="text-slate-500 dark:text-slate-400 italic">
@@ -208,7 +211,7 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
                     </div>
 
                     {/* Memory Hack */}
-                    <div className="flex items-start gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                    <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20 leading-relaxed">
                       <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
                       <span><strong>Hack:</strong> {item.memoryHack}</span>
                     </div>
@@ -220,6 +223,6 @@ export const FalseFriendsModal: React.FC<FalseFriendsModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </ModalDialog>
   );
 };

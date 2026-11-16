@@ -3,6 +3,7 @@ import { X, Award, Compass, ArrowRight, RotateCcw } from 'lucide-react';
 import { DIAGNOSTIC_QUESTIONS, calculateDiagnosticLevel, CEFR_LEVELS } from '../data';
 import { CEFRLevel } from '../types';
 import { soundEngine } from '../utils/audio';
+import { ModalDialog } from './ModalDialog';
 
 interface DiagnosticModalProps {
   isOpen: boolean;
@@ -51,19 +52,19 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({
     : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
+    <ModalDialog isOpen={isOpen} onClose={onClose} labelledBy="diagnostic-modal-title" maxWidthClass="max-w-xl">
+      <div className="w-full relative">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200/80 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
+            <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400">
               <Compass className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg">
+              <h2 id="diagnostic-modal-title" className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">
                 CEFR Level Diagnostic Finder
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Determine your authentic functional proficiency tier in 2 minutes.
               </p>
@@ -71,8 +72,10 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({
           </div>
 
           <button
+            type="button"
+            aria-label="Close dialog"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -173,6 +176,6 @@ export const DiagnosticModal: React.FC<DiagnosticModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </ModalDialog>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Code2, Check, Copy, Sparkles, Layers } from 'lucide-react';
 import { LANGUAGES } from '../data/languages';
+import { ModalDialog } from './ModalDialog';
 
 interface ExtensibilityModalProps {
   isOpen: boolean;
@@ -58,28 +59,30 @@ export const ExtensibilityModal: React.FC<ExtensibilityModalProps> = ({
   const previewLanguages = LANGUAGES.filter((l) => l.status === 'preview');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+    <ModalDialog isOpen={isOpen} onClose={onClose} labelledBy="extensibility-modal-title" maxWidthClass="max-w-3xl">
+      <div className="w-full max-h-[88vh] flex flex-col">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-6 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 dark:text-white text-lg">
+              <h2 id="extensibility-modal-title" className="font-bold text-slate-900 dark:text-white text-lg">
                 Extensible Architecture: Add Any Language
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Designed to easily scale from English & German to 50+ languages with strict TypeScript schemas.
+                Designed to easily scale from English &amp; German to 50+ languages with strict TypeScript schemas.
               </p>
             </div>
           </div>
 
           <button
+            type="button"
+            aria-label="Close dialog"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -167,6 +170,6 @@ export const ExtensibilityModal: React.FC<ExtensibilityModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </ModalDialog>
   );
 };
