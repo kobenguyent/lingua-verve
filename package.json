@@ -8,7 +8,12 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "macos:sync": "node scripts/export-curriculum.mjs",
+    "macos:test": "npm run macos:sync && cd macos && swift test",
+    "macos:build": "npm run macos:sync && cd macos && swift build -c release",
+    "macos:app": "bash scripts/build-macos-app.sh",
+    "macos:launch": "npm run macos:app && (killall LinguaVerve 2>/dev/null || true) && open dist-macos/LinguaVerve.app"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

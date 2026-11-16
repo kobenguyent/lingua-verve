@@ -1,0 +1,1434 @@
+{
+  "generatedAt": "2026-11-16T00:00:00Z",
+  "version": "1.0.0",
+  "languages": [
+    {
+      "id": "english",
+      "name": "English",
+      "nativeName": "English",
+      "flag": "🇬🇧",
+      "tagline": "The Global Lingua Franca",
+      "description": "Master non-phonetic spelling, rhythmic stress timing, nuanced phrasal verbs, and effortless conversational cadence.",
+      "family": "West Germanic (heavy Anglo-Norman French and Latin influences)",
+      "estimatedHoursToC1": 750,
+      "difficultyRating": "Universal Baseline",
+      "keyTraps": [
+        "Irregular spelling vs. pronunciation (cough, though, through, rough)",
+        "Phrasal verbs with hundreds of unpredictable contextual meanings",
+        "Stress-timed rhythm and reduced vowels (the ubiquitous Schwa /ə/)",
+        "Subtle prepositions (in time vs. on time, at school vs. in school)"
+      ],
+      "soundFeatures": [
+        "Schwa /ə/",
+        "Voiced/Voiceless TH (/θ/, /ð/)",
+        "Glottal stops",
+        "Connected speech reductions"
+      ],
+      "status": "active",
+      "imageUrl": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "London, United Kingdom"
+    },
+    {
+      "id": "german",
+      "name": "German",
+      "nativeName": "Deutsch",
+      "flag": "🇩🇪",
+      "tagline": "The Precision Engine of Europe",
+      "description": "Crack noun genders, the 4-case system, separable verbs, verb-final subordinate clauses, and expressive modal particles.",
+      "family": "West Germanic",
+      "estimatedHoursToC1": 900,
+      "difficultyRating": "Category II (Challenging structure, logical rules)",
+      "keyTraps": [
+        "Three grammatical genders (der, die, das) and four cases (Nom, Akk, Dat, Gen)",
+        "Verb-at-the-end in subordinate clauses (weil, dass, obwohl)",
+        "Separable prefixes flying to the end of the sentence (aufstehen -> steht auf)",
+        "False friends with English (Gift = poison, Not = distress, Wer = who)"
+      ],
+      "soundFeatures": [
+        "Umlauts (ä, ö, ü)",
+        "Ich-Laut [ç] vs. Ach-Laut [x]",
+        "Glottal stop (Knacklaut)",
+        "Final consonant devoicing"
+      ],
+      "status": "active",
+      "imageUrl": "https://images.unsplash.com/photo-1599946347371-68eb71b16afc?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "Berlin, Germany"
+    },
+    {
+      "id": "meta",
+      "name": "Polyglot Meta-System",
+      "nativeName": "Universal Tactics",
+      "flag": "🧠",
+      "tagline": "Neuroscience-Backed Polyglot Strategies",
+      "description": "The universal meta-learning principles used by polyglots to decode any language in record time without burning out.",
+      "family": "Cognitive Science & Linguistics",
+      "estimatedHoursToC1": 0,
+      "difficultyRating": "Meta Skill",
+      "keyTraps": [
+        "The \"App Trap\" (swiping endlessly without productive production)",
+        "Passive listening disguised as true study",
+        "Premature grammar drilling before core frequency vocabulary",
+        "The B2 Intermediate Plateau"
+      ],
+      "soundFeatures": [
+        "Phoneme mimicry",
+        "Shadowing technique",
+        "IPA baseline mapping",
+        "Auditory discrimination"
+      ],
+      "status": "active",
+      "imageUrl": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "Cognitive Polyglot Library"
+    },
+    {
+      "id": "spanish",
+      "name": "Spanish",
+      "nativeName": "Español",
+      "flag": "🇪🇸",
+      "tagline": "The Expressive Romance Tongue",
+      "description": "Subjunctive mood mastery, rolled R phonetics, rapid syllable-timed cadence, and regional colloquialisms.",
+      "family": "Romance / Ibero-Romance",
+      "estimatedHoursToC1": 600,
+      "difficultyRating": "Category I (High phonetic regularity)",
+      "keyTraps": [
+        "Por vs. Para distinction",
+        "Subjunctive mood triggers",
+        "Ser vs. Estar",
+        "Rapid syllable-timed rhythm"
+      ],
+      "soundFeatures": [
+        "Rolled trill /r/",
+        "Soft fricative /d/, /b/, /g/",
+        "Pure five-vowel system"
+      ],
+      "status": "preview",
+      "imageUrl": "https://images.unsplash.com/photo-1543783207-ec64e4d95325?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "Madrid, Spain"
+    },
+    {
+      "id": "french",
+      "name": "French",
+      "nativeName": "Français",
+      "flag": "🇫🇷",
+      "tagline": "The Fluid Melody of Flow",
+      "description": "Nasal vowels, liaison connections, subtle gender cues, and high-frequency colloquial verlan.",
+      "family": "Romance / Gallo-Romance",
+      "estimatedHoursToC1": 650,
+      "difficultyRating": "Category I (Spelling requires decoding)",
+      "keyTraps": [
+        "Liaison and enchaînement in speech",
+        "Nasal vowels (an, on, in, un)",
+        "Silent final consonants",
+        "Subjunctive nuances"
+      ],
+      "soundFeatures": [
+        "Uvular R [ʁ]",
+        "Nasalized vowels",
+        "Liaison flow",
+        "Front rounded vowels"
+      ],
+      "status": "preview",
+      "imageUrl": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "Paris, France"
+    },
+    {
+      "id": "japanese",
+      "name": "Japanese",
+      "nativeName": "日本語",
+      "flag": "🇯🇵",
+      "tagline": "The Contextual Architecture",
+      "description": "Three writing systems, pitch accent, SOV sentence order, topic-comment markers, and layered honorific speech.",
+      "family": "Japonic",
+      "estimatedHoursToC1": 2200,
+      "difficultyRating": "Category IV (High character commitment)",
+      "keyTraps": [
+        "Kanji readings (On/Kun)",
+        "Topic vs. Subject (wa vs. ga)",
+        "High-context ellipsis",
+        "Keigo (Honorifics)"
+      ],
+      "soundFeatures": [
+        "Pitch accent",
+        "Mora timing",
+        "Devoiced vowels /u/ and /i/",
+        "Syllabic nasal /n/"
+      ],
+      "status": "preview",
+      "imageUrl": "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80",
+      "imageCaption": "Kyoto, Japan"
+    }
+  ],
+  "levels": [
+    {
+      "id": "A1",
+      "name": "A1: Breakthrough",
+      "stageName": "Absolute Beginner",
+      "badge": "A1 Explorer",
+      "hoursEstimated": "80 – 120 hours",
+      "milestoneGoal": "Survive basic social encounters, introduce yourself, decipher street signs, and grasp phonetics.",
+      "canDoSummary": [
+        "Recognize familiar words and basic phrases concerning yourself and immediate surroundings.",
+        "Ask and answer simple questions about personal details (where you live, people you know, things you have).",
+        "Interact in a simple way provided the other person talks slowly and clearly and is prepared to help.",
+        "Pronounce the basic sound inventory without establishing destructive fossilized habits."
+      ],
+      "color": {
+        "bg": "bg-emerald-500/10 dark:bg-emerald-500/20",
+        "text": "text-emerald-700 dark:text-emerald-300",
+        "border": "border-emerald-300 dark:border-emerald-700",
+        "glow": "shadow-emerald-500/20"
+      }
+    },
+    {
+      "id": "A2",
+      "name": "A2: Waystage",
+      "stageName": "Elementary Pioneer",
+      "badge": "A2 Builder",
+      "hoursEstimated": "180 – 240 hours",
+      "milestoneGoal": "Narrate past events, order food effortlessly, describe your daily routine, and manage travel emergencies.",
+      "canDoSummary": [
+        "Understand sentences and frequently used expressions related to areas of most immediate relevance (shopping, local geography, employment).",
+        "Communicate in simple and routine tasks requiring a simple and direct exchange of information.",
+        "Describe in simple terms aspects of your background, immediate environment, and matters in areas of immediate need.",
+        "Produce short connected sentences using basic conjunctions (and, but, because)."
+      ],
+      "color": {
+        "bg": "bg-teal-500/10 dark:bg-teal-500/20",
+        "text": "text-teal-700 dark:text-teal-300",
+        "border": "border-teal-300 dark:border-teal-700",
+        "glow": "shadow-teal-500/20"
+      }
+    },
+    {
+      "id": "B1",
+      "name": "B1: Threshold",
+      "stageName": "Intermediate Independent",
+      "badge": "B1 Bridge",
+      "hoursEstimated": "350 – 450 hours",
+      "milestoneGoal": "Escape textbook dependence, travel independently in the target country, and hold 15-minute unstructured chats.",
+      "canDoSummary": [
+        "Understand the main points of clear standard input on familiar matters regularly encountered in work, school, and leisure.",
+        "Deal with most situations likely to arise whilst travelling in an area where the language is spoken.",
+        "Produce simple connected text on topics which are familiar or of personal interest.",
+        "Describe experiences, events, dreams, hopes, and ambitions and briefly give reasons and explanations for opinions and plans."
+      ],
+      "color": {
+        "bg": "bg-sky-500/10 dark:bg-sky-500/20",
+        "text": "text-sky-700 dark:text-sky-300",
+        "border": "border-sky-300 dark:border-sky-700",
+        "glow": "shadow-sky-500/20"
+      }
+    },
+    {
+      "id": "B2",
+      "name": "B2: Vantage",
+      "stageName": "Upper-Intermediate Flow",
+      "badge": "B2 Fluency",
+      "hoursEstimated": "550 – 700 hours",
+      "milestoneGoal": "Break through the notorious B2 plateau, enjoy native podcasts, watch TV series without subtitles, and debate opinions.",
+      "canDoSummary": [
+        "Understand the main ideas of complex text on both concrete and abstract topics, including technical discussions in your field.",
+        "Interact with a degree of fluency and spontaneity that makes regular interaction with native speakers quite possible without strain for either party.",
+        "Produce clear, detailed text on a wide range of subjects and explain a viewpoint on a topical issue giving advantages and disadvantages.",
+        "Naturally deploy common idioms and colloquial discourse markers."
+      ],
+      "color": {
+        "bg": "bg-indigo-500/10 dark:bg-indigo-500/20",
+        "text": "text-indigo-700 dark:text-indigo-300",
+        "border": "border-indigo-300 dark:border-indigo-700",
+        "glow": "shadow-indigo-500/20"
+      }
+    },
+    {
+      "id": "C1",
+      "name": "C1: Effective Operational",
+      "stageName": "Advanced Professional",
+      "badge": "C1 Virtuoso",
+      "hoursEstimated": "800 – 1000 hours",
+      "milestoneGoal": "Work, negotiate, write essays, express humor and sarcasm, and absorb implicit cultural subtext without effort.",
+      "canDoSummary": [
+        "Understand a wide range of demanding, longer texts, and recognize implicit meaning.",
+        "Express ideas fluently and spontaneously without much obvious searching for expressions.",
+        "Use language flexibly and effectively for social, academic, and professional purposes.",
+        "Produce clear, well-structured, detailed text on complex subjects, showing controlled use of organizational patterns, connectors, and cohesive devices."
+      ],
+      "color": {
+        "bg": "bg-purple-500/10 dark:bg-purple-500/20",
+        "text": "text-purple-700 dark:text-purple-300",
+        "border": "border-purple-300 dark:border-purple-700",
+        "glow": "shadow-purple-500/20"
+      }
+    },
+    {
+      "id": "C2",
+      "name": "C2: Mastery",
+      "stageName": "Near-Native Mastery",
+      "badge": "C2 Polyglot Elite",
+      "hoursEstimated": "1200+ hours",
+      "milestoneGoal": "Master literary register, understand dialects and slang instantly, write publishable prose, and speak with near-native precision.",
+      "canDoSummary": [
+        "Understand with ease virtually everything heard or read.",
+        "Summarize information from different spoken and written sources, reconstructing arguments and accounts in a coherent presentation.",
+        "Express yourself spontaneously, very fluently and precisely, differentiating finer shades of meaning even in the most complex situations.",
+        "Effortlessly appreciate wordplay, cultural references, irony, and regional nuance."
+      ],
+      "color": {
+        "bg": "bg-amber-500/10 dark:bg-amber-500/20",
+        "text": "text-amber-700 dark:text-amber-300",
+        "border": "border-amber-300 dark:border-amber-700",
+        "glow": "shadow-amber-500/20"
+      }
+    }
+  ],
+  "tips": [
+    {
+      "id": "eng-a1-schwa",
+      "title": "Unlock the Secret English Sound: The Schwa (/ə/)",
+      "languageId": "english",
+      "level": "A1",
+      "category": "pronunciation",
+      "diagramType": "mouth-phonetics",
+      "summary": "English is stress-timed, not syllable-timed. Over 60% of unstressed vowels in English collapse into the lazy \"uh\" sound known as the Schwa.",
+      "goldenRule": "Never pronounce every vowel clearly. Stressed syllables are loud and clear; unstressed syllables become the lazy Schwa /ə/.",
+      "tactics": [
+        "Find the stressed vowel in a multi-syllable word first (e.g., in \"ba-NA-na\", the middle \"na\" is stressed).",
+        "Turn the remaining unstressed vowels into a neutral, relaxed sigh: /bə-ˈnɑː-nə/.",
+        "Practice function words in sentences: \"to\" becomes /tə/, \"for\" becomes /fə/, \"and\" becomes /ənd/ or /ən/."
+      ],
+      "examples": [
+        {
+          "source": "Photograph vs. Photographer",
+          "explanation": "PHO-to-graph (/ˈfəʊ.tə.ɡrɑːf/) vs. pho-TO-gra-pher (/fəˈtɒɡ.rə.fər/). Stress changes where the schwa lands!"
+        },
+        {
+          "source": "A cup of tea",
+          "explanation": "Pronounced \"A cuppa tea\" (/ə kʌp əv tiː/)."
+        }
+      ],
+      "commonPitfall": "Pronouncing every written letter with equal robotic emphasis, which native ears find confusing.",
+      "timeCommitment": "10 mins daily ear-training",
+      "tags": [
+        "pronunciation",
+        "schwa",
+        "stress-timed",
+        "phonetics"
+      ],
+      "recommendedTools": [
+        {
+          "name": "YouGlish (English)",
+          "category": "tool",
+          "url": "https://youglish.com/english",
+          "note": "Search any word to hear real native speakers pronounce it in context."
+        }
+      ]
+    },
+    {
+      "id": "eng-a1-300-words",
+      "title": "The Pareto 300 Core Frequency Foundation",
+      "languageId": "english",
+      "level": "A1",
+      "category": "vocabulary",
+      "summary": "The top 300 most frequent English words account for approximately 65% of all daily written and spoken communication.",
+      "goldenRule": "Do not memorize random word lists. Prioritize verbs of existence, motion, and desire (be, have, do, go, want, need) plus core function words.",
+      "tactics": [
+        "Download or create an Anki flashcard deck with the top 300 English lemma words.",
+        "Always learn words with full mini-sentences, never isolated dictionary definitions.",
+        "Focus on \"Island Sentences\" you can use immediately: \"I want to...\", \"Where is the...\", \"Do you have...\"."
+      ],
+      "examples": [
+        {
+          "source": "I need to go",
+          "explanation": "Combines 3 of the top 50 words into an actionable survival sentence."
+        },
+        {
+          "source": "What do you think?",
+          "explanation": "High-frequency question starter."
+        }
+      ],
+      "commonPitfall": "Wasting weeks learning rare animal names or exotic kitchen utensils before mastering core verbs.",
+      "timeCommitment": "15 mins/day with Anki SRS",
+      "tags": [
+        "vocabulary",
+        "frequency-list",
+        "anki",
+        "foundations"
+      ]
+    },
+    {
+      "id": "eng-a1-th-sound",
+      "title": "The Tamed \"TH\" Sound: Voiced vs. Voiceless",
+      "languageId": "english",
+      "level": "A1",
+      "category": "pronunciation",
+      "summary": "Most languages lack the dental fricatives /θ/ (think) and /ð/ (this). Learners mistakenly substitute S, Z, T, or D.",
+      "goldenRule": "Lightly place the tip of your tongue between your upper and lower teeth; do not bite down. Blow air for /θ/, vibrate vocal cords for /ð/.",
+      "tactics": [
+        "Voiceless /θ/: \"Thanks\", \"Three\", \"Think\", \"Bath\" (no throat vibration, just breath).",
+        "Voiced /ð/: \"This\", \"That\", \"The\", \"Brother\" (throat vocal cords hum).",
+        "Practice the tongue poke in front of a mirror until muscle memory takes over."
+      ],
+      "commonPitfall": "Saying \"sink\" or \"tink\" instead of \"think\", or \"dis\" instead of \"this\".",
+      "timeCommitment": "5 mins in front of mirror",
+      "tags": [
+        "pronunciation",
+        "th-sound",
+        "phonetics"
+      ]
+    },
+    {
+      "id": "eng-a2-irregular-verbs",
+      "title": "Cluster Irregular Verbs by Rhyme & Rhythm",
+      "languageId": "english",
+      "level": "A2",
+      "category": "grammar",
+      "summary": "English has around 180 irregular verbs, but they do not need to be memorized alphabetically. Group them by their vowel morphing families.",
+      "goldenRule": "Stop studying alphabetical tables (A to Z). Group verbs by sonic pattern families.",
+      "tactics": [
+        "The \"i-a-u\" Family: sing/sang/sung, ring/rang/rung, swim/swam/swum, drink/drank/drunk.",
+        "The \"-ought / -aught\" Family: buy/bought/bought, bring/brought/brought, think/thought/thought, catch/caught/caught.",
+        "The \"No Change\" Family: cost/cost/cost, cut/cut/cut, hit/hit/hit, put/put/put.",
+        "The \"-ew / -own\" Family: blow/blew/blown, know/knew/known, throw/threw/thrown."
+      ],
+      "examples": [
+        {
+          "source": "I drink -> I drank -> I have drunk",
+          "explanation": "Follows the exact rhythm of sing -> sang -> sung."
+        }
+      ],
+      "commonPitfall": "Trying to memorize \"abide, arise, awake\" because they begin with the letter A.",
+      "timeCommitment": "15 mins spaced repetition per family",
+      "tags": [
+        "grammar",
+        "irregular-verbs",
+        "patterns"
+      ]
+    },
+    {
+      "id": "eng-a2-preposition-matrix",
+      "title": "The Spatial Matrix for \"IN, ON, AT\"",
+      "languageId": "english",
+      "level": "A2",
+      "category": "grammar",
+      "diagramType": "preposition-pyramid",
+      "summary": "Mastering IN, ON, and AT for both Time and Space using a simple inverted pyramid rule.",
+      "goldenRule": "Think from General to Specific: IN is broad/enclosed, ON is a surface/street/day, AT is a precise point or exact time.",
+      "tactics": [
+        "TIME: IN the 21st century / in July / in 2026 (broad) -> ON Monday / on my birthday (specific day) -> AT 7:30 PM / at noon (exact point).",
+        "SPACE: IN France / in the room (enclosed/large) -> ON the table / on Oxford Street (surface/line) -> AT the bus stop / at the corner (specific point).",
+        "Transportation exception: \"ON the bus / train / plane\" (you can walk on it) vs. \"IN the car / taxi\" (you sit enclosed)."
+      ],
+      "examples": [
+        {
+          "source": "At 5 PM on Friday in December",
+          "explanation": "Specific time (at) -> Day (on) -> Month (in)."
+        },
+        {
+          "source": "On the plane vs. in the car",
+          "explanation": "Public transit with floor space = on; small private vehicle = in."
+        }
+      ],
+      "commonPitfall": "Saying \"at the morning\" instead of \"in the morning\", or \"in the bus\" instead of \"on the bus\".",
+      "timeCommitment": "10 mins chart review",
+      "tags": [
+        "grammar",
+        "prepositions",
+        "spatial-mental-model"
+      ]
+    },
+    {
+      "id": "eng-b1-phrasal-particles",
+      "title": "Decode Phrasal Verbs via Particle Metaphors",
+      "languageId": "english",
+      "level": "B1",
+      "category": "vocabulary",
+      "imageUrl": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=700&q=80",
+      "imageCaption": "Deconstruct words through conceptual metaphors",
+      "summary": "Phrasal verbs seem random until you realize the preposition/particle carries a systematic conceptual metaphor.",
+      "goldenRule": "Look at the particle, not just the root verb. UP often means \"completion\" or \"visibility\"; OUT means \"expansion\" or \"extinction\".",
+      "tactics": [
+        "Particle \"UP\" = Completion or intensification: drink up (finish it), eat up, wrap up, clean up, use up.",
+        "Particle \"OUT\" = Dispersion or disappearance: fade out, blow out, run out, figure out, pass out.",
+        "Particle \"DOWN\" = Decrease or recording: turn down, calm down, write down, shut down.",
+        "Keep a \"Particle Notebook\" rather than an alphabetical verb list."
+      ],
+      "examples": [
+        {
+          "source": "Drink vs. Drink up",
+          "explanation": "Drink is the act; Drink up means finish every last drop."
+        },
+        {
+          "source": "Find vs. Figure out",
+          "explanation": "Find is discovery; Figure out is mental calculation until clarity emerges."
+        }
+      ],
+      "commonPitfall": "Translating phrasal verbs literally into your native tongue word-for-word.",
+      "timeCommitment": "15 mins/day journaling phrasal verb clusters",
+      "tags": [
+        "phrasal-verbs",
+        "b1",
+        "conceptual-metaphor"
+      ]
+    },
+    {
+      "id": "eng-b1-connected-speech",
+      "title": "Connected Speech & Linking Sounds",
+      "languageId": "english",
+      "level": "B1",
+      "category": "listening",
+      "summary": "Native English speakers rarely pause between words; words blend together through linking consonants, intruding sounds, and elision.",
+      "goldenRule": "Stop expecting clean gaps between spoken words. When word 1 ends in a consonant and word 2 begins with a vowel, link them as one word.",
+      "tactics": [
+        "Consonant-to-Vowel linking: \"Hold on\" sounds like \"Hol-don\". \"First of all\" sounds like \"Firs-to-fall\".",
+        "Intrusive /w/ and /j/ (\"y\"): \"Go away\" -> \"Go-[w]-away\". \"I agree\" -> \"I-[j]-agree\".",
+        "T-Flapping in American English: \"Water\" -> \"Wa-der\", \"Butter\" -> \"Bud-der\"."
+      ],
+      "examples": [
+        {
+          "source": "Tell him I love him",
+          "explanation": "H is dropped: \"Tell-im I lov-im\"."
+        }
+      ],
+      "commonPitfall": "Thinking native speakers are talking too fast when they are simply using standard phonetic reduction.",
+      "timeCommitment": "20 mins listening with transcript comparison",
+      "tags": [
+        "listening",
+        "connected-speech",
+        "phonetics"
+      ]
+    },
+    {
+      "id": "eng-b2-collocations",
+      "title": "The Collocation Shift: Move from Words to Chunks",
+      "languageId": "english",
+      "level": "B2",
+      "category": "speaking",
+      "summary": "The difference between unnatural B1 English and fluent B2 English is using habitual word partnerships (collocations) rather than translating.",
+      "goldenRule": "Never learn a noun without its natural verb and adjective. Languages are spoken in prefabricated chunks.",
+      "tactics": [
+        "Identify \"Make\" vs. \"Do\": You *make* a decision, mistake, progress, effort, money. You *do* homework, business, chores, research, a favor.",
+        "Adjective + Noun pairs: \"Heavy rain\" (not \"strong rain\"), \"strong coffee\" (not \"heavy coffee\"), \"striking resemblance\".",
+        "Verb + Preposition collocations: \"Insist on\", \"rely on\", \"participate in\", \"discourage from\"."
+      ],
+      "examples": [
+        {
+          "source": "Fast food vs. Quick shower",
+          "explanation": "We never say \"quick food\" or \"fast shower\". Natural collocations dictate authenticity."
+        }
+      ],
+      "commonPitfall": "Combining grammatically correct words that native speakers simply never say together.",
+      "timeCommitment": "Read native non-fiction with a highlighter for 20 mins",
+      "tags": [
+        "collocations",
+        "fluency",
+        "chunks",
+        "b2-flow"
+      ]
+    },
+    {
+      "id": "eng-b2-podcast-immersion",
+      "title": "The 1.25x Comprehension Cascade",
+      "languageId": "english",
+      "level": "B2",
+      "category": "immersion",
+      "summary": "Push your listening comprehension past the comfortable threshold by training on unscripted conversational audio.",
+      "goldenRule": "Abandon ESL-scripted material. Transition to authentic podcasts on topics you are already passionate about.",
+      "tactics": [
+        "Pick topical podcasts: The Daily, Radiolab, Lex Fridman, Huberman Lab, or comedy talk shows.",
+        "Step 1: Listen at 1.0x without subtitles/transcript. Mark the timestamps where you lose the thread.",
+        "Step 2: Inspect transcripts for the missing idioms or slang.",
+        "Step 3: Re-listen at 1.2x. When you return to 1.0x normal speed, conversational English will sound effortless."
+      ],
+      "commonPitfall": "Listening passively while multitasking without ever doing active phrase extraction.",
+      "timeCommitment": "30 mins during commute or exercise",
+      "tags": [
+        "immersion",
+        "podcasts",
+        "speed-listening"
+      ]
+    },
+    {
+      "id": "eng-c1-register-inversion",
+      "title": "Stylistic Inversion & Rhetorical Nuance",
+      "languageId": "english",
+      "level": "C1",
+      "category": "grammar",
+      "summary": "At C1, grammar is no longer about correctness—it is about style, register, cadence, and persuasion. Inversion commands executive presence.",
+      "goldenRule": "Invert the subject and auxiliary verb after negative or restrictive adverbs to create literary drama and rhetorical weight.",
+      "tactics": [
+        "Formula: Negative adverbial + Auxiliary + Subject + Main verb.",
+        "\"Rarely have I seen such dedication...\" (instead of \"I have rarely seen...\")",
+        "\"Not only did they exceed targets, but they also redefined the standard.\"",
+        "\"Scarcely had we arrived when the announcement was made.\"",
+        "\"Under no circumstances should you accept this clause.\""
+      ],
+      "examples": [
+        {
+          "source": "Seldom do we witness such rapid linguistic transformation.",
+          "explanation": "Instantly marks high-level rhetorical competence in professional writing and presentations."
+        }
+      ],
+      "commonPitfall": "Forgetting auxiliary inversion and writing *\"Rarely I have seen...\"*.",
+      "timeCommitment": "15 mins rewriting standard sentences into inverted forms",
+      "tags": [
+        "advanced-grammar",
+        "inversion",
+        "c1",
+        "formal-register"
+      ]
+    },
+    {
+      "id": "eng-c1-discourse-markers",
+      "title": "The Art of Nuanced Hedging & Discourse Markers",
+      "languageId": "english",
+      "level": "C1",
+      "category": "speaking",
+      "summary": "C1 speakers do not speak in blunt absolutes. They employ sophisticated hedges, concessions, and transitional pivot phrases.",
+      "goldenRule": "Structure complex arguments using precise nuance words: \"Albeit\", \"Notwithstanding\", \"To a certain extent\", \"Having said that\".",
+      "tactics": [
+        "Concession & Pivot: \"That is undoubtedly a valid concern; having said that, empirical data suggests otherwise.\"",
+        "Hedging statements: \"It would appear that...\", \"The findings point towards a potential correlation, albeit a tenuous one.\"",
+        "Nuanced contrast: \"Whereas\" / \"Whilst\" / \"On the flip side\" / \"By the same token\"."
+      ],
+      "commonPitfall": "Overusing basic connectors like \"However\", \"In addition\", and \"Moreover\" in every paragraph.",
+      "timeCommitment": "Incorporate one new hedging device in your next meeting or essay",
+      "tags": [
+        "c1",
+        "hedging",
+        "discourse-markers",
+        "sophisticated-speaking"
+      ]
+    },
+    {
+      "id": "eng-c2-cultural-subtext",
+      "title": "Decoding British Understatement & American Irony",
+      "languageId": "english",
+      "level": "C2",
+      "category": "mindset",
+      "summary": "C2 is not about vocabulary size; it is about detecting emotional subtext, sarcasm, self-deprecation, and unstated social expectations.",
+      "goldenRule": "Words do not mean what they say in high-context English. Decode the pragmatic subtext.",
+      "tactics": [
+        "British diplomatic translation: \"With the greatest respect...\" = \"You are completely wrong.\"",
+        "\"That is an interesting proposal...\" = \"That will never happen.\"",
+        "\"I was a bit disappointed...\" = \"I am utterly furious.\"",
+        "American workplace idioms: \"Circle back\", \"Move the needle\", \"Elephant in the room\", \"Touch base\"."
+      ],
+      "examples": [
+        {
+          "source": "\"It is not bad at all.\"",
+          "explanation": "Often means exceptional or outstanding in British English understatement."
+        }
+      ],
+      "commonPitfall": "Taking formal politeness or diplomatic euphemisms at face value.",
+      "timeCommitment": "Watch political debates, high-brow British panel shows (QI, Have I Got News For You)",
+      "tags": [
+        "c2",
+        "pragmatics",
+        "culture",
+        "humor",
+        "subtext"
+      ]
+    },
+    {
+      "id": "eng-c2-polyglot-rhythm",
+      "title": "Prosody, Pausing & The Vocal Signature",
+      "languageId": "english",
+      "level": "C2",
+      "category": "speaking",
+      "summary": "At near-native level, your accent is irrelevant, but your prosody (intonation curves, dramatic pauses, vocal variety) defines mastery.",
+      "goldenRule": "Speak with deliberate rhythmic pauses rather than rapid-fire filler words. Use pitch drops at sentence conclusions.",
+      "tactics": [
+        "Adopt the \"thought group\" pause: Chunk complex ideas with subtle breathing intervals.",
+        "Downward pitch inflection on statements to project executive authority and certainty.",
+        "Record yourself giving a 5-minute unscripted speech, listen back, and eliminate vocal fillers (um, like, you know)."
+      ],
+      "commonPitfall": "Rushing your speech thinking speed equals fluency.",
+      "timeCommitment": "Weekly vocal recording audit",
+      "tags": [
+        "prosody",
+        "public-speaking",
+        "c2-mastery",
+        "intonation"
+      ]
+    },
+    {
+      "id": "ger-a1-gender-suffixes",
+      "title": "The Der/Die/Das Hack: 80% Suffix Cheat Codes",
+      "languageId": "german",
+      "level": "A1",
+      "category": "grammar",
+      "diagramType": "german-gender",
+      "summary": "Do not guess German genders! Over 80% of German nouns reveal their gender (der, die, or das) by their ending suffixes.",
+      "goldenRule": "Never memorize a noun alone. Memorize it with its article and color-code your notes (Blue for Der, Red for Die, Green for Das).",
+      "tactics": [
+        "ALWAYS DIE (Feminine): -ung (die Zeitung), -heit (die Freiheit), -keit (die Möglichkeit), -schaft (die Freundschaft), -tion (die Station), -tät (die Universität), -ie (die Biologie), -ei (die Bäckerei).",
+        "ALWAYS DAS (Neuter): -chen (das Mädchen), -lein (das Fräulein), -ment (das Dokument), -um (das Museum), -ma (das Thema), and all nominalized infinitives (das Essen, das Leben).",
+        "USUALLY DER (Masculine): -ling (der Schmetterling), -or (der Motor), -ismus (der Optimismus), -ist (der Tourist), -er denoting actors/tools (der Lehrer, der Computer), days/months/seasons (der Montag, der Juli, der Sommer)."
+      ],
+      "examples": [
+        {
+          "source": "die Einsamkeit, die Hoffnung",
+          "explanation": "-keit and -ung endings guarantee the feminine article \"die\" 100% of the time."
+        },
+        {
+          "source": "das Brötchen, das Datum",
+          "explanation": "-chen diminutive and -um suffix guarantee neuter \"das\"."
+        }
+      ],
+      "commonPitfall": "Treating grammatical gender as biological gender (e.g., \"das Mädchen\" is neuter purely because of the diminutive -chen ending).",
+      "timeCommitment": "15 mins/day color-coded flashcards",
+      "tags": [
+        "grammar",
+        "der-die-das",
+        "noun-endings",
+        "gender-hacks"
+      ],
+      "recommendedTools": [
+        {
+          "name": "Der Die Das App",
+          "category": "app",
+          "url": "https://derdiedas.app",
+          "note": "Interactive flashcards strictly testing German article recall."
+        }
+      ]
+    },
+    {
+      "id": "ger-a1-verb-position-v2",
+      "title": "The Iron V2 Rule: Verb is King in Position 2",
+      "languageId": "german",
+      "level": "A1",
+      "category": "grammar",
+      "summary": "In any standard German main clause, the conjugated verb MUST occupy the second grammatical slot, no matter what starts the sentence.",
+      "goldenRule": "If you move anything to position 1 (like time or place), the subject immediately flips behind the verb.",
+      "tactics": [
+        "Standard: \"Ich trinke heute Kaffee.\" (Position 1: Ich, Position 2: trinke).",
+        "Time first: \"Heute trinke ich Kaffee.\" (Position 1: Heute, Position 2: trinke, Position 3: ich). NOT *\"Heute ich trinke\"*.",
+        "Place first: \"In Berlin trinke ich Kaffee.\"",
+        "Treat the second slot as an anchored wall that never shifts in declarative sentences."
+      ],
+      "examples": [
+        {
+          "source": "Morgen gehe ich ins Kino.",
+          "explanation": "Time element occupies position 1; conjugated verb \"gehe\" stays strictly at position 2."
+        }
+      ],
+      "commonPitfall": "Translating directly from English: *\"Morgen ich gehe...\"* (English word order error).",
+      "timeCommitment": "10 mins sentence inversion drills",
+      "tags": [
+        "grammar",
+        "v2-rule",
+        "sentence-order",
+        "foundations"
+      ]
+    },
+    {
+      "id": "ger-a1-pronunciation-ch-umlauts",
+      "title": "Phonetic Mastery: The Two CH Sounds & Umlauts",
+      "languageId": "german",
+      "level": "A1",
+      "category": "pronunciation",
+      "diagramType": "mouth-phonetics",
+      "summary": "German pronunciation is remarkably phonetic and consistent once you unlock the Ich-Laut [ç], the Ach-Laut [x], and the three Umlauts (ä, ö, ü).",
+      "goldenRule": "Umlauts are shaped by your tongue inside your mouth while holding your lips rounded like an O or U.",
+      "tactics": [
+        "The \"Ü\" Hack: Shape your lips into a tight circle as if whistling or saying \"oo\", but hold that shape and try to pronounce \"ee\". Out comes a perfect German \"Ü\" [y]!",
+        "The \"Ö\" Hack: Round your lips as if to say \"oh\", but pronounce the English vowel in \"bed\" (\"eh\"). That produces \"Ö\" [ø].",
+        "The \"CH\" Rule: After A, O, U, AU -> throaty Ach-Laut (Buch, Bach, Koch). After E, I, Ä, Ö, Ü, or consonants -> soft hissing kitten Ich-Laut (ich, echt, Bücher, Milch)."
+      ],
+      "examples": [
+        {
+          "source": "Küche vs. Kuchen",
+          "explanation": "Küche uses the soft Ich-Laut [ç] after ü; Kuchen uses the throaty Ach-Laut [x] after u."
+        }
+      ],
+      "commonPitfall": "Pronouncing \"ich\" like \"isch\" or \"ick\" or pronouncing German Umlauts like English flat vowels.",
+      "timeCommitment": "5 mins daily tongue shaping in front of a mirror",
+      "tags": [
+        "pronunciation",
+        "umlauts",
+        "ich-laut",
+        "ach-laut",
+        "phonetics"
+      ]
+    },
+    {
+      "id": "ger-a2-cases-demystified",
+      "title": "The 4-Case Secret: Only Masculine Changes in Akkusativ!",
+      "languageId": "german",
+      "level": "A2",
+      "category": "grammar",
+      "summary": "Cases terrify beginners, but Akkusativ (direct object) is astonishingly simple: feminine, neuter, and plural do not change at all.",
+      "goldenRule": "In the Accusative case, only the masculine changes: DER becomes DEN, EIN becomes EINEN. Everything else stays identical to Nominative.",
+      "tactics": [
+        "Masculine: Der Mann -> Ich sehe DEN Mann. Ein Hund -> Ich habe EINEN Hund.",
+        "Feminine: Die Frau -> Ich sehe DIE Frau. Eine Katze -> Ich habe EINE Katze. (Zero change!)",
+        "Neuter: Das Kind -> Ich sehe DAS Kind. Ein Buch -> Ich habe EIN Buch. (Zero change!)",
+        "Plural: Die Bücher -> Ich sehe DIE Bücher. (Zero change!)",
+        "Master this relief: 75% of accusative articles don't even shift!"
+      ],
+      "examples": [
+        {
+          "source": "Ich habe einen Apfel (der Apfel -> einen Apfel)",
+          "explanation": "Direct object + masculine = -en suffix."
+        }
+      ],
+      "commonPitfall": "Worrying about changing feminine or neuter articles in basic direct object sentences.",
+      "timeCommitment": "15 mins case recognition exercises",
+      "tags": [
+        "cases",
+        "akkusativ",
+        "grammar",
+        "articles"
+      ]
+    },
+    {
+      "id": "ger-a2-two-way-prepositions",
+      "title": "Wechselpräpositionen: Movement vs. Position",
+      "languageId": "german",
+      "level": "A2",
+      "category": "grammar",
+      "diagramType": "two-way-prepositions",
+      "summary": "The 9 two-way prepositions (an, auf, hinter, in, neben, über, unter, vor, zwischen) take Akkusativ for movement and Dativ for stationary location.",
+      "goldenRule": "Ask \"Wohin?\" (Where to? -> Akkusativ movement). Ask \"Wo?\" (Where at? -> Dativ location).",
+      "tactics": [
+        "Movement (Wohin? -> Akk): \"Ich lege das Buch auf DEN Tisch.\" (I am putting it onto the table).",
+        "Location (Wo? -> Dat): \"Das Buch liegt auf DEM Tisch.\" (The book is resting on the table).",
+        "Mnemonic pair: Stellen/Legen/Setzen (Action verbs -> Akkusativ) vs. Stehen/Liegen/Sitzen (State verbs -> Dativ)."
+      ],
+      "examples": [
+        {
+          "source": "In die Stadt (Akk) vs. in der Stadt (Dat)",
+          "explanation": "Going into town (direction) vs. strolling inside the town (stationary sphere)."
+        }
+      ],
+      "commonPitfall": "Using Dative when moving something across a boundary into a new space.",
+      "timeCommitment": "15 mins daily with household objects",
+      "tags": [
+        "cases",
+        "prepositions",
+        "dativ",
+        "akkusativ",
+        "wechselpraepositionen"
+      ]
+    },
+    {
+      "id": "ger-a2-separable-verbs",
+      "title": "Separable Verbs & The Prefix Launchpad",
+      "languageId": "german",
+      "level": "A2",
+      "category": "vocabulary",
+      "summary": "German prefixes completely transform root verbs, and in main clauses, separable prefixes fly to the absolute end of the sentence.",
+      "goldenRule": "In a main clause, conjugate the root verb at position 2, and launch the separable prefix to the very last position of the sentence.",
+      "tactics": [
+        "Root verb: FANGEN (to catch). Prefix: AN (anfangen = to begin).",
+        "\"Der Film fängt um 20:00 Uhr im Kino an.\"",
+        "Inseparable prefixes NEVER split: be-, ge-, emp-, ent-, er-, ver-, zer-, miss- (Remember: Be-Ge-Emp-Ent-Er-Ver-Zer-Miss).",
+        "Separable prefixes: auf-, ab-, an-, aus-, ein-, mit-, vor-, zu-, zurück-."
+      ],
+      "examples": [
+        {
+          "source": "Ich stehe jeden Morgen um 7 Uhr auf.",
+          "explanation": "Prefix \"auf\" anchors the final punctuation mark of the sentence."
+        }
+      ],
+      "commonPitfall": "Keeping the separable prefix attached to the verb in simple present sentences: *\"Ich aufstehe um 7 Uhr\"*.",
+      "timeCommitment": "10 mins prefix sorting drill",
+      "tags": [
+        "verbs",
+        "prefixes",
+        "separable-verbs",
+        "a2"
+      ]
+    },
+    {
+      "id": "ger-b1-subordinate-kick",
+      "title": "The Subordinate Verb-Kicker: weil, dass, obwohl, wenn",
+      "languageId": "german",
+      "level": "B1",
+      "category": "grammar",
+      "summary": "Conjunctions in German are divided into two teams: coordinating (zero position) and subordinating (verb kickers that launch the verb to the end).",
+      "goldenRule": "When you trigger \"weil\", \"dass\", \"obwohl\", \"wenn\", or \"da\", the conjugated verb is kicked to the ultimate position.",
+      "tactics": [
+        "Coordinating (ADUSO: Aber, Denn, Und, Sondern, Oder) -> Verb stays in position 2: \"Ich lerne, denn ich will reisen.\"",
+        "Subordinating (weil, dass, obwohl, wenn, als) -> Verb kicked to the end: \"Ich lerne Deutsch, weil ich in Berlin arbeiten will.\"",
+        "Notice: \"arbeiten\" is infinitive, \"will\" is conjugated and ends up last."
+      ],
+      "examples": [
+        {
+          "source": "Obwohl es regnet, gehen wir spazieren.",
+          "explanation": "In the subordinate clause \"Obwohl es regnet\", regnet is at the end. In the main clause that follows, V2 rule places \"gehen\" immediately after the comma."
+        }
+      ],
+      "commonPitfall": "Saying *\"weil ich will Deutsch lernen\"* instead of *\"weil ich Deutsch lernen will\"*.",
+      "timeCommitment": "15 mins conjunction connector drills",
+      "tags": [
+        "subordinate-clauses",
+        "verb-order",
+        "b1",
+        "grammar"
+      ]
+    },
+    {
+      "id": "ger-b1-polite-konjunktiv-2",
+      "title": "The Politeness Superpower: Konjunktiv II",
+      "languageId": "german",
+      "level": "B1",
+      "category": "speaking",
+      "summary": "Instead of sounding abrupt or demanding with the imperative or present tense, native Germans rely on Konjunktiv II for politeness and hypothetical wishes.",
+      "goldenRule": "Use \"könnten Sie...\" and \"würde + Infinitiv\" to instantly transform demands into courteous native German.",
+      "tactics": [
+        "Core forms: \"Ich hätte gern...\" (I would like to have...), \"Ich wäre gern...\" (I would like to be...), \"Könnten Sie mir helfen?\" (Could you help me?).",
+        "For other verbs, use Würde-form: \"Ich würde gern wissen...\" (I would like to know...), \"Was würdest du tun?\" (What would you do?).",
+        "At restaurants/cafes: Replace *\"Ich will einen Kaffee\"* with *\"Ich hätte gern einen Kaffee, bitte.\"*"
+      ],
+      "examples": [
+        {
+          "source": "Könnten Sie das bitte wiederholen?",
+          "explanation": "Far more polite and natural than \"Wiederholen Sie das!\"."
+        }
+      ],
+      "commonPitfall": "Using \"Ich will...\" in shops and restaurants, which can sound unintentionally rude or childlike to native German ears.",
+      "timeCommitment": "10 mins cafe & street scenario rehearsal",
+      "tags": [
+        "speaking",
+        "politeness",
+        "konjunktiv-2",
+        "social-fluency"
+      ]
+    },
+    {
+      "id": "ger-b2-modal-particles",
+      "title": "The Secret Flavor of Native German: Modalpartikeln",
+      "languageId": "german",
+      "level": "B2",
+      "category": "speaking",
+      "imageUrl": "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=700&q=80",
+      "imageCaption": "Authentic social banter in Berlin cafes",
+      "summary": "Modal particles (doch, ja, mal, halt, eben, denn, bloß) carry zero grammatical weight, but they communicate emotion, attitude, and social rapport.",
+      "goldenRule": "Sprinkle modal particles into your speech to instantly sound like you have lived in Germany for 10 years.",
+      "tactics": [
+        "DOCH: Contradicts an assumption or softens an invitation (\"Komm doch rein!\" = Come on in! / \"Das weißt du doch!\" = You know that already!).",
+        "JA: Signals shared knowledge or surprise (\"Das ist ja toll!\" = That really is awesome! / \"Ich bin ja kein Experte\" = As you know, I'm no expert).",
+        "MAL: Softens requests (\"Schau mal\" = Take a quick look / \"Kannst du mir mal helfen?\").",
+        "HALT / EBEN: Resignation or accepting reality (\"Es ist halt so\" = That's just the way it is)."
+      ],
+      "examples": [
+        {
+          "source": "Das ist doch kein Problem!",
+          "explanation": "The \"doch\" dispels hesitation and reassures the listener warmly."
+        }
+      ],
+      "commonPitfall": "Translating modal particles literally into your native language—they have no direct dictionary equivalent; they are emotional seasoning.",
+      "timeCommitment": "Watch German vloggers and tally occurrences of \"doch\" and \"halt\"",
+      "tags": [
+        "modal-particles",
+        "colloquial",
+        "fluency",
+        "b2-flow"
+      ],
+      "recommendedTools": [
+        {
+          "name": "Easy German (YouTube & Podcast)",
+          "category": "channel",
+          "url": "https://www.easygerman.org",
+          "note": "Authentic street interviews with real conversational modal particles."
+        }
+      ]
+    },
+    {
+      "id": "ger-b2-adjective-endings",
+      "title": "The Two-Step Adjective Ending Logic (No 48-Cell Tables!)",
+      "languageId": "german",
+      "level": "B2",
+      "category": "grammar",
+      "summary": "Learners dread German adjective declensions because textbooks present intimidating 48-cell grids. Reduce it to two simple polyglot questions.",
+      "goldenRule": "Ask Question 1: Has the article in front already shown the case/gender signal? If YES -> Adjective takes lazy \"-e\" or \"-en\". If NO -> Adjective must carry the signal flag!",
+      "tactics": [
+        "RULE 1 (Definite Article / Der-Die-Das): Der/Die/Das already carries the signal. Nominative singular adjectives take only \"-e\" (der gute Mann, die gute Frau, das gute Kind). All plural and oblique cases take \"-en\".",
+        "RULE 2 (Zero Article / No Signal): When there is no article (e.g. \"kalter Kaffee\", \"gutes Bier\"), the adjective itself must wear the case flag (-er for masc, -es for neuter, -e for fem).",
+        "RULE 3: Dativ & Genitiv adjectives ALWAYS end in \"-en\", no matter what (mit dem guten Freund, der netten Frau)."
+      ],
+      "examples": [
+        {
+          "source": "Ein schönes Haus",
+          "explanation": "\"Ein\" has no ending to signal neuter, so the adjective \"schönes\" must carry the \"-es\" neuter flag."
+        }
+      ],
+      "commonPitfall": "Paralyzing your speech trying to mentally browse a massive declension table in real-time.",
+      "timeCommitment": "15 mins rule-based pattern drilling",
+      "tags": [
+        "adjective-endings",
+        "grammar-hack",
+        "b2",
+        "declension"
+      ]
+    },
+    {
+      "id": "ger-c1-nominalstil",
+      "title": "Nominalstil: The Architecture of German Intellect",
+      "languageId": "german",
+      "level": "C1",
+      "category": "grammar",
+      "summary": "High-level academic, scientific, and business German favors Nominalstil (nominal style)—condensing verbs and clauses into sophisticated noun compounds with genitives.",
+      "goldenRule": "Transform verbal actions into nouns with suffixes like -ung, -ung des, and prepositions with genitive (aufgrund, anlässlich, bezüglich).",
+      "tactics": [
+        "Verbal (B1/B2): \"Weil die Preise gestiegen sind, müssen wir sparen.\"",
+        "Nominal (C1): \"Aufgrund des Preisanstiegs sind Sparmaßnahmen erforderlich.\"",
+        "Verbal: \"Bevor der Vertrag unterzeichnet wird...\" -> Nominal: \"Vor der Vertragsunterzeichnung...\"",
+        "Learn high-level Genitive prepositions: anlässlich (on the occasion of), bezüglich (regarding), hinsichtlich (with respect to)."
+      ],
+      "examples": [
+        {
+          "source": "Nach Überprüfung der Unterlagen...",
+          "explanation": "Replaces \"Nachdem wir die Unterlagen überprüft haben...\". Clean, authoritative, concise."
+        }
+      ],
+      "commonPitfall": "Writing in C1 German using the casual verbal syntax of spoken B1 everyday conversation.",
+      "timeCommitment": "20 mins converting news headlines from verbal to nominal style",
+      "tags": [
+        "nominalstil",
+        "c1-german",
+        "academic-german",
+        "advanced-writing"
+      ]
+    },
+    {
+      "id": "ger-c1-partizipialkonstruktion",
+      "title": "Extended Participial Clauses (Partizipialattribute)",
+      "languageId": "german",
+      "level": "C1",
+      "category": "grammar",
+      "summary": "German newspapers (Spiegel, FAZ, Zeit) pack entire subordinate clauses into a single bracketed participial adjective between article and noun.",
+      "goldenRule": "Find the article first, skip over the sandwich filling, and find the noun at the end to grasp the subject, then decode the participle inside.",
+      "tactics": [
+        "Example: \"Die [von Experten seit langem geforderte] Steuerreform...\"",
+        "Translation: The tax reform [which has long been demanded by experts]...",
+        "Present Participle (-end): \"Das schnell wachsende Unternehmen\" (The rapidly growing company).",
+        "Past Participle (-t / -en): \"Der gestern verabschiedete Gesetzentwurf\" (The draft law passed yesterday)."
+      ],
+      "examples": [
+        {
+          "source": "Alle an der Konferenz teilnehmenden Delegierten...",
+          "explanation": "Compresses \"Alle Delegierten, die an der Konferenz teilnehmen...\"."
+        }
+      ],
+      "commonPitfall": "Losing the subject of the sentence while reading because you get trapped in the embedded participle modifier.",
+      "timeCommitment": "15 mins dissecting Der Spiegel articles",
+      "tags": [
+        "c1",
+        "reading-comprehension",
+        "partizipien",
+        "journalism"
+      ]
+    },
+    {
+      "id": "ger-c2-redewendungen",
+      "title": "Idiomatic Mastery & Pragmatic Precision",
+      "languageId": "german",
+      "level": "C2",
+      "category": "speaking",
+      "summary": "At C2, you transition from someone who speaks German accurately to someone who thinks in German cultural metaphors.",
+      "goldenRule": "Deploy authentic German Redewendungen effortlessly and accurately in professional negotiations and banter.",
+      "tactics": [
+        "\"Die Kirche im Dorf lassen\" -> Don't get carried away / keep things grounded.",
+        "\"Den Nagel auf den Kopf treffen\" -> Hit the nail on the head / pinpoint the exact truth.",
+        "\"Schwein haben\" -> Have a stroke of pure luck.",
+        "\"Auf Nummer sicher gehen\" -> Play it completely safe.",
+        "\"Jemandem reinen Wein einschenken\" -> Tell someone the unvarnished truth."
+      ],
+      "examples": [
+        {
+          "source": "Da hast du wirklich den Nagel auf den Kopf getroffen.",
+          "explanation": "Used naturally in boardrooms and casual conversations alike."
+        }
+      ],
+      "commonPitfall": "Using literal translations of English idioms like *\"einen kühlen Kopf halten\"* without verifying native German equivalents.",
+      "timeCommitment": "Weekly immersion in German satirical news (heute-show, Die Anstalt)",
+      "tags": [
+        "c2",
+        "idioms",
+        "redewendungen",
+        "native-wit",
+        "mastery"
+      ]
+    },
+    {
+      "id": "ger-c2-nuance-particles-konjunktiv1",
+      "title": "Konjunktiv I & Journalistic Distance",
+      "languageId": "german",
+      "level": "C2",
+      "category": "mindset",
+      "summary": "True mastery of high German requires Konjunktiv I (indirect discourse), signaling that you are reporting an assertion without personally guaranteeing its veracity.",
+      "goldenRule": "Use Konjunktiv I to maintain professional neutrality and journalistic distance: \"Der Sprecher sagte, es gebe keine Gefahr.\"",
+      "tactics": [
+        "Form: Root of infinitive + -e, -est, -e, -en, -et, -en.",
+        "Key irregulars: sein -> er sei / sie seien; haben -> er habe; können -> er könne; wissen -> er wisse.",
+        "Notice the difference: \"Er sagte, er ist krank\" (Direct quote/fact) vs. \"Er sagte, er sei krank\" (Reported speech, objective distance)."
+      ],
+      "examples": [
+        {
+          "source": "Die Regierung betonte, der Plan sei alternativlos.",
+          "explanation": "Maintains neutral reporting without taking ownership of the claim."
+        }
+      ],
+      "commonPitfall": "Confusing Konjunktiv I (reported speech neutrality) with Konjunktiv II (hypothetical counterfactuals).",
+      "timeCommitment": "15 mins reading Tagesschau or FAZ news reports",
+      "tags": [
+        "c2",
+        "konjunktiv-1",
+        "journalism",
+        "precision",
+        "advanced-german"
+      ]
+    },
+    {
+      "id": "meta-shadowing",
+      "title": "The Shadowing Technique: Muscle Memory for Fluency",
+      "languageId": "meta",
+      "level": "ALL",
+      "category": "pronunciation",
+      "imageUrl": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=700&q=80",
+      "imageCaption": "Active shadowing with audio on outdoor walks",
+      "summary": "Pioneered by linguist Prof. Alexander Arguelles, shadowing trains your vocal tract and ear simultaneously by repeating audio a split-second behind a native speaker.",
+      "goldenRule": "Do not wait for a sentence to finish before speaking. Echo the native voice 200–500 milliseconds behind, mimicking pitch, rhythm, and tone.",
+      "tactics": [
+        "Select a short, high-quality audio clip (1–2 minutes) with an exact verbatim transcript.",
+        "Phase 1: Blind Shadowing — Walk at a brisk pace with headphones on and speak along without reading.",
+        "Phase 2: Transcript Shadowing — Read the text while shadowing to bridge auditory and orthographic connections.",
+        "Do this for just 15 minutes daily. It rapidly eliminates foreign cadence and builds articulatory stamina."
+      ],
+      "commonPitfall": "Sitting statically at a desk murmuring under your breath. Shadowing works best standing upright, projecting your voice with energy.",
+      "timeCommitment": "15 mins daily routine",
+      "tags": [
+        "polyglot-tactics",
+        "shadowing",
+        "pronunciation",
+        "accent-reduction"
+      ]
+    },
+    {
+      "id": "meta-island-method",
+      "title": "The Conversational Island Method",
+      "languageId": "meta",
+      "level": "A2",
+      "category": "speaking",
+      "summary": "Native speakers do not improvise every single sentence from scratch; they navigate familiar conversational \"islands\" they have rehearsed dozens of times.",
+      "goldenRule": "Prepare 5 to 7 modular 90-second conversational scripts about your life, career, hobbies, and origin story before your first real conversation.",
+      "tactics": [
+        "Island 1: Your profession, why you chose it, and an interesting daily challenge.",
+        "Island 2: Why you are learning this language and what your connection to the culture is.",
+        "Island 3: Your favorite trip, funny travel mishap, or hometown recommendation.",
+        "Have a native tutor or AI check these scripts for natural idiomatic phrasing, then memorize the transitions (\"Bridges\")."
+      ],
+      "examples": [
+        {
+          "source": "Speaking bridge",
+          "explanation": "\"Speaking of which, that actually reminds me of an experience I had last year...\" (Seamlessly links back to an island)."
+        }
+      ],
+      "commonPitfall": "Freezing on italki or Tandem calls because you are trying to assemble novel grammar under pressure.",
+      "timeCommitment": "1 hour scripting + 20 mins rehearsal",
+      "tags": [
+        "speaking",
+        "island-method",
+        "confidence",
+        "conversations"
+      ]
+    },
+    {
+      "id": "meta-comprehensible-input",
+      "title": "Krashen’s \"i + 1\" Principle & The 85% Comprehension Sweet Spot",
+      "languageId": "meta",
+      "level": "B1",
+      "category": "immersion",
+      "summary": "Linguist Stephen Krashen proved language is acquired through comprehensible input (input that is just one notch above your current understanding).",
+      "goldenRule": "If you understand less than 70%, it is cognitive noise. If you understand 100%, you are not growing. Aim for 80–90% effortless comprehension.",
+      "tactics": [
+        "At A1–A2: Use graded readers and beginner podcast dialogues with transcripts.",
+        "At B1: Move to learner podcasts (Easy German, Coffee Break, BBC Learning).",
+        "At B2: Jump to native YouTubers who speak about your favorite hobbies (gaming, cooking, tech, science).",
+        "The \"Two-Pass Rule\": Watch once for gist, watch a second time to capture 3–5 high-yield unknown phrases."
+      ],
+      "commonPitfall": "Forcing yourself to read classic 19th-century literature at B1 and giving up in frustration.",
+      "timeCommitment": "30–45 mins daily comprehensible immersion",
+      "tags": [
+        "krashen",
+        "comprehensible-input",
+        "immersion",
+        "polyglot-theory"
+      ]
+    },
+    {
+      "id": "meta-anki-srs",
+      "title": "The 3 Iron Rules of Spaced Repetition (Anki Done Right)",
+      "languageId": "meta",
+      "level": "ALL",
+      "category": "vocabulary",
+      "summary": "Most learners quit Anki because their decks become bloated digital flashcard graveyards. Optimize your SRS with cognitive economy.",
+      "goldenRule": "Card Rule #1: Minimum Information Principle. One card = one discrete, atomic fact.",
+      "tactics": [
+        "Never create 2-sided vocabulary lists with bare word translations (e.g., Hund = Dog).",
+        "Use Cloze Deletion with authentic context sentences (e.g., \"Ich gehe jeden Morgen mit meinem [...] spazieren.\").",
+        "Add audio clips to every card (using tools like Forvo or AwesomeTTS) so auditory memory reinforces visual memory.",
+        "Delete or suspend cards that fail more than 4 times—they are poorly formulated \"leech\" cards."
+      ],
+      "commonPitfall": "Spending 80% of your time creating cards and only 20% reviewing them. Invert the ratio.",
+      "timeCommitment": "10–15 mins daily morning streak",
+      "tags": [
+        "anki",
+        "srs",
+        "memory",
+        "spaced-repetition"
+      ]
+    },
+    {
+      "id": "meta-intermediate-plateau",
+      "title": "Smashing the Notorious B2 Plateau",
+      "languageId": "meta",
+      "level": "B2",
+      "category": "mindset",
+      "summary": "The B2 plateau is the most common death zone in language learning. You can communicate, so the urgency is gone, yet native content still tires you.",
+      "goldenRule": "Stop \"studying\" the language. Switch your entire digital life (phone OS, Wikipedia searches, entertainment) into the target language.",
+      "tactics": [
+        "Change your phone and computer system language today.",
+        "Stop searching Google in your native language for technical questions, recipes, or reviews.",
+        "Engage in active production: Write a 200-word daily journal or Reddit comment in the target language.",
+        "Schedule weekly 1-on-1 debate sessions with native tutors on controversial, philosophical, or professional topics."
+      ],
+      "commonPitfall": "Staying in the comfortable bubble of learner podcasts and graded materials for years.",
+      "timeCommitment": "Total environmental integration",
+      "tags": [
+        "b2-plateau",
+        "mindset",
+        "habits",
+        "mastery"
+      ]
+    }
+  ],
+  "falseFriends": [
+    {
+      "id": "ff-gift",
+      "languageId": "german",
+      "word": "das Gift",
+      "confusedWith": "Gift (English: a present)",
+      "actualMeaning": "Poison or venom",
+      "mistakeExample": "❌ \"Danke für das Gift!\" (Thank you for the poison!)",
+      "correctAlternative": "Das Geschenk (present / gift)",
+      "memoryHack": "Think of \"toxic gift\". In German, giving someone Gift will land you in prison.",
+      "imageUrl": "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      "id": "ff-bekommen",
+      "languageId": "german",
+      "word": "bekommen",
+      "confusedWith": "Become (English: to turn into / evolve)",
+      "actualMeaning": "To get / receive",
+      "mistakeExample": "❌ \"Ich möchte ein Arzt bekommen.\" (I want to receive a doctor.)",
+      "correctAlternative": "werden (to become) -> \"Ich möchte Arzt werden.\"",
+      "memoryHack": "Be-KOMMEN sounds like \"come to me\". What comes to you, you receive!"
+    },
+    {
+      "id": "ff-aktuell",
+      "languageId": "german",
+      "word": "aktuell",
+      "confusedWith": "Actual (English: real / true / existing in fact)",
+      "actualMeaning": "Current / topical / up-to-date",
+      "mistakeExample": "❌ \"Das ist der aktuelle Grund.\" (thinking it means \"the actual reason\")",
+      "correctAlternative": "tatsächlich / eigentlich (actual / real) -> \"der tatsächliche Grund\"",
+      "memoryHack": "Aktuell = at this very moment (current news / Zeitgeschehen).",
+      "imageUrl": "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      "id": "ff-chef",
+      "languageId": "german",
+      "word": "der Chef",
+      "confusedWith": "Chef (English: a professional kitchen cook)",
+      "actualMeaning": "Boss / supervisor / managing director",
+      "mistakeExample": "❌ \"Er kocht gut, er ist Chef.\" (thinking he is a culinary chef)",
+      "correctAlternative": "der Koch / die Köchin (cook / culinary chef)",
+      "memoryHack": "The Chief Executive (CEO) is your Chef at the office.",
+      "imageUrl": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+      "id": "ff-praegnant",
+      "languageId": "german",
+      "word": "prägnant",
+      "confusedWith": "Pregnant (English: carrying an unborn child)",
+      "actualMeaning": "Concise, succinct, punchy",
+      "mistakeExample": "❌ \"Meine Schwester ist prägnant.\" (Awkward disaster!)",
+      "correctAlternative": "schwanger (pregnant) -> \"Meine Schwester ist schwanger.\"",
+      "memoryHack": "A prägnante Antwort is short, pregnant with meaning, not with a baby!"
+    },
+    {
+      "id": "ff-brav",
+      "languageId": "german",
+      "word": "brav",
+      "confusedWith": "Brave (English: courageous / bold)",
+      "actualMeaning": "Well-behaved, obedient, good (usually describing children or pets)",
+      "mistakeExample": "❌ \"Der Soldat war sehr brav.\" (Sounds like the soldier was a quiet good boy!)",
+      "correctAlternative": "mutig / tapfer (brave / courageous) -> \"Der Soldat war tapfer.\"",
+      "memoryHack": "Brav kids follow the rules quietly. Mutige heroes slay dragons."
+    },
+    {
+      "id": "ff-fast",
+      "languageId": "german",
+      "word": "fast",
+      "confusedWith": "Fast (English: quick / rapid speed)",
+      "actualMeaning": "Almost / nearly",
+      "mistakeExample": "❌ \"Das Auto fährt sehr fast.\" (Gibberish!)",
+      "correctAlternative": "schnell (fast / rapid) -> \"Das Auto fährt sehr schnell.\"",
+      "memoryHack": "\"Fast fertig\" means almost done, not quickly done."
+    },
+    {
+      "id": "ff-hell",
+      "languageId": "german",
+      "word": "hell",
+      "confusedWith": "Hell (English: underworld of fire and brimstone)",
+      "actualMeaning": "Bright, light, clear (in color or luminosity)",
+      "mistakeExample": "❌ \"Draußen ist es wie die Hölle.\" vs. \"Es ist noch hell draußen.\"",
+      "correctAlternative": "die Hölle (Hell / underworld)",
+      "memoryHack": "A bright room has \"helles Licht\"."
+    },
+    {
+      "id": "ff-eng-sympathetic",
+      "languageId": "english",
+      "word": "Sympathetic",
+      "confusedWith": "Sympathisch (German: likeable / pleasant)",
+      "actualMeaning": "Feeling or showing compassion, pity, or sorrow for someone",
+      "mistakeExample": "❌ \"She is very sympathetic, I enjoy her company.\" (Better: \"She is very likeable/pleasant\")",
+      "correctAlternative": "Likeable / charming / congenial",
+      "memoryHack": "Sympathetic means you show sympathy when someone suffers."
+    },
+    {
+      "id": "ff-eng-eventually",
+      "languageId": "english",
+      "word": "Eventually",
+      "confusedWith": "Eventuell (German: possibly / perhaps)",
+      "actualMeaning": "In the end / after a long time (inevitability)",
+      "mistakeExample": "❌ \"Eventually I will come, if I have time.\" (Wrong! It means it definitely happens eventually)",
+      "correctAlternative": "Possibly / perhaps / maybe",
+      "memoryHack": "Eventual = final destination, NOT a 50/50 possibility."
+    }
+  ],
+  "diagnosticQuestions": [
+    {
+      "id": "q1-comprehension",
+      "question": "When listening to unscripted native podcasts, news, or YouTube videos in your target language:",
+      "options": [
+        {
+          "text": "I only catch isolated words like \"hello\", \"yes\", or numbers.",
+          "level": "A1"
+        },
+        {
+          "text": "I understand slow, simplified audio made for learners, but real native audio is a blur.",
+          "level": "A2"
+        },
+        {
+          "text": "I understand the main gist if the topic is familiar, but get lost with slang or fast cadence.",
+          "level": "B1"
+        },
+        {
+          "text": "I comfortably follow native talk shows and YouTube, missing only cultural jokes and rare idioms.",
+          "level": "B2"
+        },
+        {
+          "text": "I understand native radio debates, movies without subtitles, and nuanced sarcasm with zero cognitive strain.",
+          "level": "C1"
+        },
+        {
+          "text": "I pick up regional dialects, subtle puns, historical references, and literary allusions effortlessly.",
+          "level": "C2"
+        }
+      ]
+    },
+    {
+      "id": "q2-spontaneous-speech",
+      "question": "When an unexpected spontaneous conversation starts with a native speaker:",
+      "options": [
+        {
+          "text": "I freeze and can only muster basic greetings or point with hand gestures.",
+          "level": "A1"
+        },
+        {
+          "text": "I can answer simple questions about my name, country, and job with basic phrases.",
+          "level": "A2"
+        },
+        {
+          "text": "I can explain my opinion and narrate past events, but I pause often to formulate grammar.",
+          "level": "B1"
+        },
+        {
+          "text": "I speak smoothly without halting pauses, easily pivoting around words I do not know.",
+          "level": "B2"
+        },
+        {
+          "text": "I can argue complex professional or philosophical viewpoints with natural idiomatic flow.",
+          "level": "C1"
+        },
+        {
+          "text": "I command rhetoric, wit, humor, and register shifting just like an articulate native speaker.",
+          "level": "C2"
+        }
+      ]
+    },
+    {
+      "id": "q3-reading-ability",
+      "question": "When reading authentic written material in your target language:",
+      "options": [
+        {
+          "text": "I can decipher street signs, menus, and short product labels.",
+          "level": "A1"
+        },
+        {
+          "text": "I can read graded reader books (A2 level) and short personal emails.",
+          "level": "A2"
+        },
+        {
+          "text": "I can read newspaper articles and blog posts with the help of a dictionary lookup tool.",
+          "level": "B1"
+        },
+        {
+          "text": "I can read full non-fiction books or news commentary with good speed and high comprehension.",
+          "level": "B2"
+        },
+        {
+          "text": "I can read classic literature, legal contracts, and academic papers without difficulty.",
+          "level": "C1"
+        },
+        {
+          "text": "I appreciate archaic poetry, complex wordplay, and subtle stylistic ironies.",
+          "level": "C2"
+        }
+      ]
+    },
+    {
+      "id": "q4-grammar-intuition",
+      "question": "How do you process the grammar of the target language when communicating?",
+      "options": [
+        {
+          "text": "I do not understand the grammatical structure yet; every sentence feels like a puzzle.",
+          "level": "A1"
+        },
+        {
+          "text": "I know basic present and past tense, but cases and complex orders confuse me.",
+          "level": "A2"
+        },
+        {
+          "text": "I know the rules intellectually, but make frequent errors when speaking fast.",
+          "level": "B1"
+        },
+        {
+          "text": "I have developed intuitive \"feel\" for word order and case endings; errors sound unnatural to me.",
+          "level": "B2"
+        },
+        {
+          "text": "I intuitively employ subjunctive moods, stylistic inversions, and passive constructions.",
+          "level": "C1"
+        },
+        {
+          "text": "I can play with grammar, intentionally bend conventions for stylistic effect, and spot native typos.",
+          "level": "C2"
+        }
+      ]
+    }
+  ]
+}
