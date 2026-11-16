@@ -1,0 +1,14 @@
+# Betterleaks Configuration for LinguaVerve (`lingua-verve`)
+# Enforced by `kb-review` (`security` role), `kb-git`, and `.github/workflows/deploy.yml`
+
+title = "LinguaVerve Secret Scanning Policy"
+
+[allowlist]
+description = "Ignore build outputs, dependencies, structural AST graphs, and test fixtures"
+paths = [
+  '''^dist/''',
+  '''^node_modules/''',
+  '''^package-lock\.json$''',
+  '''^graphify-out/''',
+  '''^\.beads/dolt/'''
+]

@@ -1,0 +1,27 @@
+# KobeanSkills Managed MCP Servers
+[mcp_servers.postgres]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-postgres","${DATABASE_URL}"]
+
+[mcp_servers.sqlite]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-sqlite","--db-path","${SQLITE_DB_PATH:-./dev.db}"]
+
+[mcp_servers.github]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-github"]
+
+[mcp_servers.github.env]
+GITHUB_PERSONAL_ACCESS_TOKEN = "${GITHUB_TOKEN}"
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-playwright"]
+
+[mcp_servers.filesystem]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-filesystem","."]
+
+[mcp_servers.fetch]
+command = "npx"
+args = ["-y","@modelcontextprotocol/server-fetch"]
