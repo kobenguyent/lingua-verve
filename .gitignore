@@ -30,3 +30,21 @@ macos/.swiftpm
 .dolt/
 *.db
 .beads-credential-key
+
+# Local AI instructions, agent configs, specs, and graphs (kept local only)
+.agents/
+.beads/
+.claude/
+.codex/
+.gemini/
+.kobean/
+.mcp.json
+.github/pull_request_template.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+CONTEXT.md
+PRODUCT.md
+PROMPTING.md
+graphify-out/
+specs/
