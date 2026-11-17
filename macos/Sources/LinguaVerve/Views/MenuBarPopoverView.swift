@@ -148,10 +148,24 @@ public struct MenuBarPopoverView: View {
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
                 } label: {
-                    Label("Open Full Workspace", systemImage: "macwindow")
+                    Label("Open Workspace", systemImage: "macwindow")
                         .font(.system(size: 12.5))
                 }
                 .controlSize(.regular)
+
+                Button {
+                    openWindow(id: "main")
+                    NSApp.activate(ignoringOtherApps: true)
+                    Task { await store.checkForUpdates(manual: true) }
+                } label: {
+                    Label(
+                        store.isUpdateAvailable ? "Update (v\(store.availableUpdate?.latestVersion ?? ""))" : "Updates",
+                        systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
+                    )
+                    .font(.system(size: 12.5))
+                }
+                .controlSize(.regular)
+
                 Spacer()
                 Button("Quit") {
                     NSApp.terminate(nil)

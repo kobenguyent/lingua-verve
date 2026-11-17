@@ -4,8 +4,9 @@
   <p><strong>The Polyglot's Tactical Blueprint</strong> — High-leverage language acquisition strategies from <strong>A1 Breakthrough</strong> to <strong>C2 Mastery</strong> for English, German, and beyond — built for both the <strong>Web</strong> and <strong>Native macOS</strong>.</p>
 
   <p>
+    <a href="https://github.com/kobenguyent/lingua-verve/releases/latest"><img src="https://img.shields.io/github/v/release/kobenguyent/lingua-verve?label=Release&logo=github&style=flat-square" alt="Latest GitHub Release" /></a>
     <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-28%20passed-10b981?style=flat-square" alt="Vitest 28 passed" /></a>
-    <a href="./macos/Tests"><img src="https://img.shields.io/badge/Swift%20XCTest-6%20passed-0ea5e9?style=flat-square&logo=swift&logoColor=white" alt="Swift XCTest 6 passed" /></a>
+    <a href="./macos/Tests"><img src="https://img.shields.io/badge/Swift%20XCTest-12%20passed-0ea5e9?style=flat-square&logo=swift&logoColor=white" alt="Swift XCTest 12 passed" /></a>
     <a href="./macos"><img src="https://img.shields.io/badge/macOS-14%2B%20SwiftUI-1e293b?style=flat-square&logo=apple&logoColor=white" alt="macOS 14+ SwiftUI" /></a>
     <a href="./.github/workflows/deploy.yml"><img src="https://img.shields.io/badge/Deployment-GitHub%20Pages-0284c7?style=flat-square" alt="Deployment GitHub Pages" /></a>
     <img src="https://img.shields.io/badge/License-MIT-3b82f6?style=flat-square" alt="License MIT" />
@@ -94,6 +95,16 @@ Most language platforms keep learners trapped in endless, low-yield vocabulary t
 ##  Native macOS App (`SwiftUI` + `MenuBarExtra`)
 
 LinguaVerve ships a first-class Swift 6 / SwiftUI native macOS application under [`./macos/`](./macos/) backed by the exact same curriculum dataset exported directly from TypeScript (`scripts/export-curriculum.mjs` → `macos/Sources/LinguaVerveCore/Resources/curriculum.json`).
+
+### 📦 Direct Downloads (GitHub Releases)
+
+| Package | Direct Download | Description |
+| :--- | :--- | :--- |
+| **💿 `LinguaVerve.dmg`** *(Recommended)* | [**Download LinguaVerve.dmg**](https://github.com/kobenguyent/lingua-verve/releases/latest/download/LinguaVerve.dmg) | Double-click to mount; drag `LinguaVerve.app` into `Applications` or run `Install LinguaVerve (No Apple Dev Account).command`. |
+| **📦 `LinguaVerve.zip`** | [**Download LinguaVerve.zip**](https://github.com/kobenguyent/lingua-verve/releases/latest/download/LinguaVerve.zip) | Packed via Apple `ditto`; double-click in Finder to extract `LinguaVerve.app`. |
+| **🔐 `SHA256SUMS.txt`** | [**View Checksums**](https://github.com/kobenguyent/lingua-verve/releases/latest/download/SHA256SUMS.txt) | SHA-256 verification hashes for release packages. |
+
+- **Built-In GitHub Releases Auto-Updater:** Checks `kobenguyent/lingua-verve` GitHub Releases automatically on launch (or manually via **LinguaVerve → Check for Updates…** / the toolbar **Updates** button) and supports one-click in-place download, quarantine removal (`xattr -cr`), ad-hoc signing (`codesign --force --deep --sign -`), and app relaunch.
 
 ### One-Command Sync & Launch
 

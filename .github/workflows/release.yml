@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release version tag (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish GitHub Release
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Cache SwiftPM Build Products
+        uses: actions/cache@v4
+        with:
+          path: macos/.build
+          key: ${{ runner.os }}-spm-${{ hashFiles('macos/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve Release Version
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_TAG="${{ inputs.tag }}"
+          else
+            RAW_TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ "${RAW_TAG}" != v* ]]; then
+            TAG="v${RAW_TAG}"
+          else
+            TAG="${RAW_TAG}"
+          fi
+          VERSION="${TAG#v}"
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved Release Tag: ${TAG} (Version: ${VERSION})"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Full Test Suite (Web Vitest + macOS XCTest)
+        run: |
+          npm run test
+          npm run macos:test
+
+      - name: Build Web Production Site
+        run: npm run build
+
+      - name: Build Native macOS App, DMG & ZIP Artifacts
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: npm run macos:app
+
+      - name: Verify Release Assets
+        run: |
+          test -d "dist-macos/LinguaVerve.app"
+          codesign --verify --deep --strict --verbose=2 "dist-macos/LinguaVerve.app"
+          test -f "dist-macos/LinguaVerve.dmg"
+          test -f "dist-macos/LinguaVerve.zip"
+          test -f "dist-macos/SHA256SUMS.txt"
+          cat "dist-macos/SHA256SUMS.txt"
+
+      - name: Upload Release Artifacts to Workflow Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinguaVerve-${{ steps.meta.outputs.tag }}-macOS
+          path: |
+            dist-macos/LinguaVerve*.dmg
+            dist-macos/LinguaVerve*.zip
+            dist-macos/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Prepare Release Notes Header
+        run: |
+          cat << 'EOF' > dist-macos/RELEASE_HEADER.md
+          ### 📦 Direct Downloads (Native macOS App)
+
+          | Package | Format | Description |
+          | :--- | :--- | :--- |
+          | **`LinguaVerve.dmg`** | **macOS Disk Image (Recommended)** | Double-click to mount, then drag **LinguaVerve.app** into **Applications** or run the included one-click installer. |
+          | **`LinguaVerve.zip`** | **macOS App Archive** | Double-click in Finder to extract **LinguaVerve.app** directly. |
+          | **`SHA256SUMS.txt`** | **Checksums** | SHA-256 integrity hashes for all release packages. |
+
+          ---
+
+          ### 🚀 Quick Installation (macOS 14.0+ Sonoma / Sequoia)
+
+          1. Download **`LinguaVerve.dmg`** below and double-click to open it.
+          2. **Option A (One-Click Installer):** Double-click **`Install LinguaVerve (No Apple Dev Account).command`** inside the mounted disk image.
+          3. **Option B (Drag & Drop):** Drag **`LinguaVerve.app`** into the **`Applications`** folder shortcut.
+          4. **First Launch (Gatekeeper Note):** Because LinguaVerve is ad-hoc signed (requiring no paid Apple Developer account), macOS flags browser-downloaded apps with quarantine. Run this command once in Terminal before opening:
+             ```bash
+             xattr -cr /Applications/LinguaVerve.app
+             ```
+             *(Or right-click `LinguaVerve.app` in Finder → choose **Open** → click **Open**).*
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "LinguaVerve ${{ steps.meta.outputs.tag }}"
+          body_path: dist-macos/RELEASE_HEADER.md
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease == true }}
+          draft: false
+          files: |
+            dist-macos/LinguaVerve.dmg
+            dist-macos/LinguaVerve.zip
+            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.dmg
+            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.zip
+            dist-macos/SHA256SUMS.txt

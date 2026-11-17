@@ -10,8 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "macos:sync": "node scripts/export-curriculum.mjs",
-    "macos:test": "npm run macos:sync && cd macos && swift test",
-    "macos:build": "npm run macos:sync && cd macos && swift build -c release",
+    "macos:test": "npm run macos:sync && ([ -d /Applications/Xcode.app/Contents/Developer ] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer || true; cd macos && swift test)",
+    "macos:build": "npm run macos:sync && ([ -d /Applications/Xcode.app/Contents/Developer ] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer || true; cd macos && swift build -c release)",
     "macos:app": "bash scripts/build-macos-app.sh",
     "macos:launch": "npm run macos:app && (killall LinguaVerve 2>/dev/null || true) && open dist-macos/LinguaVerve.app"
   },

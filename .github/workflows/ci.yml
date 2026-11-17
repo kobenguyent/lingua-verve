@@ -1,0 +1,113 @@
+name: CI & Native macOS Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Test & Package Native macOS App
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Cache SwiftPM Build Products
+        uses: actions/cache@v4
+        with:
+          path: macos/.build
+          key: ${{ runner.os }}-spm-${{ hashFiles('macos/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Web Vitest Suite
+        run: npm run test
+
+      - name: Run Native macOS Swift XCTest Suite
+        run: npm run macos:test
+
+      - name: Build Web Production Bundle
+        run: npm run build
+
+      - name: Build & Package Native macOS App (.app, .dmg, .zip, SHA256SUMS.txt)
+        run: npm run macos:app
+
+      - name: Verify Bundle & Installer Integrity
+        run: |
+          test -d "dist-macos/LinguaVerve.app"
+          codesign --verify --deep --strict --verbose=2 "dist-macos/LinguaVerve.app"
+          test -f "dist-macos/LinguaVerve.dmg"
+          test -f "dist-macos/LinguaVerve.zip"
+          test -f "dist-macos/SHA256SUMS.txt"
+          cat "dist-macos/SHA256SUMS.txt"
+          echo "✅ Native macOS application bundle and installers verified!"
+
+      - name: Upload Native macOS DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinguaVerve-macOS-DMG
+          path: dist-macos/LinguaVerve.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Native macOS ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinguaVerve-macOS-ZIP
+          path: dist-macos/LinguaVerve.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Complete macOS Release Bundle (DMG, ZIP & SHA256SUMS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinguaVerve-macOS-Release
+          path: |
+            dist-macos/LinguaVerve*.dmg
+            dist-macos/LinguaVerve*.zip
+            dist-macos/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish Build & Installation Summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## 🍎 LinguaVerve — Native macOS App (`SwiftUI` + `MenuBarExtra`)
+
+          Download the **ad-hoc signed** native macOS application directly from the **Artifacts** section of this workflow run:
+          - **`LinguaVerve-macOS-DMG`** — Apple Disk Image (`LinguaVerve.dmg`) with drag-to-Applications shortcut and one-click installer
+          - **`LinguaVerve-macOS-ZIP`** — Compressed `LinguaVerve.app` bundle (`LinguaVerve.zip`)
+          - **`LinguaVerve-macOS-Release`** — Complete release bundle including versioned packages and `SHA256SUMS.txt`
+
+          ### 🚀 Installing on macOS (No Apple Developer Account Required)
+          1. **Option A (One-Click DMG Installer):** Open `LinguaVerve.dmg` and double-click **`Install LinguaVerve (No Apple Dev Account).command`** (or drag `LinguaVerve.app` to `Applications`).
+          2. **Option B (Terminal Gatekeeper Bypass after dragging to `/Applications`):**
+             ```bash
+             xattr -cr /Applications/LinguaVerve.app && open /Applications/LinguaVerve.app
+             ```
+          EOF
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🔐 SHA-256 Checksums" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat dist-macos/SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

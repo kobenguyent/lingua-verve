@@ -18,6 +18,12 @@ struct LinguaVerveApp: App {
         }
         .defaultSize(width: 1240, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Task { await store.checkForUpdates(manual: true) }
+                }
+            }
+
             CommandMenu("Polyglot Tools") {
                 Button("Random Tactical Blueprint") {
                     if let rnd = store.randomTip() {

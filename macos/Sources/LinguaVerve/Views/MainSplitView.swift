@@ -78,6 +78,29 @@ public struct MainSplitView: View {
                     )
                 }
                 .help("Toggle synthesized sound effects and TTS audio")
+
+                Button {
+                    if store.isUpdateAvailable {
+                        store.isUpdateSheetPresented = true
+                    } else {
+                        Task { await store.checkForUpdates(manual: true) }
+                    }
+                } label: {
+                    if store.isCheckingForUpdates {
+                        ProgressView()
+                            .controlSize(.mini)
+                    } else if let update = store.availableUpdate {
+                        Label("Update v\(update.latestVersion)", systemImage: "arrow.down.circle.fill")
+                            .foregroundStyle(BrandTheme.emeraldMint)
+                    } else {
+                        Label("Updates", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .help(
+                    store.isUpdateAvailable
+                        ? "Update available (v\(store.availableUpdate?.latestVersion ?? "")) — click to install"
+                        : "Check GitHub Releases for updates"
+                )
             }
         }
         .sheet(isPresented: $showDiagnosticSheet) {
@@ -85,6 +108,14 @@ public struct MainSplitView: View {
         }
         .sheet(isPresented: $showFalseFriendsSheet) {
             FalseFriendsView(store: store)
+        }
+        .sheet(isPresented: $store.isUpdateSheetPresented) {
+            UpdateSheetView(store: store)
+        }
+        .task {
+            if store.autoCheckForUpdates && store.lastUpdateCheckDate == nil {
+                await store.checkForUpdates(manual: false)
+            }
         }
     }
 
@@ -411,7 +442,12 @@ public struct MainSplitView: View {
     // MARK: - Detail Column
 
     private var detailColumn: some View {
-        Group {
+        VStack(spacing: 0) {
+            if store.shouldShowUpdateBanner, let update = store.availableUpdate {
+                UpdateNotificationBanner(store: store, update: update)
+                Divider()
+            }
+
             if let selectedId = store.selectedTipId,
                let tip = store.bundle.tips.first(where: { $0.id == selectedId }) {
                 TipDetailView(store: store, tip: tip)
