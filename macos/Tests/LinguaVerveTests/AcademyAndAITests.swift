@@ -283,4 +283,67 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertEqual(appleModels.count, 1)
         XCTAssertEqual(appleModels.first?.ownedBy, "Apple Intelligence")
     }
+
+    func testGuidedUnitLessonsDecodeForAll36UnitsAndPersistUnitStudyProgress() throws {
+        let store = makeTestStore()
+        var totalModules = 0
+        for course in store.bundle.intensiveCourses {
+            for mod in course.modules {
+                totalModules += 1
+                guard let lesson = mod.lesson else {
+                    XCTFail("Missing guided lesson for module \(mod.id)")
+                    continue
+                }
+                XCTAssertGreaterThanOrEqual(lesson.sections.count, 2, "Expected >=2 sections for \(mod.id)")
+                XCTAssertEqual(lesson.vocabCards.count, mod.keyVocabulary.count, "Vocab card count mismatch for \(mod.id)")
+                XCTAssertGreaterThanOrEqual(lesson.practiceQuestions.count, 3, "Expected >=3 quiz questions for \(mod.id)")
+                XCTAssertFalse(lesson.checkpointModelAnswer.isEmpty, "Missing checkpoint model answer for \(mod.id)")
+            }
+        }
+        XCTAssertEqual(totalModules, 36)
+
+        guard let course = store.course(for: "german", level: .A1),
+              let unit1 = course.modules.first else {
+            XCTFail("Expected German A1 Unit 1")
+            return
+        }
+
+        // Open guided lesson, persist per-unit step progress, and complete with checkpoint score
+        store.openUnitLesson(moduleId: unit1.id, languageId: "german", level: .A1)
+        XCTAssertEqual(store.activeLessonModuleId, unit1.id)
+
+        let progress = UnitStudyProgress(
+            moduleId: unit1.id,
+            currentStep: 4,
+            completedSteps: [0, 1, 2, 3, 4],
+            masteredVocab: ["heißen", "wohnen"],
+            quizAnswers: ["de-a1-m1-q1": 1],
+            completedDrillIndices: [0],
+            checkpointResponse: "Guten Tag, ich heiße Lukas und wohne in München.",
+            checkpointScore: 88
+        )
+        store.saveUnitProgress(progress)
+        XCTAssertEqual(store.unitProgress(for: unit1.id)?.checkpointScore, 88)
+        XCTAssertEqual(store.unitProgress(for: unit1.id)?.masteredVocab, ["heißen", "wohnen"])
+
+        store.markModuleCompleted(unit1, languageId: "german", level: .A1, score: 88)
+        XCTAssertTrue(store.isModuleCompleted(unit1.id))
+        XCTAssertEqual(store.learnerState.activityLog.first?.score, 88)
+
+        // Verify JSON backup export/import preserves unitProgress
+        let backup = store.exportProgressJSON()
+        let restored = makeTestStore()
+        try restored.importProgressJSON(backup)
+        XCTAssertEqual(restored.unitProgress(for: unit1.id)?.checkpointScore, 88)
+        XCTAssertEqual(restored.unitProgress(for: unit1.id)?.completedSteps, [0, 1, 2, 3, 4])
+
+        // Verify backward-compatible decoding of legacy progress JSON without `unitProgress`
+        let legacyJSON = #"{"version":1,"completedModuleIds":["de-a1-m1"],"enrolledCourseIds":[],"preTestHistory":[],"examHistory":[],"aiSessionHistory":[],"activityLog":[],"studyDays":[]}"#
+        let legacyDecoded = try JSONDecoder().decode(LearnerProgressState.self, from: Data(legacyJSON.utf8))
+        XCTAssertEqual(legacyDecoded.completedModuleIds, ["de-a1-m1"])
+        XCTAssertTrue(legacyDecoded.unitProgress.isEmpty)
+
+        store.closeUnitLesson()
+        XCTAssertNil(store.activeLessonModuleId)
+    }
 }

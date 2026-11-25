@@ -14,17 +14,20 @@ import {
   LearnerProgressState,
   PreTestResult,
   SkillType,
+  UnitStudyProgress,
   WorkspaceTab,
 } from './types';
 import { soundEngine } from './utils/audio';
 import { loadAIConfig, saveAIConfig } from './utils/aiClient';
 import {
+  completeModuleInState,
   createEmptyLearnerState,
   loadLearnerState,
   recordAISession,
   recordExamAttempt,
   recordPreTestResult,
   saveLearnerState,
+  saveUnitProgressInState,
   toggleModuleCompletionInState,
 } from './utils/progressStore';
 import { Navbar } from './components/Navbar';
@@ -159,6 +162,17 @@ export const App: React.FC = () => {
     meta: { languageId: string; level: CEFRLevel; title: string }
   ) => {
     setLearnerState((prev) => toggleModuleCompletionInState(prev, moduleId, meta));
+  };
+
+  const handleSaveUnitProgress = (progress: UnitStudyProgress) => {
+    setLearnerState((prev) => saveUnitProgressInState(prev, progress));
+  };
+
+  const handleCompleteGuidedModule = (
+    moduleId: string,
+    meta: { languageId: string; level: CEFRLevel; title: string; score?: number }
+  ) => {
+    setLearnerState((prev) => completeModuleInState(prev, moduleId, meta));
   };
 
   const handleCompletePreTest = (result: PreTestResult) => {
@@ -355,6 +369,10 @@ export const App: React.FC = () => {
             completedModuleIds={learnerState.completedModuleIds}
             enrolledCourseIds={learnerState.enrolledCourseIds}
             onToggleModuleComplete={handleToggleModuleComplete}
+            onCompleteModule={handleCompleteGuidedModule}
+            unitProgressMap={learnerState.unitProgress ?? {}}
+            onSaveUnitProgress={handleSaveUnitProgress}
+            aiConfig={aiConfig}
             onLaunchExam={handleLaunchExam}
             onLaunchAICoach={handleLaunchAICoach}
             onLaunchPreTest={(langId) => {

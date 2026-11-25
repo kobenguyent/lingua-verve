@@ -151,6 +151,51 @@ export interface CourseDrill {
   samplePassage?: string;
 }
 
+export interface UnitLessonExample {
+  target: string;
+  translation: string;
+  highlight?: string;
+}
+
+export interface UnitLessonSection {
+  id: string;
+  heading: string;
+  explanation: string;
+  formula?: string;
+  examples: UnitLessonExample[];
+  proTip?: string;
+}
+
+export interface UnitVocabCard {
+  term: string;
+  pronunciation?: string;
+  meaning: string;
+  example: string;
+  exampleNote?: string;
+}
+
+export interface UnitPracticeQuestion {
+  id: string;
+  skill: SkillType;
+  prompt: string;
+  passage?: string;
+  audioScript?: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface UnitGuidedLesson {
+  estimatedMins: number;
+  overview: string;
+  sections: UnitLessonSection[];
+  vocabCards: UnitVocabCard[];
+  practiceQuestions: UnitPracticeQuestion[];
+  checkpointSkill: 'writing' | 'speaking';
+  checkpointMinWords: number;
+  checkpointModelAnswer: string;
+}
+
 export interface CourseModule {
   id: string;
   weekLabel: string;
@@ -162,6 +207,7 @@ export interface CourseModule {
   keyVocabulary: string[];
   drills: CourseDrill[];
   checkpointPrompt: string;
+  lesson?: UnitGuidedLesson;
 }
 
 export interface IntensiveCourse {
@@ -386,6 +432,18 @@ export interface StudyActivityEntry {
   score?: number;
 }
 
+export interface UnitStudyProgress {
+  moduleId: string;
+  currentStep: number; // 0..4: Learn, Vocab, Quiz, Drills, Checkpoint
+  completedSteps: number[];
+  masteredVocab: string[];
+  quizAnswers: Record<string, number>;
+  completedDrillIndices: number[];
+  checkpointResponse?: string;
+  checkpointScore?: number;
+  lastStudiedAt: string;
+}
+
 export interface LearnerProgressState {
   version: number;
   completedModuleIds: string[];
@@ -395,4 +453,5 @@ export interface LearnerProgressState {
   aiSessionHistory: AISessionRecord[];
   activityLog: StudyActivityEntry[];
   studyDays: string[]; // YYYY-MM-DD unique active days for streak tracking
+  unitProgress?: Record<string, UnitStudyProgress>;
 }

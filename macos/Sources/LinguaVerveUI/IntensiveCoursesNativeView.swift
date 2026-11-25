@@ -14,6 +14,34 @@ public struct IntensiveCoursesNativeView: View {
         let currentCourse = store.course(for: store.courseLanguageId, level: store.courseLevel) ?? courses.first
         let zeroToHero = store.languageZeroToHeroProgress(for: store.courseLanguageId)
 
+        if let course = currentCourse,
+           let activeId = store.activeLessonModuleId,
+           let activeIdx = course.modules.firstIndex(where: { $0.id == activeId }) {
+            let activeMod = course.modules[activeIdx]
+            let nextMod = activeIdx + 1 < course.modules.count ? course.modules[activeIdx + 1] : nil
+            let courseIdx = courses.firstIndex(where: { $0.id == course.id })
+            let nextLvlCourse = courseIdx.flatMap { $0 + 1 < courses.count ? courses[$0 + 1] : nil }
+
+            UnitLessonPlayerView(
+                store: store,
+                course: course,
+                module: activeMod,
+                unitIndex: activeIdx + 1,
+                totalUnits: course.modules.count,
+                nextModule: nextMod,
+                nextLevelCourse: nextLvlCourse
+            )
+            .id(activeMod.id)
+        } else {
+            syllabusBody(courses: courses, currentCourse: currentCourse, zeroToHero: zeroToHero)
+        }
+    }
+
+    private func syllabusBody(
+        courses: [IntensiveCourse],
+        currentCourse: IntensiveCourse?,
+        zeroToHero: (done: Int, total: Int, percent: Int)
+    ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 // Header & Language Switcher
@@ -56,6 +84,7 @@ public struct IntensiveCoursesNativeView: View {
 
                                 Button {
                                     NativeAudioEngine.shared.playClickSound()
+                                    store.activeLessonModuleId = nil
                                     store.courseLevel = course.level
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
@@ -128,6 +157,21 @@ public struct IntensiveCoursesNativeView: View {
                         }
 
                         FlowLayout(spacing: 8, lineSpacing: 8) {
+                            if let rec = recommendedUnit(for: course) {
+                                Button {
+                                    NativeAudioEngine.shared.playClickSound()
+                                    store.openUnitLesson(
+                                        moduleId: rec.module.id,
+                                        languageId: course.languageId,
+                                        level: course.level
+                                    )
+                                } label: {
+                                    Label(rec.ctaLabel, systemImage: "play.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(BrandTheme.emeraldMint)
+                            }
+
                             Button {
                                 NativeAudioEngine.shared.playClickSound()
                                 store.openExamSimulator(languageId: course.languageId, level: course.level)
@@ -280,8 +324,25 @@ public struct IntensiveCoursesNativeView: View {
         .frame(maxWidth: 240)
     }
 
+    private func recommendedUnit(for course: IntensiveCourse) -> (module: CourseModule, ctaLabel: String)? {
+        if let inProgIdx = course.modules.firstIndex(where: { !store.isModuleCompleted($0.id) && store.unitProgress(for: $0.id) != nil }) {
+            return (course.modules[inProgIdx], "Continue Unit \(inProgIdx + 1)")
+        }
+        if let nextIdx = course.modules.firstIndex(where: { !store.isModuleCompleted($0.id) }) {
+            return (course.modules[nextIdx], "Start Learning · Unit \(nextIdx + 1)")
+        }
+        if let first = course.modules.first {
+            return (first, "Review Unit 1")
+        }
+        return nil
+    }
+
     private func moduleCard(_ mod: CourseModule, index: Int, course: IntensiveCourse) -> some View {
         let done = store.isModuleCompleted(mod.id)
+        let savedProg = store.unitProgress(for: mod.id)
+        let stepsDone = savedProg?.completedSteps.count ?? 0
+        let inProgress = !done && savedProg != nil
+
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -291,6 +352,22 @@ public struct IntensiveCoursesNativeView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(Capsule().fill(Color.primary.opacity(0.08)))
+                        if inProgress {
+                            Text("In Progress · \(stepsDone)/5")
+                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
+                                .foregroundStyle(BrandTheme.deepGold)
+                        }
+                        if let score = savedProg?.checkpointScore {
+                            Text("Checkpoint \(score)%")
+                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                                .foregroundStyle(BrandTheme.emeraldMint)
+                        }
                         ForEach(mod.focusSkills) { sk in
                             Label(sk.shortName, systemImage: sk.systemImage)
                                 .font(.system(size: 11, weight: .semibold))
@@ -307,20 +384,36 @@ public struct IntensiveCoursesNativeView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button {
-                    let nowDone = store.toggleModuleComplete(mod, languageId: course.languageId, level: course.level)
-                    if nowDone {
-                        NativeAudioEngine.shared.playSuccessChime()
-                    } else {
+                VStack(alignment: .trailing, spacing: 6) {
+                    Button {
                         NativeAudioEngine.shared.playClickSound()
-                    }
-                } label: {
-                    Label(done ? "Completed" : "Complete", systemImage: done ? "checkmark.circle.fill" : "circle")
+                        store.openUnitLesson(moduleId: mod.id, languageId: course.languageId, level: course.level)
+                    } label: {
+                        Label(
+                            done ? "Review Unit \(index)" : inProgress ? "Resume Unit \(index)" : "Start Unit \(index)",
+                            systemImage: "play.fill"
+                        )
                         .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.celestialSky)
+                    .controlSize(.small)
+
+                    Button {
+                        let nowDone = store.toggleModuleComplete(mod, languageId: course.languageId, level: course.level)
+                        if nowDone {
+                            NativeAudioEngine.shared.playSuccessChime()
+                        } else {
+                            NativeAudioEngine.shared.playClickSound()
+                        }
+                    } label: {
+                        Label(done ? "Completed" : "Complete", systemImage: done ? "checkmark.circle.fill" : "circle")
+                            .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(done ? BrandTheme.emeraldMint : .accentColor)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(done ? BrandTheme.emeraldMint : .accentColor)
-                .controlSize(.small)
             }
 
             // Objectives

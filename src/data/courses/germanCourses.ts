@@ -1,6 +1,7 @@
 import { IntensiveCourse } from '../../types';
+import { GERMAN_UNIT_LESSONS } from './germanUnitLessons';
 
-export const GERMAN_INTENSIVE_COURSES: IntensiveCourse[] = [
+const RAW_GERMAN_INTENSIVE_COURSES: IntensiveCourse[] = [
   {
     id: 'de-intensive-a1',
     languageId: 'german',
@@ -625,3 +626,11 @@ export const GERMAN_INTENSIVE_COURSES: IntensiveCourse[] = [
     ],
   },
 ];
+
+export const GERMAN_INTENSIVE_COURSES: IntensiveCourse[] = RAW_GERMAN_INTENSIVE_COURSES.map((course) => ({
+  ...course,
+  modules: course.modules.map((mod) => ({
+    ...mod,
+    lesson: GERMAN_UNIT_LESSONS[mod.id],
+  })),
+}));

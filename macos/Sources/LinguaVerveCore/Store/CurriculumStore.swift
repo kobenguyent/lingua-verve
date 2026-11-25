@@ -15,6 +15,7 @@ public final class CurriculumStore {
     public var activeWorkspace: WorkspaceSection = .courses
     public var courseLanguageId: String = "german"
     public var courseLevel: CEFRLevel = .A1
+    public var activeLessonModuleId: String? = nil
     public var examTargetLevel: CEFRLevel = .B1
     public var aiCoachLevel: CEFRLevel = .B1
     public var aiCoachSkill: SkillType = .speaking
@@ -236,6 +237,45 @@ public final class CurriculumStore {
             persistLearnerState()
             return true
         }
+    }
+
+    public func unitProgress(for moduleId: String) -> UnitStudyProgress? {
+        learnerState.unitProgress[moduleId]
+    }
+
+    public func saveUnitProgress(_ progress: UnitStudyProgress) {
+        learnerState.unitProgress[progress.moduleId] = progress
+        touchStudyDay()
+        persistLearnerState()
+    }
+
+    public func markModuleCompleted(
+        _ module: CourseModule,
+        languageId: String,
+        level: CEFRLevel,
+        score: Int? = nil
+    ) {
+        if !learnerState.completedModuleIds.contains(module.id) {
+            learnerState.completedModuleIds.append(module.id)
+        }
+        touchStudyDay()
+        let detail: String
+        if let score {
+            detail = "\(languageId.uppercased()) \(level.rawValue) guided unit completed · Checkpoint \(score)%"
+        } else {
+            detail = "\(languageId.uppercased()) \(level.rawValue) guided unit mastered"
+        }
+        appendActivity(
+            StudyActivityEntry(
+                type: "module-complete",
+                languageId: languageId,
+                level: level,
+                title: "Completed Unit: \(module.title)",
+                detail: detail,
+                score: score
+            )
+        )
+        persistLearnerState()
     }
 
     public func courseCompletionPercent(for course: IntensiveCourse) -> Int {
@@ -525,7 +565,19 @@ public final class CurriculumStore {
     public func openCourse(languageId: String, level: CEFRLevel) {
         self.courseLanguageId = languageId == "german" ? "german" : "english"
         self.courseLevel = level
+        self.activeLessonModuleId = nil
         self.activeWorkspace = .courses
+    }
+
+    public func openUnitLesson(moduleId: String, languageId: String, level: CEFRLevel) {
+        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLevel = level
+        self.activeLessonModuleId = moduleId
+        self.activeWorkspace = .courses
+    }
+
+    public func closeUnitLesson() {
+        self.activeLessonModuleId = nil
     }
 
     public func openExamSimulator(languageId: String, level: CEFRLevel) {

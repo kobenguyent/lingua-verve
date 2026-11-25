@@ -1,0 +1,1375 @@
+import SwiftUI
+import LinguaVerveCore
+
+public struct UnitLessonPlayerView: View {
+    @Bindable var store: CurriculumStore
+    public let course: IntensiveCourse
+    public let module: CourseModule
+    public let unitIndex: Int
+    public let totalUnits: Int
+    public let nextModule: CourseModule?
+    public let nextLevelCourse: IntensiveCourse?
+
+    private enum LessonStep: Int, CaseIterable, Identifiable {
+        case learn = 0
+        case vocab = 1
+        case quiz = 2
+        case drills = 3
+        case checkpoint = 4
+
+        var id: Int { rawValue }
+
+        var shortTitle: String {
+            switch self {
+            case .learn: return "1. Learn"
+            case .vocab: return "2. Vocab"
+            case .quiz: return "3. Quiz"
+            case .drills: return "4. Drills"
+            case .checkpoint: return "5. Checkpoint"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .learn: return "book.fill"
+            case .vocab: return "speaker.wave.2.fill"
+            case .quiz: return "sparkles"
+            case .drills: return "headphones"
+            case .checkpoint: return "rosette"
+            }
+        }
+    }
+
+    @State private var currentStep: LessonStep = .learn
+    @State private var completedSteps: Set<Int> = []
+
+    // Step 2: Vocab flashcards
+    @State private var vocabIndex: Int = 0
+    @State private var isCardFlipped: Bool = false
+    @State private var masteredVocab: Set<String> = []
+
+    // Step 3: Interactive Quiz
+    @State private var quizAnswers: [String: Int] = [:]
+
+    // Step 4: Drills workbench
+    @State private var completedDrills: Set<Int> = []
+    @State private var drillNotes: [Int: String] = [:]
+    @State private var drillAudioPlays: [Int: Int] = [:]
+    @State private var drillEvaluations: [Int: AIEvaluationResult] = [:]
+    @State private var evaluatingDrillIdx: Int? = nil
+    @State private var activeMicDrillIdx: Int? = nil
+
+    // Step 5: Milestone Checkpoint
+    @State private var checkpointText: String = ""
+    @State private var checkpointEvaluation: AIEvaluationResult? = nil
+    @State private var checkpointScore: Int? = nil
+    @State private var isEvaluatingCheckpoint: Bool = false
+    @State private var showModelAnswer: Bool = false
+    @State private var isRecordingCheckpoint: Bool = false
+    @State private var justCompletedUnit: Bool = false
+
+    @State private var speechRecognizer = NativeSpeechRecognizer()
+    private let aiService = AIClientService()
+
+    public init(
+        store: CurriculumStore,
+        course: IntensiveCourse,
+        module: CourseModule,
+        unitIndex: Int,
+        totalUnits: Int,
+        nextModule: CourseModule?,
+        nextLevelCourse: IntensiveCourse?
+    ) {
+        self.store = store
+        self.course = course
+        self.module = module
+        self.unitIndex = unitIndex
+        self.totalUnits = totalUnits
+        self.nextModule = nextModule
+        self.nextLevelCourse = nextLevelCourse
+
+        let saved = store.unitProgress(for: module.id)
+        let savedStep = LessonStep(rawValue: saved?.currentStep ?? 0) ?? .learn
+        _currentStep = State(initialValue: savedStep)
+        _completedSteps = State(initialValue: Set(saved?.completedSteps ?? []))
+        _masteredVocab = State(initialValue: Set(saved?.masteredVocab ?? []))
+        _quizAnswers = State(initialValue: saved?.quizAnswers ?? [:])
+        _completedDrills = State(initialValue: Set(saved?.completedDrillIndices ?? []))
+        _checkpointText = State(initialValue: saved?.checkpointResponse ?? "")
+        _checkpointScore = State(initialValue: saved?.checkpointScore)
+    }
+
+    private var lesson: UnitGuidedLesson {
+        if let existing = module.lesson {
+            return existing
+        }
+        return UnitGuidedLesson(
+            estimatedMins: 25,
+            overview: module.summary,
+            sections: module.grammarCheckpoints.enumerated().map { idx, grammar in
+                UnitLessonSection(
+                    id: "\(module.id)-fallback-\(idx)",
+                    heading: grammar,
+                    explanation: idx < module.objectives.count ? module.objectives[idx] : module.summary,
+                    formula: nil,
+                    examples: [
+                        UnitLessonExample(
+                            target: module.keyVocabulary.joined(separator: " · "),
+                            translation: "Practice pronouncing and using these target unit expressions in context.",
+                            highlight: nil
+                        )
+                    ],
+                    proTip: nil
+                )
+            },
+            vocabCards: module.keyVocabulary.map { term in
+                UnitVocabCard(
+                    term: term,
+                    pronunciation: nil,
+                    meaning: "High-yield term for \(module.title)",
+                    example: term,
+                    exampleNote: nil
+                )
+            },
+            practiceQuestions: [
+                UnitPracticeQuestion(
+                    id: "\(module.id)-fallback-q1",
+                    skill: module.focusSkills.first ?? .reading,
+                    prompt: "Which objective belongs to \(module.title)?",
+                    passage: nil,
+                    audioScript: nil,
+                    options: [
+                        module.objectives.first ?? module.summary,
+                        "Skip listening and speaking completely.",
+                        "Avoid checking grammar patterns."
+                    ],
+                    correctIndex: 0,
+                    explanation: module.objectives.first ?? module.summary
+                )
+            ],
+            checkpointSkill: module.focusSkills.contains(.speaking) ? .speaking : .writing,
+            checkpointMinWords: 40,
+            checkpointModelAnswer: module.checkpointPrompt
+        )
+    }
+
+    public var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                headerAndStepperCard
+
+                switch currentStep {
+                case .learn:
+                    learnStepView
+                case .vocab:
+                    vocabStepView
+                case .quiz:
+                    quizStepView
+                case .drills:
+                    drillsStepView
+                case .checkpoint:
+                    checkpointStepView
+                }
+            }
+            .padding(20)
+        }
+        .onChange(of: speechRecognizer.transcript) { _, newValue in
+            guard !newValue.isEmpty else { return }
+            if isRecordingCheckpoint {
+                checkpointText = newValue
+            } else if let idx = activeMicDrillIdx {
+                drillNotes[idx] = newValue
+            }
+        }
+        .onDisappear {
+            stopSpeech()
+            persistProgress()
+        }
+    }
+
+    // MARK: - Header & 5-Step Stepper
+
+    private var headerAndStepperCard: some View {
+        let isDone = store.isModuleCompleted(module.id)
+        let pct = Int((Double(completedSteps.count) / Double(LessonStep.allCases.count) * 100.0).rounded())
+
+        return VStack(alignment: .leading, spacing: 14) {
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    backButton
+                    Spacer()
+                    audioControls
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    backButton
+                    audioControls
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                FlowLayout(spacing: 6, lineSpacing: 4) {
+                    Text("\(course.level.rawValue) · Unit \(unitIndex) of \(totalUnits)")
+                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(BrandTheme.celestialSky))
+                        .foregroundStyle(.white)
+
+                    Text(module.weekLabel)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.primary.opacity(0.06)))
+
+                    if isDone {
+                        Label("Unit Mastered", systemImage: "checkmark.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                            .foregroundStyle(BrandTheme.emeraldMint)
+                    }
+                }
+
+                Text(module.title)
+                    .font(.system(size: 21, weight: .bold, design: .serif))
+                Text(lesson.overview)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Guided Lesson Progress")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(completedSteps.count)/\(LessonStep.allCases.count) steps (\(pct)%)")
+                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .monospacedDigit()
+                }
+                ProgressView(value: Double(max(8, pct)), total: 100.0)
+                    .tint(BrandTheme.emeraldMint)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(LessonStep.allCases) { step in
+                            let isActive = currentStep == step
+                            let isStepDone = completedSteps.contains(step.rawValue)
+                            Button {
+                                goToStep(step)
+                            } label: {
+                                Label(
+                                    step.shortTitle,
+                                    systemImage: (isStepDone && !isActive) ? "checkmark.circle.fill" : step.systemImage
+                                )
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(
+                                            isActive
+                                                ? BrandTheme.celestialSky
+                                                : isStepDone
+                                                    ? BrandTheme.emeraldMint.opacity(0.15)
+                                                    : Color.primary.opacity(0.05)
+                                        )
+                                )
+                                .foregroundStyle(
+                                    isActive
+                                        ? Color.white
+                                        : isStepDone
+                                            ? BrandTheme.emeraldMint
+                                            : Color.primary
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+    }
+
+    private var backButton: some View {
+        Button {
+            stopSpeech()
+            NativeAudioEngine.shared.playClickSound()
+            persistProgress()
+            store.closeUnitLesson()
+        } label: {
+            Label("Back to \(course.level.rawValue) Syllabus", systemImage: "chevron.left")
+                .font(.caption.weight(.bold))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var audioControls: some View {
+        HStack(spacing: 12) {
+            Label("~\(lesson.estimatedMins)m", systemImage: "clock")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            Toggle("0.75x Slow", isOn: Bindable(NativeAudioEngine.shared).slowPace)
+                .toggleStyle(.switch)
+                .font(.caption.monospaced())
+                .fixedSize()
+        }
+    }
+
+    // MARK: - Step 1: Learn (Concept & Grammar)
+
+    private var learnStepView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("WHAT YOU WILL MASTER IN UNIT \(unitIndex)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(BrandTheme.celestialSky)
+                ForEach(module.objectives, id: \.self) { obj in
+                    HStack(alignment: .top, spacing: 7) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundStyle(BrandTheme.celestialSky)
+                            .padding(.top, 2)
+                        Text(obj)
+                            .font(.subheadline)
+                    }
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 13).fill(BrandTheme.celestialSky.opacity(0.08)))
+
+            ForEach(Array(lesson.sections.enumerated()), id: \.element.id) { idx, section in
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("CORE CONCEPT \(idx + 1) OF \(lesson.sections.count)")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(BrandTheme.celestialSky)
+                    Text(section.heading)
+                        .font(.headline)
+                    Text(section.explanation)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    if let formula = section.formula {
+                        Text(formula)
+                            .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                            .padding(11)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)))
+                    }
+
+                    Text("LIVE EXAMPLES (TAP TO LISTEN)")
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
+                        ForEach(section.examples) { ex in
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                NativeAudioEngine.shared.speak(ex.target, languageId: course.languageId)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Text(ex.target)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .multilineTextAlignment(.leading)
+                                        Spacer(minLength: 4)
+                                        Image(systemName: "speaker.wave.2.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(BrandTheme.celestialSky)
+                                    }
+                                    Text(ex.translation)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.leading)
+                                    if let highlight = ex.highlight {
+                                        Text("Pattern: \(highlight)")
+                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(RoundedRectangle(cornerRadius: 6).fill(BrandTheme.celestialSky.opacity(0.14)))
+                                            .foregroundStyle(BrandTheme.celestialSky)
+                                    }
+                                }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                                .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.04)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if let tip = section.proTip {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundStyle(BrandTheme.deepGold)
+                                .padding(.top, 2)
+                            Text("Exam Pro Tip: \(tip)")
+                                .font(.caption)
+                        }
+                        .padding(11)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.champagneGold.opacity(0.14)))
+                    }
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    goToStep(.vocab, markCurrentDone: true)
+                } label: {
+                    Label("Continue to Vocabulary Flashcards", systemImage: "arrow.right")
+                        .font(.subheadline.weight(.bold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(BrandTheme.celestialSky)
+            }
+        }
+    }
+
+    // MARK: - Step 2: Audio Vocabulary Flashcards
+
+    private var vocabStepView: some View {
+        let cards = lesson.vocabCards
+        let safeIdx = min(vocabIndex, max(0, cards.count - 1))
+        let card = cards.isEmpty ? nil : cards[safeIdx]
+
+        return VStack(alignment: .leading, spacing: 14) {
+            if let card {
+                let isMastered = masteredVocab.contains(card.term)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("AUDIO FLASHCARD DECK · CARD \(safeIdx + 1) OF \(cards.count)")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(BrandTheme.celestialSky)
+                            Text("High-Yield Exam Vocabulary Studio")
+                                .font(.headline)
+                        }
+                        Spacer()
+                        Text("Mastered \(masteredVocab.count)/\(cards.count)")
+                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                            .foregroundStyle(BrandTheme.emeraldMint)
+                    }
+
+                    // Flashcard Surface
+                    VStack(spacing: 14) {
+                        HStack(spacing: 8) {
+                            Text(isCardFlipped ? "MEANING & CONTEXT" : "TARGET EXPRESSION")
+                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            if isMastered {
+                                Label("Got It", systemImage: "checkmark.circle.fill")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(BrandTheme.emeraldMint)
+                            }
+                        }
+
+                        Text(card.term)
+                            .font(.system(size: 26, weight: .bold, design: .serif))
+                            .multilineTextAlignment(.center)
+
+                        if let pron = card.pronunciation {
+                            Text(pron)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                NativeAudioEngine.shared.speak(card.term, languageId: course.languageId)
+                            } label: {
+                                Label("Listen", systemImage: "speaker.wave.2.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(BrandTheme.celestialSky)
+
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                isCardFlipped.toggle()
+                            } label: {
+                                Label(isCardFlipped ? "Hide Answer" : "Reveal Meaning & Example", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        if isCardFlipped {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(card.meaning)
+                                    .font(.headline)
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("“\(card.example)”")
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Button {
+                                        NativeAudioEngine.shared.playClickSound()
+                                        NativeAudioEngine.shared.speak(card.example, languageId: course.languageId)
+                                    } label: {
+                                        Image(systemName: "speaker.wave.2.fill")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
+                                if let note = card.exampleNote {
+                                    Text(note)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        FlowLayout(spacing: 10, lineSpacing: 8) {
+                            Button {
+                                handleVocabDecision(mastered: false, card: card, total: cards.count)
+                            } label: {
+                                Label("Need Review", systemImage: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(BrandTheme.deepGold)
+
+                            Button {
+                                handleVocabDecision(mastered: true, card: card, total: cards.count)
+                            } label: {
+                                Label("Got It! Next Card", systemImage: "checkmark.circle.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(BrandTheme.emeraldMint)
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(BrandTheme.celestialSky.opacity(0.25), lineWidth: 1))
+
+                    // Deck Pills
+                    FlowLayout(spacing: 6, lineSpacing: 6) {
+                        ForEach(Array(cards.enumerated()), id: \.element.id) { idx, item in
+                            let selected = idx == safeIdx
+                            let itemMastered = masteredVocab.contains(item.term)
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                vocabIndex = idx
+                                isCardFlipped = false
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if itemMastered {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.caption2)
+                                    }
+                                    Text(item.term)
+                                        .font(.system(size: 11.5, design: .monospaced))
+                                }
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(
+                                            selected
+                                                ? BrandTheme.celestialSky
+                                                : itemMastered
+                                                    ? BrandTheme.emeraldMint.opacity(0.15)
+                                                    : Color.primary.opacity(0.05)
+                                        )
+                                )
+                                .foregroundStyle(selected ? .white : itemMastered ? BrandTheme.emeraldMint : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            }
+
+            stepFooterButtons(back: .learn, backLabel: "Back to Concept", next: .quiz, nextLabel: "Continue to Quiz")
+        }
+    }
+
+    // MARK: - Step 3: Interactive Knowledge Check Quiz
+
+    private var quizStepView: some View {
+        let questions = lesson.practiceQuestions
+        let correctCount = questions.filter { quizAnswers[$0.id] == $0.correctIndex }.count
+
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("INTERACTIVE CHECK · INSTANT EXPLANATIONS")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(BrandTheme.celestialSky)
+                        Text("Test Your Unit \(unitIndex) Mastery")
+                            .font(.headline)
+                    }
+                    Spacer()
+                    Text("Score \(correctCount)/\(questions.count)")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
+                        .foregroundStyle(BrandTheme.celestialSky)
+                    if !quizAnswers.isEmpty {
+                        Button("Retry") {
+                            NativeAudioEngine.shared.playClickSound()
+                            quizAnswers = [:]
+                            persistProgress()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+
+                ForEach(Array(questions.enumerated()), id: \.element.id) { idx, q in
+                    let chosen = quizAnswers[q.id]
+                    let isAnswered = chosen != nil
+                    let isCorrect = chosen == q.correctIndex
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Question \(idx + 1) of \(questions.count)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Label(q.skill.shortName, systemImage: q.skill.systemImage)
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
+                                .foregroundStyle(BrandTheme.celestialSky)
+                        }
+
+                        if let passage = q.passage {
+                            Text(passage)
+                                .font(.caption)
+                                .italic()
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+                        }
+
+                        if let audioScript = q.audioScript {
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                NativeAudioEngine.shared.speak(audioScript, languageId: course.languageId)
+                            } label: {
+                                Label("Play Listening Clip", systemImage: "speaker.wave.2.fill")
+                                    .font(.caption.weight(.bold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.purple)
+                            .controlSize(.small)
+
+                            if isAnswered {
+                                DisclosureGroup("View Audio Transcript") {
+                                    Text(audioScript)
+                                        .font(.caption)
+                                        .padding(.top, 4)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .font(.caption)
+                            }
+                        }
+
+                        Text(q.prompt)
+                            .font(.subheadline.weight(.semibold))
+
+                        VStack(spacing: 7) {
+                            ForEach(Array(q.options.enumerated()), id: \.offset) { optIdx, opt in
+                                let selected = chosen == optIdx
+                                let optionIsRight = optIdx == q.correctIndex
+
+                                Button {
+                                    handleAnswerQuiz(question: q, optionIndex: optIdx)
+                                } label: {
+                                    HStack {
+                                        Text(opt)
+                                            .font(.caption)
+                                            .multilineTextAlignment(.leading)
+                                        Spacer()
+                                        if isAnswered && optionIsRight {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(BrandTheme.emeraldMint)
+                                        } else if isAnswered && selected && !optionIsRight {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundStyle(.red)
+                                        }
+                                    }
+                                    .padding(10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 9)
+                                            .fill(
+                                                isAnswered && optionIsRight
+                                                    ? BrandTheme.emeraldMint.opacity(0.16)
+                                                    : isAnswered && selected && !optionIsRight
+                                                        ? Color.red.opacity(0.14)
+                                                        : Color.primary.opacity(0.04)
+                                            )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 9)
+                                            .strokeBorder(
+                                                isAnswered && optionIsRight
+                                                    ? BrandTheme.emeraldMint
+                                                    : isAnswered && selected && !optionIsRight
+                                                        ? Color.red
+                                                        : Color.primary.opacity(0.1),
+                                                lineWidth: 1
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        if isAnswered {
+                            Text("\(isCorrect ? "✓ Correct: " : "Key Takeaway: ")\(q.explanation)")
+                                .font(.caption)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(isCorrect ? BrandTheme.emeraldMint.opacity(0.12) : BrandTheme.champagneGold.opacity(0.16))
+                                )
+                        }
+                    }
+                    .padding(13)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.035)))
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+
+            stepFooterButtons(back: .vocab, backLabel: "Back to Vocab", next: .drills, nextLabel: "Continue to Drills")
+        }
+    }
+
+    // MARK: - Step 4: Interactive 4-Skill Drills Workbench
+
+    private var drillsStepView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("ACTIVE SKILL WORKBENCH · \(completedDrills.count)/\(module.drills.count) PRACTICED")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(BrandTheme.celestialSky)
+
+                if let msg = speechRecognizer.statusMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
+                }
+
+                ForEach(Array(module.drills.enumerated()), id: \.element.id) { idx, drill in
+                    let practiced = completedDrills.contains(idx)
+                    let isProductive = drill.skill == .writing || drill.skill == .speaking
+                    let noteBinding = Binding<String>(
+                        get: { drillNotes[idx] ?? "" },
+                        set: { drillNotes[idx] = $0 }
+                    )
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(BrandTheme.celestialSky)
+                                Text(drill.title)
+                                    .font(.subheadline.weight(.bold))
+                            }
+                            Spacer()
+                            Button {
+                                toggleDrillPracticed(idx)
+                            } label: {
+                                Label(practiced ? "Practiced" : "Mark Practiced", systemImage: practiced ? "checkmark.circle.fill" : "circle")
+                                    .font(.caption2.weight(.bold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(practiced ? BrandTheme.emeraldMint : .accentColor)
+                            .controlSize(.mini)
+                        }
+
+                        Text(drill.instruction)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let passage = drill.samplePassage {
+                            Text(passage)
+                                .font(.caption)
+                                .italic()
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+                        }
+
+                        if let script = drill.audioScript {
+                            HStack(spacing: 10) {
+                                Button {
+                                    NativeAudioEngine.shared.playClickSound()
+                                    NativeAudioEngine.shared.speak(script, languageId: course.languageId)
+                                    drillAudioPlays[idx, default: 0] += 1
+                                } label: {
+                                    Label("Play Listening Audio", systemImage: "speaker.wave.2.fill")
+                                        .font(.caption.weight(.bold))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.purple)
+                                .controlSize(.small)
+
+                                if let count = drillAudioPlays[idx], count > 0 {
+                                    Text("Played \(count)×")
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            DisclosureGroup("Reveal Audio Transcript") {
+                                Text(script)
+                                    .font(.caption)
+                                    .padding(.top, 4)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .font(.caption)
+                        }
+
+                        Text(isProductive ? "Your Practice Response:" : "Your Notes & Comprehension Answers:")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.secondary)
+
+                        TextEditor(text: noteBinding)
+                            .font(.caption)
+                            .frame(minHeight: isProductive ? 84 : 56)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+
+                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                            if drill.skill == .speaking {
+                                let recordingThis = speechRecognizer.isRecording && activeMicDrillIdx == idx
+                                Button {
+                                    toggleDrillMic(idx)
+                                } label: {
+                                    Label(
+                                        recordingThis ? "Stop Mic" : "Dictate Live Voice",
+                                        systemImage: recordingThis ? "mic.slash.fill" : "mic.fill"
+                                    )
+                                    .font(.caption.weight(.bold))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(recordingThis ? .red : BrandTheme.emeraldMint)
+                                .controlSize(.small)
+                            }
+
+                            if isProductive {
+                                Button {
+                                    Task { await evaluateDrill(idx: idx, drill: drill) }
+                                } label: {
+                                    Label(
+                                        evaluatingDrillIdx == idx ? "Evaluating..." : "Evaluate Drill",
+                                        systemImage: "sparkles"
+                                    )
+                                    .font(.caption.weight(.bold))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(BrandTheme.celestialSky)
+                                .controlSize(.small)
+                                .disabled(evaluatingDrillIdx == idx || (drillNotes[idx] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+
+                            Button {
+                                store.openAICoach(
+                                    languageId: course.languageId,
+                                    level: course.level,
+                                    skill: drill.skill,
+                                    seedPrompt: "Practice drill: \(drill.title). \(drill.instruction)"
+                                )
+                            } label: {
+                                Label("Open in AI Coach", systemImage: "bubble.left.and.sparkles")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        if let result = drillEvaluations[idx] {
+                            evaluationBox(result)
+                        }
+                    }
+                    .padding(13)
+                    .background(
+                        RoundedRectangle(cornerRadius: 11)
+                            .fill(practiced ? BrandTheme.emeraldMint.opacity(0.06) : Color.primary.opacity(0.035))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11)
+                            .strokeBorder(practiced ? BrandTheme.emeraldMint.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+
+            stepFooterButtons(back: .quiz, backLabel: "Back to Quiz", next: .checkpoint, nextLabel: "Continue to Checkpoint")
+        }
+    }
+
+    // MARK: - Step 5: Milestone Checkpoint & Unit Completion
+
+    private var checkpointStepView: some View {
+        let wordCount = checkpointText.split(whereSeparator: \.isWhitespace).count
+
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Label("UNIT \(unitIndex) MILESTONE CHECKPOINT", systemImage: "rosette")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(BrandTheme.deepGold)
+                            Text(lesson.checkpointSkill.displayName)
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
+                                .foregroundStyle(BrandTheme.celestialSky)
+                        }
+                        Text(module.checkpointPrompt)
+                            .font(.headline)
+                    }
+                    Spacer()
+                    Text("\(wordCount) / \(lesson.checkpointMinWords)+ words")
+                        .font(.caption.monospaced())
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.primary.opacity(0.07)))
+                }
+
+                // Vocabulary hints
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("TRY USING THESE UNIT \(unitIndex) TERMS (TAP TO HEAR)")
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 6, lineSpacing: 6) {
+                        ForEach(module.keyVocabulary, id: \.self) { word in
+                            let used = checkpointText.localizedCaseInsensitiveContains(word)
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                NativeAudioEngine.shared.speak(word, languageId: course.languageId)
+                            } label: {
+                                Label(word, systemImage: used ? "checkmark.circle.fill" : "speaker.wave.2.fill")
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 7)
+                                            .fill(used ? BrandTheme.emeraldMint.opacity(0.18) : BrandTheme.celestialSky.opacity(0.12))
+                                    )
+                                    .foregroundStyle(used ? BrandTheme.emeraldMint : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if let msg = speechRecognizer.statusMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
+                }
+
+                TextEditor(text: $checkpointText)
+                    .font(.subheadline)
+                    .frame(minHeight: 130)
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+
+                FlowLayout(spacing: 8, lineSpacing: 8) {
+                    Button {
+                        toggleCheckpointMic()
+                    } label: {
+                        Label(
+                            isRecordingCheckpoint ? "Stop Mic Recording" : "Dictate Live Voice",
+                            systemImage: isRecordingCheckpoint ? "mic.slash.fill" : "mic.fill"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isRecordingCheckpoint ? .red : BrandTheme.emeraldMint)
+
+                    Button {
+                        Task { await evaluateCheckpoint() }
+                    } label: {
+                        Label(
+                            isEvaluatingCheckpoint ? "Evaluating..." : "Evaluate Checkpoint",
+                            systemImage: "sparkles"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.celestialSky)
+                    .disabled(isEvaluatingCheckpoint || checkpointText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button {
+                        NativeAudioEngine.shared.playClickSound()
+                        showModelAnswer.toggle()
+                    } label: {
+                        Label(showModelAnswer ? "Hide Model Answer" : "Compare with Model Answer", systemImage: "doc.text.magnifyingglass")
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if let eval = checkpointEvaluation {
+                    evaluationBox(eval)
+                }
+
+                if showModelAnswer {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("REFERENCE \(course.level.rawValue) MODEL RESPONSE")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                NativeAudioEngine.shared.playClickSound()
+                                NativeAudioEngine.shared.speak(lesson.checkpointModelAnswer, languageId: course.languageId)
+                            } label: {
+                                Label("Listen to Model", systemImage: "speaker.wave.2.fill")
+                                    .font(.caption.weight(.bold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(BrandTheme.celestialSky)
+                            .controlSize(.small)
+                        }
+                        Text(lesson.checkpointModelAnswer)
+                            .font(.subheadline)
+                    }
+                    .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.04)))
+                }
+
+                if justCompletedUnit {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Unit \(unitIndex) Completed! Progress saved.", systemImage: "graduationcap.fill")
+                            .font(.headline)
+                            .foregroundStyle(BrandTheme.emeraldMint)
+                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                            Button {
+                                store.closeUnitLesson()
+                                store.openExamSimulator(languageId: course.languageId, level: course.level)
+                            } label: {
+                                Label("Simulate \(course.level.rawValue) 4-Skill Exam", systemImage: "timer")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(BrandTheme.celestialSky)
+
+                            if let nextLvl = nextLevelCourse {
+                                Button {
+                                    NativeAudioEngine.shared.playClickSound()
+                                    store.openCourse(languageId: nextLvl.languageId, level: nextLvl.level)
+                                } label: {
+                                    Label("Start \(nextLvl.level.rawValue) Course", systemImage: "arrow.right.circle.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(BrandTheme.emeraldMint)
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(BrandTheme.emeraldMint.opacity(0.14)))
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+
+            HStack {
+                Button {
+                    goToStep(.drills)
+                } label: {
+                    Label("Back to Drills", systemImage: "chevron.left")
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                if let nextMod = nextModule {
+                    Button {
+                        finishUnit(advanceTo: nextMod)
+                    } label: {
+                        Label("Complete Unit & Continue to Unit \(unitIndex + 1)", systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.emeraldMint)
+                } else {
+                    Button {
+                        finishUnit(advanceTo: nil)
+                    } label: {
+                        Label("Complete Unit \(unitIndex) & Finish \(course.level.rawValue)", systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.emeraldMint)
+                }
+            }
+        }
+    }
+
+    // MARK: - Reusable Subviews & Actions
+
+    private func stepFooterButtons(back: LessonStep, backLabel: String, next: LessonStep, nextLabel: String) -> some View {
+        HStack {
+            Button {
+                goToStep(back)
+            } label: {
+                Label(backLabel, systemImage: "chevron.left")
+            }
+            .buttonStyle(.bordered)
+
+            Spacer()
+
+            Button {
+                goToStep(next, markCurrentDone: true)
+            } label: {
+                Label(nextLabel, systemImage: "arrow.right")
+                    .font(.subheadline.weight(.bold))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(BrandTheme.celestialSky)
+        }
+    }
+
+    private func evaluationBox(_ result: AIEvaluationResult) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(result.score)/100")
+                    .font(.title3.bold().monospacedDigit())
+                Text("CEFR \(result.cefrEstimate.rawValue)")
+                    .font(.caption.weight(.bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(BrandTheme.celestialSky))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(result.providerLabel)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            Text(result.examinerSummary)
+                .font(.caption)
+
+            if !result.strengths.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Strengths")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                    ForEach(result.strengths, id: \.self) { item in
+                        Text("• \(item)").font(.caption)
+                    }
+                }
+            }
+            if !result.corrections.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Next-Level Fixes")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(BrandTheme.deepGold)
+                    ForEach(result.corrections, id: \.self) { item in
+                        Text("• \(item)").font(.caption)
+                    }
+                }
+            }
+            if !result.upgradedVersion.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Upgraded \(course.level.rawValue)+ Version")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(BrandTheme.celestialSky)
+                    Text(result.upgradedVersion).font(.caption)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.celestialSky.opacity(0.09)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(BrandTheme.celestialSky.opacity(0.3), lineWidth: 1))
+    }
+
+    private func stopSpeech() {
+        speechRecognizer.stop()
+        activeMicDrillIdx = nil
+        isRecordingCheckpoint = false
+    }
+
+    private func goToStep(_ next: LessonStep, markCurrentDone: Bool = false) {
+        stopSpeech()
+        NativeAudioEngine.shared.playClickSound()
+        if markCurrentDone {
+            completedSteps.insert(currentStep.rawValue)
+        }
+        currentStep = next
+        persistProgress()
+    }
+
+    private func handleVocabDecision(mastered: Bool, card: UnitVocabCard, total: Int) {
+        if mastered {
+            NativeAudioEngine.shared.playSuccessChime()
+            masteredVocab.insert(card.term)
+        } else {
+            NativeAudioEngine.shared.playClickSound()
+            masteredVocab.remove(card.term)
+        }
+        if masteredVocab.count >= total {
+            completedSteps.insert(LessonStep.vocab.rawValue)
+        }
+        persistProgress()
+        isCardFlipped = false
+        if vocabIndex + 1 < total {
+            vocabIndex += 1
+        }
+    }
+
+    private func handleAnswerQuiz(question: UnitPracticeQuestion, optionIndex: Int) {
+        quizAnswers[question.id] = optionIndex
+        if optionIndex == question.correctIndex {
+            NativeAudioEngine.shared.playSuccessChime()
+        } else {
+            NativeAudioEngine.shared.playClickSound()
+        }
+        if lesson.practiceQuestions.allSatisfy({ quizAnswers[$0.id] != nil }) {
+            completedSteps.insert(LessonStep.quiz.rawValue)
+        }
+        persistProgress()
+    }
+
+    private func toggleDrillPracticed(_ idx: Int) {
+        if completedDrills.contains(idx) {
+            completedDrills.remove(idx)
+            NativeAudioEngine.shared.playClickSound()
+        } else {
+            completedDrills.insert(idx)
+            NativeAudioEngine.shared.playSuccessChime()
+        }
+        if completedDrills.count >= module.drills.count {
+            completedSteps.insert(LessonStep.drills.rawValue)
+        }
+        persistProgress()
+    }
+
+    private func toggleDrillMic(_ idx: Int) {
+        if speechRecognizer.isRecording && activeMicDrillIdx == idx {
+            stopSpeech()
+        } else {
+            stopSpeech()
+            activeMicDrillIdx = idx
+            speechRecognizer.start(languageId: course.languageId, existingText: drillNotes[idx] ?? "")
+        }
+    }
+
+    private func evaluateDrill(idx: Int, drill: CourseDrill) async {
+        let text = (drillNotes[idx] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        evaluatingDrillIdx = idx
+        defer { evaluatingDrillIdx = nil }
+
+        let result = await aiService.evaluateWithAIOrFallback(
+            config: store.aiConfig,
+            text: text,
+            languageId: course.languageId,
+            level: course.level,
+            skill: drill.skill == .speaking ? .speaking : .writing,
+            taskPrompt: "\(drill.title): \(drill.instruction)",
+            minWords: max(20, Int(Double(lesson.checkpointMinWords) * 0.7)),
+            expectedKeywords: module.keyVocabulary
+        )
+        drillEvaluations[idx] = result
+        completedDrills.insert(idx)
+        if completedDrills.count >= module.drills.count {
+            completedSteps.insert(LessonStep.drills.rawValue)
+        }
+        persistProgress()
+        NativeAudioEngine.shared.playSuccessChime()
+    }
+
+    private func toggleCheckpointMic() {
+        if isRecordingCheckpoint {
+            stopSpeech()
+        } else {
+            stopSpeech()
+            isRecordingCheckpoint = true
+            speechRecognizer.start(languageId: course.languageId, existingText: checkpointText)
+        }
+    }
+
+    private func evaluateCheckpoint() async {
+        stopSpeech()
+        isEvaluatingCheckpoint = true
+        defer { isEvaluatingCheckpoint = false }
+
+        let result = await aiService.evaluateWithAIOrFallback(
+            config: store.aiConfig,
+            text: checkpointText,
+            languageId: course.languageId,
+            level: course.level,
+            skill: lesson.checkpointSkill,
+            taskPrompt: module.checkpointPrompt,
+            minWords: lesson.checkpointMinWords,
+            expectedKeywords: module.keyVocabulary
+        )
+        checkpointEvaluation = result
+        checkpointScore = result.score
+        completedSteps.insert(LessonStep.checkpoint.rawValue)
+        persistProgress()
+        NativeAudioEngine.shared.playSuccessChime()
+    }
+
+    private func finishUnit(advanceTo nextMod: CourseModule?) {
+        stopSpeech()
+        completedSteps = Set(LessonStep.allCases.map(\.rawValue))
+        persistProgress()
+        store.markModuleCompleted(module, languageId: course.languageId, level: course.level, score: checkpointScore)
+        NativeAudioEngine.shared.playSuccessChime()
+        if let nextMod {
+            store.openUnitLesson(moduleId: nextMod.id, languageId: course.languageId, level: course.level)
+        } else {
+            justCompletedUnit = true
+        }
+    }
+
+    private func persistProgress() {
+        let progress = UnitStudyProgress(
+            moduleId: module.id,
+            currentStep: currentStep.rawValue,
+            completedSteps: completedSteps.sorted(),
+            masteredVocab: masteredVocab.sorted(),
+            quizAnswers: quizAnswers,
+            completedDrillIndices: completedDrills.sorted(),
+            checkpointResponse: checkpointText,
+            checkpointScore: checkpointScore,
+            lastStudiedAt: ISO8601DateFormatter().string(from: Date())
+        )
+        store.saveUnitProgress(progress)
+    }
+}

@@ -274,6 +274,129 @@ public struct CourseDrill: Codable, Equatable, Sendable, Identifiable {
     public let samplePassage: String?
 }
 
+public struct UnitLessonExample: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { target }
+    public let target: String
+    public let translation: String
+    public let highlight: String?
+
+    public init(target: String, translation: String, highlight: String? = nil) {
+        self.target = target
+        self.translation = translation
+        self.highlight = highlight
+    }
+}
+
+public struct UnitLessonSection: Codable, Equatable, Sendable, Identifiable {
+    public let id: String
+    public let heading: String
+    public let explanation: String
+    public let formula: String?
+    public let examples: [UnitLessonExample]
+    public let proTip: String?
+
+    public init(
+        id: String,
+        heading: String,
+        explanation: String,
+        formula: String? = nil,
+        examples: [UnitLessonExample],
+        proTip: String? = nil
+    ) {
+        self.id = id
+        self.heading = heading
+        self.explanation = explanation
+        self.formula = formula
+        self.examples = examples
+        self.proTip = proTip
+    }
+}
+
+public struct UnitVocabCard: Codable, Equatable, Sendable, Identifiable {
+    public var id: String { term }
+    public let term: String
+    public let pronunciation: String?
+    public let meaning: String
+    public let example: String
+    public let exampleNote: String?
+
+    public init(
+        term: String,
+        pronunciation: String? = nil,
+        meaning: String,
+        example: String,
+        exampleNote: String? = nil
+    ) {
+        self.term = term
+        self.pronunciation = pronunciation
+        self.meaning = meaning
+        self.example = example
+        self.exampleNote = exampleNote
+    }
+}
+
+public struct UnitPracticeQuestion: Codable, Equatable, Sendable, Identifiable {
+    public let id: String
+    public let skill: SkillType
+    public let prompt: String
+    public let passage: String?
+    public let audioScript: String?
+    public let options: [String]
+    public let correctIndex: Int
+    public let explanation: String
+
+    public init(
+        id: String,
+        skill: SkillType,
+        prompt: String,
+        passage: String? = nil,
+        audioScript: String? = nil,
+        options: [String],
+        correctIndex: Int,
+        explanation: String
+    ) {
+        self.id = id
+        self.skill = skill
+        self.prompt = prompt
+        self.passage = passage
+        self.audioScript = audioScript
+        self.options = options
+        self.correctIndex = correctIndex
+        self.explanation = explanation
+    }
+}
+
+public struct UnitGuidedLesson: Codable, Equatable, Sendable {
+    public let estimatedMins: Int
+    public let overview: String
+    public let sections: [UnitLessonSection]
+    public let vocabCards: [UnitVocabCard]
+    public let practiceQuestions: [UnitPracticeQuestion]
+    public let checkpointSkill: SkillType
+    public let checkpointMinWords: Int
+    public let checkpointModelAnswer: String
+
+    public init(
+        estimatedMins: Int,
+        overview: String,
+        sections: [UnitLessonSection],
+        vocabCards: [UnitVocabCard],
+        practiceQuestions: [UnitPracticeQuestion],
+        checkpointSkill: SkillType,
+        checkpointMinWords: Int,
+        checkpointModelAnswer: String
+    ) {
+        self.estimatedMins = estimatedMins
+        self.overview = overview
+        self.sections = sections
+        self.vocabCards = vocabCards
+        self.practiceQuestions = practiceQuestions
+        self.checkpointSkill = checkpointSkill
+        self.checkpointMinWords = checkpointMinWords
+        self.checkpointModelAnswer = checkpointModelAnswer
+    }
+}
+
 public struct CourseModule: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let weekLabel: String
@@ -285,6 +408,7 @@ public struct CourseModule: Codable, Identifiable, Equatable, Sendable {
     public let keyVocabulary: [String]
     public let drills: [CourseDrill]
     public let checkpointPrompt: String
+    public let lesson: UnitGuidedLesson?
 }
 
 public struct CourseExamBlueprint: Codable, Equatable, Sendable {
@@ -772,6 +896,40 @@ public struct StudyActivityEntry: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+public struct UnitStudyProgress: Codable, Equatable, Sendable {
+    public let moduleId: String
+    public var currentStep: Int
+    public var completedSteps: [Int]
+    public var masteredVocab: [String]
+    public var quizAnswers: [String: Int]
+    public var completedDrillIndices: [Int]
+    public var checkpointResponse: String?
+    public var checkpointScore: Int?
+    public var lastStudiedAt: String
+
+    public init(
+        moduleId: String,
+        currentStep: Int = 0,
+        completedSteps: [Int] = [],
+        masteredVocab: [String] = [],
+        quizAnswers: [String: Int] = [:],
+        completedDrillIndices: [Int] = [],
+        checkpointResponse: String? = nil,
+        checkpointScore: Int? = nil,
+        lastStudiedAt: String = ISO8601DateFormatter().string(from: Date())
+    ) {
+        self.moduleId = moduleId
+        self.currentStep = currentStep
+        self.completedSteps = completedSteps
+        self.masteredVocab = masteredVocab
+        self.quizAnswers = quizAnswers
+        self.completedDrillIndices = completedDrillIndices
+        self.checkpointResponse = checkpointResponse
+        self.checkpointScore = checkpointScore
+        self.lastStudiedAt = lastStudiedAt
+    }
+}
+
 public struct LearnerProgressState: Codable, Equatable, Sendable {
     public var version: Int
     public var completedModuleIds: [String]
@@ -781,6 +939,12 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
     public var aiSessionHistory: [AISessionRecord]
     public var activityLog: [StudyActivityEntry]
     public var studyDays: [String]
+    public var unitProgress: [String: UnitStudyProgress]
+
+    enum CodingKeys: String, CodingKey {
+        case version, completedModuleIds, enrolledCourseIds, preTestHistory, examHistory
+        case aiSessionHistory, activityLog, studyDays, unitProgress
+    }
 
     public init(
         version: Int = 1,
@@ -790,7 +954,8 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         examHistory: [ExamAttemptRecord] = [],
         aiSessionHistory: [AISessionRecord] = [],
         activityLog: [StudyActivityEntry] = [],
-        studyDays: [String] = []
+        studyDays: [String] = [],
+        unitProgress: [String: UnitStudyProgress] = [:]
     ) {
         self.version = version
         self.completedModuleIds = completedModuleIds
@@ -800,6 +965,20 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         self.aiSessionHistory = aiSessionHistory
         self.activityLog = activityLog
         self.studyDays = studyDays
+        self.unitProgress = unitProgress
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        self.completedModuleIds = try c.decodeIfPresent([String].self, forKey: .completedModuleIds) ?? []
+        self.enrolledCourseIds = try c.decodeIfPresent([String].self, forKey: .enrolledCourseIds) ?? []
+        self.preTestHistory = try c.decodeIfPresent([PreTestResult].self, forKey: .preTestHistory) ?? []
+        self.examHistory = try c.decodeIfPresent([ExamAttemptRecord].self, forKey: .examHistory) ?? []
+        self.aiSessionHistory = try c.decodeIfPresent([AISessionRecord].self, forKey: .aiSessionHistory) ?? []
+        self.activityLog = try c.decodeIfPresent([StudyActivityEntry].self, forKey: .activityLog) ?? []
+        self.studyDays = try c.decodeIfPresent([String].self, forKey: .studyDays) ?? []
+        self.unitProgress = try c.decodeIfPresent([String: UnitStudyProgress].self, forKey: .unitProgress) ?? [:]
     }
 }
 

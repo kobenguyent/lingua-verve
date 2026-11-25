@@ -55,6 +55,34 @@ describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
       });
     });
   });
+
+  it('provides complete 5-step guided lesson content for all 36 units across A1–C2 English and German', () => {
+    let totalModules = 0;
+    INTENSIVE_COURSES.forEach((course) => {
+      course.modules.forEach((mod) => {
+        totalModules += 1;
+        expect(mod.lesson, `Missing guided lesson for ${mod.id}`).toBeDefined();
+        const lesson = mod.lesson!;
+        expect(lesson.estimatedMins).toBeGreaterThanOrEqual(20);
+        expect(lesson.overview.length).toBeGreaterThan(20);
+        expect(lesson.sections.length).toBeGreaterThanOrEqual(2);
+        lesson.sections.forEach((sec) => {
+          expect(sec.examples.length).toBeGreaterThanOrEqual(2);
+        });
+        expect(lesson.vocabCards.length).toBe(mod.keyVocabulary.length);
+        expect(lesson.practiceQuestions.length).toBeGreaterThanOrEqual(3);
+        lesson.practiceQuestions.forEach((q) => {
+          expect(q.options.length).toBeGreaterThanOrEqual(3);
+          expect(q.correctIndex).toBeGreaterThanOrEqual(0);
+          expect(q.correctIndex).toBeLessThan(q.options.length);
+          expect(q.explanation.length).toBeGreaterThan(15);
+        });
+        expect(lesson.checkpointMinWords).toBeGreaterThanOrEqual(25);
+        expect(lesson.checkpointModelAnswer.length).toBeGreaterThan(50);
+      });
+    });
+    expect(totalModules).toBe(36);
+  });
 });
 
 describe('Scored 4-Skill Placement Pre-Test & Collective Course Recommender', () => {

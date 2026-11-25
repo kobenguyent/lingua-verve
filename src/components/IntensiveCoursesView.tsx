@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   GraduationCap,
   CheckCircle2,
@@ -15,14 +15,22 @@ import {
   Clock,
   Sparkles,
   Gauge,
+  Play,
 } from 'lucide-react';
-import { CEFRLevel, CourseModule, SkillType } from '../types';
+import {
+  AIProviderConfig,
+  CEFRLevel,
+  CourseModule,
+  SkillType,
+  UnitStudyProgress,
+} from '../types';
 import {
   CEFR_LEVELS,
   INTENSIVE_COURSES,
   OFFICIAL_EXAM_REFERENCES,
 } from '../data';
 import { soundEngine } from '../utils/audio';
+import { UnitLessonPlayer } from './UnitLessonPlayer';
 
 interface IntensiveCoursesViewProps {
   activeLanguageId: string;
@@ -32,6 +40,10 @@ interface IntensiveCoursesViewProps {
   completedModuleIds: string[];
   enrolledCourseIds: string[];
   onToggleModuleComplete: (moduleId: string, meta: { languageId: string; level: CEFRLevel; title: string }) => void;
+  onCompleteModule?: (moduleId: string, meta: { languageId: string; level: CEFRLevel; title: string; score?: number }) => void;
+  unitProgressMap?: Record<string, UnitStudyProgress>;
+  onSaveUnitProgress?: (progress: UnitStudyProgress) => void;
+  aiConfig?: AIProviderConfig;
   onLaunchExam: (languageId: string, level: CEFRLevel) => void;
   onLaunchAICoach: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
   onLaunchPreTest: (languageId: string) => void;
@@ -68,6 +80,10 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
   completedModuleIds,
   enrolledCourseIds,
   onToggleModuleComplete,
+  onCompleteModule,
+  unitProgressMap,
+  onSaveUnitProgress,
+  aiConfig,
   onLaunchExam,
   onLaunchAICoach,
   onLaunchPreTest,
@@ -76,6 +92,14 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
   const selectedLevel: CEFRLevel = activeLevel === 'ALL' ? 'A1' : activeLevel;
   const [slowAudio, setSlowAudio] = useState(false);
   const [showAllRefs, setShowAllRefs] = useState(false);
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const [localUnitProgress, setLocalUnitProgress] = useState<Record<string, UnitStudyProgress>>({});
+
+  const effectiveUnitProgress = unitProgressMap ?? localUnitProgress;
+
+  useEffect(() => {
+    setActiveModuleId(null);
+  }, [courseLang, selectedLevel]);
 
   const languageCourses = useMemo(
     () => INTENSIVE_COURSES.filter((c) => c.languageId === courseLang),
@@ -86,6 +110,62 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
     () => languageCourses.find((c) => c.level === selectedLevel) || languageCourses[0],
     [languageCourses, selectedLevel]
   );
+
+  const nextLevelCourse = useMemo(() => {
+    const idx = languageCourses.findIndex((c) => c.id === currentCourse.id);
+    return idx >= 0 && idx + 1 < languageCourses.length ? languageCourses[idx + 1] : undefined;
+  }, [languageCourses, currentCourse]);
+
+  const recommendedUnit = useMemo(() => {
+    const inProgress = currentCourse.modules.find(
+      (m) => !completedModuleIds.includes(m.id) && Boolean(effectiveUnitProgress[m.id])
+    );
+    if (inProgress) {
+      return {
+        module: inProgress,
+        unitNumber: currentCourse.modules.findIndex((m) => m.id === inProgress.id) + 1,
+        mode: 'continue' as const,
+      };
+    }
+    const nextUnfinished = currentCourse.modules.find((m) => !completedModuleIds.includes(m.id));
+    if (nextUnfinished) {
+      return {
+        module: nextUnfinished,
+        unitNumber: currentCourse.modules.findIndex((m) => m.id === nextUnfinished.id) + 1,
+        mode: 'start' as const,
+      };
+    }
+    return {
+      module: currentCourse.modules[0],
+      unitNumber: 1,
+      mode: 'review' as const,
+    };
+  }, [currentCourse, completedModuleIds, effectiveUnitProgress]);
+
+  const handleSaveProgress = (progress: UnitStudyProgress) => {
+    if (onSaveUnitProgress) {
+      onSaveUnitProgress(progress);
+    } else {
+      setLocalUnitProgress((prev) => ({ ...prev, [progress.moduleId]: progress }));
+    }
+  };
+
+  const handleCompleteGuidedUnit = (mod: CourseModule, score?: number) => {
+    if (onCompleteModule) {
+      onCompleteModule(mod.id, {
+        languageId: currentCourse.languageId,
+        level: currentCourse.level,
+        title: mod.title,
+        score,
+      });
+    } else if (!completedModuleIds.includes(mod.id)) {
+      onToggleModuleComplete(mod.id, {
+        languageId: currentCourse.languageId,
+        level: currentCourse.level,
+        title: mod.title,
+      });
+    }
+  };
 
   const overallCourseStats = useMemo(() => {
     const allModules = languageCourses.flatMap((c) => c.modules);
@@ -123,6 +203,44 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
       title: mod.title,
     });
   };
+
+  const activeModuleIndex = activeModuleId
+    ? currentCourse.modules.findIndex((m) => m.id === activeModuleId)
+    : -1;
+  const activeModule = activeModuleIndex >= 0 ? currentCourse.modules[activeModuleIndex] : null;
+
+  if (activeModule) {
+    const nextModule =
+      activeModuleIndex + 1 < currentCourse.modules.length
+        ? currentCourse.modules[activeModuleIndex + 1]
+        : undefined;
+    return (
+      <UnitLessonPlayer
+        key={activeModule.id}
+        course={currentCourse}
+        module={activeModule}
+        unitIndex={activeModuleIndex + 1}
+        totalUnits={currentCourse.modules.length}
+        nextModule={nextModule}
+        nextLevelCourse={nextLevelCourse}
+        isCompleted={completedModuleIds.includes(activeModule.id)}
+        initialProgress={effectiveUnitProgress[activeModule.id]}
+        slowAudio={slowAudio}
+        onToggleSlowAudio={() => setSlowAudio((prev) => !prev)}
+        aiConfig={aiConfig}
+        onSaveProgress={handleSaveProgress}
+        onCompleteUnit={(score) => handleCompleteGuidedUnit(activeModule, score)}
+        onExit={() => setActiveModuleId(null)}
+        onStartModule={(nextId) => setActiveModuleId(nextId)}
+        onAdvanceLevel={(lvl) => {
+          setActiveModuleId(null);
+          onSelectLevel(lvl);
+        }}
+        onLaunchExam={onLaunchExam}
+        onLaunchAICoach={onLaunchAICoach}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -292,6 +410,25 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
 
           {/* Direct Action Triggers */}
           <div className="flex flex-wrap lg:flex-col gap-2 shrink-0">
+            {recommendedUnit.module && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  setActiveModuleId(recommendedUnit.module.id);
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-colors"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>
+                  {recommendedUnit.mode === 'continue'
+                    ? `Continue Unit ${recommendedUnit.unitNumber}`
+                    : recommendedUnit.mode === 'review'
+                    ? `Review Unit ${recommendedUnit.unitNumber}`
+                    : `Start Learning · Unit ${recommendedUnit.unitNumber}`}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -370,6 +507,10 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
         <div className="space-y-4">
           {currentCourse.modules.map((mod, idx) => {
             const isCompleted = completedModuleIds.includes(mod.id);
+            const savedProg = effectiveUnitProgress[mod.id];
+            const stepsDone = savedProg?.completedSteps?.length ?? 0;
+            const inProgress = !isCompleted && Boolean(savedProg);
+
             return (
               <article
                 key={mod.id}
@@ -385,6 +526,16 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
                       <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                         Unit {idx + 1} · {mod.weekLabel}
                       </span>
+                      {inProgress && (
+                        <span className="px-2 py-0.5 rounded-full font-mono text-[11px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                          In Progress · {stepsDone}/5 steps
+                        </span>
+                      )}
+                      {typeof savedProg?.checkpointScore === 'number' && (
+                        <span className="px-2 py-0.5 rounded-full font-mono text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                          Checkpoint {savedProg.checkpointScore}%
+                        </span>
+                      )}
                       {mod.focusSkills.map((sk) => {
                         const meta = SKILL_META[sk];
                         return (
@@ -401,19 +552,39 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
                     <p className="text-sm text-slate-600 dark:text-slate-300">{mod.summary}</p>
                   </div>
 
-                  <button
-                    type="button"
-                    aria-pressed={isCompleted}
-                    onClick={() => handleToggleModule(mod)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors shrink-0 ${
-                      isCompleted
-                        ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-emerald-500'
-                    }`}
-                  >
-                    {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                    <span>{isCompleted ? 'Completed' : 'Mark Unit Complete'}</span>
-                  </button>
+                  <div className="flex flex-wrap sm:flex-col items-stretch gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClickSound();
+                        setActiveModuleId(mod.id);
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>
+                        {isCompleted
+                          ? `Review Unit ${idx + 1}`
+                          : inProgress
+                          ? `Resume Unit ${idx + 1}`
+                          : `Start Unit ${idx + 1}`}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-pressed={isCompleted}
+                      onClick={() => handleToggleModule(mod)}
+                      className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                        isCompleted
+                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-emerald-500'
+                      }`}
+                    >
+                      {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                      <span>{isCompleted ? 'Completed' : 'Mark Unit Complete'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Objectives & Grammar/Lexis */}

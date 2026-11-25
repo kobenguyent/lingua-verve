@@ -35,6 +35,74 @@ describe('IntensiveCoursesView Component', () => {
     fireEvent.click(completeBtns[0]);
     expect(onToggleComplete).toHaveBeenCalledTimes(1);
   });
+
+  it('launches the 5-step Guided Lesson Player for Unit 1, evaluates checkpoint, and advances to Unit 2', async () => {
+    const onCompleteModule = vi.fn();
+    const onSaveUnitProgress = vi.fn();
+
+    render(
+      <IntensiveCoursesView
+        activeLanguageId="german"
+        onSelectLanguage={vi.fn()}
+        activeLevel="A1"
+        onSelectLevel={vi.fn()}
+        completedModuleIds={[]}
+        enrolledCourseIds={['de-intensive-a1']}
+        onToggleModuleComplete={vi.fn()}
+        onCompleteModule={onCompleteModule}
+        onSaveUnitProgress={onSaveUnitProgress}
+        aiConfig={getDefaultAIConfig('ollama')}
+        onLaunchExam={vi.fn()}
+        onLaunchAICoach={vi.fn()}
+        onLaunchPreTest={vi.fn()}
+      />
+    );
+
+    // Launch Unit 1 from the syllabus card
+    fireEvent.click(screen.getByRole('button', { name: /Start Unit 1/i }));
+    expect(screen.getByText(/A1 · Unit 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/V2 Verb-Second Engine/i)).toBeInTheDocument();
+
+    // Step 1 -> Step 2 (Vocabulary Flashcards)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Vocabulary Flashcards/i }));
+    expect(screen.getByText(/High-Yield Exam Vocabulary Studio/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Reveal Meaning & Example/i }));
+    expect(screen.getByText(/to be called \/ named/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Got It! Next Card/i }));
+    expect(onSaveUnitProgress).toHaveBeenCalled();
+
+    // Step 2 -> Step 3 (Interactive Quiz)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Knowledge Check/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heute wohne ich in München.' }));
+    expect(screen.getByText(/Correct!/i)).toBeInTheDocument();
+
+    // Step 3 -> Step 4 (4-Skill Drills)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to 4-Skill Drills/i }));
+    const markPracticedBtns = screen.getAllByRole('button', { name: /Mark Practiced/i });
+    fireEvent.click(markPracticedBtns[0]);
+
+    // Step 4 -> Step 5 (Milestone Checkpoint)
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Milestone Checkpoint/i }));
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, {
+      target: {
+        value:
+          'Guten Tag! Ich heiße Lukas und wohne in München. Meine Adresse ist Hauptstraße zehn und ich kann meinen Namen gut buchstabieren. Entschuldigung, wie ist Ihre Telefonnummer?',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Evaluate Checkpoint/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Built-in CEFR Rubric Engine/i)).toBeInTheDocument();
+    });
+
+    // Complete Unit 1 & auto-advance directly into Unit 2
+    fireEvent.click(screen.getByRole('button', { name: /Complete Unit & Continue to Unit 2/i }));
+    expect(onCompleteModule).toHaveBeenCalledTimes(1);
+    expect(onCompleteModule.mock.calls[0][0]).toBe('de-a1-m1');
+    expect(typeof onCompleteModule.mock.calls[0][1].score).toBe('number');
+    expect(screen.getByText(/A1 · Unit 2 of 3/i)).toBeInTheDocument();
+  });
 });
 
 describe('PreTestView Component', () => {

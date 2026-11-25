@@ -6,6 +6,7 @@ import {
   PreTestResult,
   SkillType,
   StudyActivityEntry,
+  UnitStudyProgress,
 } from '../types';
 
 export const PROGRESS_STORAGE_KEY = 'linguaverve_learner_state_v1';
@@ -27,6 +28,7 @@ export function createEmptyLearnerState(): LearnerProgressState {
     aiSessionHistory: [],
     activityLog: [],
     studyDays: [],
+    unitProgress: {},
   };
 }
 
@@ -45,6 +47,10 @@ export function loadLearnerState(): LearnerProgressState {
       aiSessionHistory: Array.isArray(parsed.aiSessionHistory) ? parsed.aiSessionHistory : [],
       activityLog: Array.isArray(parsed.activityLog) ? parsed.activityLog : [],
       studyDays: Array.isArray(parsed.studyDays) ? parsed.studyDays : [],
+      unitProgress:
+        parsed.unitProgress && typeof parsed.unitProgress === 'object' && !Array.isArray(parsed.unitProgress)
+          ? parsed.unitProgress
+          : {},
     };
   } catch {
     return createEmptyLearnerState();
@@ -95,6 +101,52 @@ export function toggleModuleCompletionInState(
     completedModuleIds,
     activityLog,
     studyDays: exists ? state.studyDays : addStudyDay(state.studyDays),
+  };
+}
+
+export function saveUnitProgressInState(
+  state: LearnerProgressState,
+  progress: UnitStudyProgress
+): LearnerProgressState {
+  return {
+    ...state,
+    unitProgress: {
+      ...(state.unitProgress ?? {}),
+      [progress.moduleId]: progress,
+    },
+    studyDays: addStudyDay(state.studyDays),
+  };
+}
+
+export function completeModuleInState(
+  state: LearnerProgressState,
+  moduleId: string,
+  meta: { languageId: string; level: CEFRLevel; title: string; score?: number }
+): LearnerProgressState {
+  const alreadyCompleted = state.completedModuleIds.includes(moduleId);
+  const completedModuleIds = alreadyCompleted
+    ? state.completedModuleIds
+    : [...state.completedModuleIds, moduleId];
+
+  const activityLog = prependActivity(state.activityLog, {
+    id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    type: 'module-complete',
+    languageId: meta.languageId,
+    level: meta.level,
+    title: `Completed Unit: ${meta.title}`,
+    detail:
+      typeof meta.score === 'number'
+        ? `${meta.languageId.toUpperCase()} ${meta.level} guided unit completed · Checkpoint ${meta.score}%`
+        : `${meta.languageId.toUpperCase()} ${meta.level} guided unit mastered`,
+    score: meta.score,
+  });
+
+  return {
+    ...state,
+    completedModuleIds,
+    activityLog,
+    studyDays: addStudyDay(state.studyDays),
   };
 }
 
@@ -275,5 +327,9 @@ export function parseImportedLearnerProgressJSON(raw: string): LearnerProgressSt
     aiSessionHistory: Array.isArray(candidate.aiSessionHistory) ? candidate.aiSessionHistory : [],
     activityLog: Array.isArray(candidate.activityLog) ? candidate.activityLog : [],
     studyDays: Array.isArray(candidate.studyDays) ? candidate.studyDays : [],
+    unitProgress:
+      candidate.unitProgress && typeof candidate.unitProgress === 'object' && !Array.isArray(candidate.unitProgress)
+        ? candidate.unitProgress
+        : {},
   };
 }
