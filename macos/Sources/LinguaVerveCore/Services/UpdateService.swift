@@ -493,6 +493,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
             throw UpdateServiceError.archiveNotFound(downloadedFile.path)
         }
 
+        #if os(macOS)
         let targetAppPath: String
         if currentBundlePath.hasSuffix(".app") {
             targetAppPath = currentBundlePath
@@ -521,6 +522,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
         proc.standardOutput = FileHandle.nullDevice
         proc.standardError = FileHandle.nullDevice
         try proc.run()
+        #endif
     }
 
     public static func buildInstallerScript(

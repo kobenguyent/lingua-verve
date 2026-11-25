@@ -13,6 +13,8 @@ dist-ssr
 dist-macos
 macos/.build
 macos/.swiftpm
+xcuserdata/
+DerivedData/
 *.local
 
 # Editor directories and files

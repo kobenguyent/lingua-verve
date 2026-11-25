@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import LinguaVerveCore
+import LinguaVerveUI
 
 public struct UpdateNotificationBanner: View {
     @Bindable var store: CurriculumStore

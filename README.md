@@ -40,13 +40,27 @@ Works 100% statically from your browser (zero backend required, ideal for GitHub
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Web & Native Apple Apps)
 
+### Web SPA (GitHub Pages)
 ```bash
 npm install
 npm run dev      # Start local dev server
 npm test         # Run all 50 Vitest unit & component integration tests
 npm run build    # Type-check & build static GitHub Pages bundle -> ./dist
+```
+
+### 📱 Native Apple Universal App (MacBook · iPad · iPhone)
+LinguaVerve shares one single source of truth (`src/data/` → `curriculum.json`) with a 100% native **SwiftUI Multiplatform App** (`LinguaVerveCore` + `LinguaVerveUI`) supporting **macOS 14+**, **iPadOS 17+**, and **iOS 17+**:
+- **Adaptive Layout:** Native `NavigationSplitView` sidebar on **MacBook** & **iPad**, and native bottom `TabView` on **iPhone**.
+- **Native Hardware Integration:** `AVSpeechSynthesizer` native voices (`0.75x` slow & `1.0x`), Apple `Speech` (`SFSpeechRecognizer`) live voice dictation for Speaking Exams & AI Roleplays, iOS haptics, and `NSAllowsLocalNetworking` so your **iPhone/iPad** can connect to **Local Ollama / LM Studio** running on your MacBook over Wi-Fi!
+- **MacBook Extras:** Standalone signed `.app` bundle (`dist-macos/LinguaVerve.app`), macOS Menu Bar quick-drill popover, keyboard shortcuts (`⌘1`–`⌘6`), and GitHub Releases auto-updater.
+
+```bash
+npm run apple:xcode   # Sync curriculum, generate icons + Xcode project, run Swift XCTests, build iOS/iPadOS & macOS
+npm run apple:open    # Open apple/LinguaVerve.xcodeproj to run on iPhone, iPad, or MacBook
+npm run macos:app     # Build & sign standalone dist-macos/LinguaVerve.app (+ .dmg / .zip)
+npm run macos:test    # Run native Swift XCTest suite (16 tests)
 ```
 
 ---

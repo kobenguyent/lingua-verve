@@ -1,24 +1,40 @@
-import AppKit
 import Foundation
 import Observation
+
+#if os(macOS)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 
 @Observable
 public final class CurriculumStore {
     public private(set) var bundle: CurriculumBundle
 
-    // Filters
+    // Active Workspace & Shared Navigation Context (MacBook, iPad, iPhone)
+    public var activeWorkspace: WorkspaceSection = .courses
+    public var courseLanguageId: String = "german"
+    public var courseLevel: CEFRLevel = .A1
+    public var examTargetLevel: CEFRLevel = .B1
+    public var aiCoachLevel: CEFRLevel = .B1
+    public var aiCoachSkill: SkillType = .speaking
+    public var aiCoachSeedPrompt: String = ""
+
+    // Field Manual Filters
     public var activeLanguageId: String = "all"
-    public var activeLevel: String = "ALL" // "ALL" or CEFRLevel.rawValue
-    public var selectedCategory: String = "all" // "all" or TipCategory.rawValue
+    public var activeLevel: String = "ALL"
+    public var selectedCategory: String = "all"
     public var searchQuery: String = ""
     public var viewMode: ViewModeFilter = .all
     public var selectedTipId: String?
 
-    // Persistent User Progress
+    // Persistent User Progress (Field Manual + Full Intensive Academy)
     public private(set) var bookmarkedIds: Set<String>
     public private(set) var masteredIds: Set<String>
+    public private(set) var learnerState: LearnerProgressState
+    public var aiConfig: AIProviderConfig
 
-    // Software Update State (GitHub Releases)
+    // Software Update State (GitHub Releases — macOS)
     public let currentAppVersion: String
     public var autoCheckForUpdates: Bool {
         didSet {
@@ -44,6 +60,8 @@ public final class CurriculumStore {
     private let bookmarksKey = "linguaverve.macos.bookmarks"
     private let masteredKey = "linguaverve.macos.mastered"
     private let autoUpdateKey = "linguaverve.macos.autoCheckForUpdates"
+    private let learnerStateKey = "linguaverve.apple.learnerState.v1"
+    private let aiConfigKey = "linguaverve.apple.aiConfig.v1"
 
     public init(
         bundle: CurriculumBundle? = nil,
@@ -64,6 +82,20 @@ public final class CurriculumStore {
         self.bookmarkedIds = Set(defaults.stringArray(forKey: bookmarksKey) ?? [])
         self.masteredIds = Set(defaults.stringArray(forKey: masteredKey) ?? [])
         self.selectedTipId = loaded.tips.first?.id
+
+        if let data = defaults.data(forKey: learnerStateKey),
+           let decoded = try? JSONDecoder().decode(LearnerProgressState.self, from: data) {
+            self.learnerState = decoded
+        } else {
+            self.learnerState = LearnerProgressState()
+        }
+
+        if let aiData = defaults.data(forKey: aiConfigKey),
+           let decodedAI = try? JSONDecoder().decode(AIProviderConfig.self, from: aiData) {
+            self.aiConfig = decodedAI
+        } else {
+            self.aiConfig = AIProviderConfig()
+        }
     }
 
     public static func loadDefaultBundle() -> CurriculumBundle {
@@ -85,7 +117,7 @@ public final class CurriculumStore {
         }
         return CurriculumBundle(
             generatedAt: "",
-            version: "1.0.0",
+            version: "2.0.0",
             languages: [],
             levels: [],
             tips: [],
@@ -93,6 +125,400 @@ public final class CurriculumStore {
             diagnosticQuestions: []
         )
     }
+
+    // MARK: - Persistence Helpers
+
+    private func persistLearnerState() {
+        if let encoded = try? JSONEncoder().encode(learnerState) {
+            defaults.set(encoded, forKey: learnerStateKey)
+        }
+    }
+
+    public func saveAIConfig(_ nextConfig: AIProviderConfig) {
+        self.aiConfig = nextConfig
+        if let encoded = try? JSONEncoder().encode(nextConfig) {
+            defaults.set(encoded, forKey: aiConfigKey)
+        }
+    }
+
+    private static func todayKey(from date: Date = Date()) -> String {
+        let fmt = DateFormatter()
+        fmt.calendar = Calendar(identifier: .gregorian)
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: date)
+    }
+
+    private func touchStudyDay() {
+        let key = Self.todayKey()
+        if !learnerState.studyDays.contains(key) {
+            learnerState.studyDays.append(key)
+            learnerState.studyDays.sort()
+        }
+    }
+
+    private func appendActivity(_ entry: StudyActivityEntry) {
+        learnerState.activityLog.insert(entry, at: 0)
+        if learnerState.activityLog.count > 100 {
+            learnerState.activityLog = Array(learnerState.activityLog.prefix(100))
+        }
+    }
+
+    // MARK: - Intensive Courses & Exam References
+
+    public func courses(for languageId: String) -> [IntensiveCourse] {
+        let target = languageId == "german" ? "german" : "english"
+        return bundle.intensiveCourses.filter { $0.languageId == target }
+    }
+
+    public func course(for languageId: String, level: CEFRLevel) -> IntensiveCourse? {
+        courses(for: languageId).first { $0.level == level }
+    }
+
+    public func examReferences(for course: IntensiveCourse, showAllForLanguage: Bool = false) -> [OfficialExamReference] {
+        if showAllForLanguage {
+            return bundle.examReferences.filter { $0.languageId == course.languageId }
+        }
+        let idSet = Set(course.referenceIds)
+        return bundle.examReferences.filter { idSet.contains($0.id) }
+    }
+
+    public func isModuleCompleted(_ moduleId: String) -> Bool {
+        learnerState.completedModuleIds.contains(moduleId)
+    }
+
+    public func isCourseEnrolled(_ courseId: String) -> Bool {
+        learnerState.enrolledCourseIds.contains(courseId)
+    }
+
+    @discardableResult
+    public func toggleModuleComplete(_ module: CourseModule, languageId: String, level: CEFRLevel) -> Bool {
+        if let idx = learnerState.completedModuleIds.firstIndex(of: module.id) {
+            learnerState.completedModuleIds.remove(at: idx)
+            persistLearnerState()
+            return false
+        } else {
+            learnerState.completedModuleIds.append(module.id)
+            touchStudyDay()
+            appendActivity(
+                StudyActivityEntry(
+                    type: "module-complete",
+                    languageId: languageId,
+                    level: level,
+                    title: "Completed Unit: \(module.title)",
+                    detail: "\(languageId.uppercased()) \(level.rawValue) intensive module"
+                )
+            )
+            persistLearnerState()
+            return true
+        }
+    }
+
+    public func courseCompletionPercent(for course: IntensiveCourse) -> Int {
+        guard !course.modules.isEmpty else { return 0 }
+        let done = course.modules.filter { isModuleCompleted($0.id) }.count
+        return Int((Double(done) / Double(course.modules.count) * 100.0).rounded())
+    }
+
+    public func languageZeroToHeroProgress(for languageId: String) -> (done: Int, total: Int, percent: Int) {
+        let allMods = courses(for: languageId).flatMap(\.modules)
+        guard !allMods.isEmpty else { return (0, 0, 0) }
+        let done = allMods.filter { isModuleCompleted($0.id) }.count
+        return (done, allMods.count, Int((Double(done) / Double(allMods.count) * 100.0).rounded()))
+    }
+
+    // MARK: - Scored Placement Pre-Test & Collective Course Recommender
+
+    public func preTestQuestions(for languageId: String) -> [PreTestQuestion] {
+        let target = languageId == "german" ? "german" : "english"
+        return bundle.preTestQuestions.filter { $0.languageId == target }
+    }
+
+    public func evaluateAndRecordPreTest(languageId: String, answers: [String: Int]) -> PreTestResult {
+        let target = languageId == "german" ? "german" : "english"
+        let questions = preTestQuestions(for: target)
+
+        var levelCorrect: [CEFRLevel: Int] = [:]
+        var levelTotal: [CEFRLevel: Int] = [:]
+        var skillCorrect: [SkillType: Int] = [:]
+        var skillTotal: [SkillType: Int] = [:]
+        var totalCorrect = 0
+
+        for q in questions {
+            levelTotal[q.level, default: 0] += 1
+            skillTotal[q.skill, default: 0] += 1
+            if answers[q.id] == q.correctIndex {
+                totalCorrect += 1
+                levelCorrect[q.level, default: 0] += 1
+                skillCorrect[q.skill, default: 0] += 1
+            }
+        }
+
+        let overall = questions.isEmpty ? 0 : Int((Double(totalCorrect) / Double(questions.count) * 100.0).rounded())
+
+        let order = CEFRLevel.allCases
+        var verifiedIdx = 0
+        for (idx, lvl) in order.enumerated() {
+            let tot = levelTotal[lvl, default: 0]
+            let cor = levelCorrect[lvl, default: 0]
+            let ratio = tot > 0 ? Double(cor) / Double(tot) : 0
+            if ratio >= 0.5 {
+                verifiedIdx = idx
+            } else if idx >= 1 {
+                break
+            }
+        }
+        if totalCorrect == 0 { verifiedIdx = 0 }
+        let verifiedLevel = order[verifiedIdx]
+
+        var skillScores: [String: Int] = [:]
+        for skill in SkillType.allCases {
+            let tot = skillTotal[skill, default: 0]
+            let cor = skillCorrect[skill, default: 0]
+            skillScores[skill.rawValue] = tot > 0 ? Int((Double(cor) / Double(tot) * 100.0).rounded()) : 0
+        }
+
+        let sortedSkills = SkillType.allCases.sorted { (skillScores[$0.rawValue] ?? 0) < (skillScores[$1.rawValue] ?? 0) }
+        let prioritySkills = Array(sortedSkills.prefix(2))
+        let langCourses = courses(for: target)
+
+        func findCourse(_ lvl: CEFRLevel) -> IntensiveCourse? {
+            langCourses.first { $0.level == lvl } ?? langCourses.first
+        }
+
+        var recommendations: [CollectiveCourseStep] = []
+
+        if verifiedIdx > 0, let weakest = sortedSkills.first, (skillScores[weakest.rawValue] ?? 0) < 60,
+           let prevCourse = findCourse(order[verifiedIdx - 1]) {
+            recommendations.append(
+                CollectiveCourseStep(
+                    role: "foundation",
+                    courseId: prevCourse.id,
+                    level: prevCourse.level,
+                    title: prevCourse.title,
+                    reason: "Close your \(weakest.displayName) gap (\(skillScores[weakest.rawValue] ?? 0)%) rapidly before advancing.",
+                    prioritySkills: [weakest]
+                )
+            )
+        }
+
+        if let coreCourse = findCourse(verifiedLevel) {
+            recommendations.append(
+                CollectiveCourseStep(
+                    role: "core",
+                    courseId: coreCourse.id,
+                    level: coreCourse.level,
+                    title: coreCourse.title,
+                    reason: "Consolidate full 4-skill exam readiness at your verified \(verifiedLevel.rawValue) tier (\(overall)% score).",
+                    prioritySkills: prioritySkills
+                )
+            )
+        }
+
+        if verifiedIdx < order.count - 1, let nextCourse = findCourse(order[verifiedIdx + 1]) {
+            recommendations.append(
+                CollectiveCourseStep(
+                    role: "bridge",
+                    courseId: nextCourse.id,
+                    level: nextCourse.level,
+                    title: nextCourse.title,
+                    reason: "Your bridge milestone to advance from \(verifiedLevel.rawValue) to \(nextCourse.level.rawValue) certification.",
+                    prioritySkills: [.speaking, .listening]
+                )
+            )
+        }
+
+        let cert = findCourse(verifiedLevel)?.targetCertificates.first
+            ?? (target == "german" ? "Goethe-Zertifikat \(verifiedLevel.rawValue)" : "Cambridge English \(verifiedLevel.rawValue)")
+
+        let result = PreTestResult(
+            id: "pre-\(UUID().uuidString.prefix(8))",
+            timestamp: ISO8601DateFormatter().string(from: Date()),
+            languageId: target,
+            verifiedLevel: verifiedLevel,
+            overallScore: overall,
+            correctCount: totalCorrect,
+            totalCount: questions.count,
+            skillScores: skillScores,
+            recommendedCourses: recommendations,
+            suggestedCertificate: cert
+        )
+
+        learnerState.preTestHistory.insert(result, at: 0)
+        if learnerState.preTestHistory.count > 50 {
+            learnerState.preTestHistory = Array(learnerState.preTestHistory.prefix(50))
+        }
+        for step in recommendations where !learnerState.enrolledCourseIds.contains(step.courseId) {
+            learnerState.enrolledCourseIds.append(step.courseId)
+        }
+        touchStudyDay()
+        appendActivity(
+            StudyActivityEntry(
+                type: "pretest",
+                languageId: target,
+                level: verifiedLevel,
+                title: "Placement Pre-Test Verified: \(verifiedLevel.rawValue)",
+                detail: "\(totalCorrect)/\(questions.count) (\(overall)%) · Suggested \(recommendations.count) courses",
+                score: overall
+            )
+        )
+        persistLearnerState()
+        return result
+    }
+
+    // MARK: - Simulated 4-Skill Exams & AI Sessions
+
+    public func mockExam(for languageId: String, level: CEFRLevel) -> MockExam? {
+        let target = languageId == "german" ? "german" : "english"
+        return bundle.mockExams.first { $0.languageId == target && $0.level == level }
+            ?? bundle.mockExams.first { $0.languageId == target }
+    }
+
+    public func recordExamAttempt(_ attempt: ExamAttemptRecord) {
+        learnerState.examHistory.insert(attempt, at: 0)
+        if learnerState.examHistory.count > 50 {
+            learnerState.examHistory = Array(learnerState.examHistory.prefix(50))
+        }
+        touchStudyDay()
+        appendActivity(
+            StudyActivityEntry(
+                type: "mock-exam",
+                languageId: attempt.languageId,
+                level: attempt.level,
+                title: "\(attempt.examTitle) (\(attempt.passed ? "PASSED" : "RETRY"))",
+                detail: "\(attempt.mode.capitalized) mode · Overall \(attempt.overallScore)%",
+                score: attempt.overallScore
+            )
+        )
+        persistLearnerState()
+    }
+
+    public func recordAISession(_ session: AISessionRecord) {
+        learnerState.aiSessionHistory.insert(session, at: 0)
+        if learnerState.aiSessionHistory.count > 60 {
+            learnerState.aiSessionHistory = Array(learnerState.aiSessionHistory.prefix(60))
+        }
+        touchStudyDay()
+        appendActivity(
+            StudyActivityEntry(
+                type: "ai-session",
+                languageId: session.languageId,
+                level: session.level,
+                title: "AI \(session.skill.shortName) Coach (\(session.level.rawValue))",
+                detail: "\(session.provider) · \(session.summary)",
+                score: session.score
+            )
+        )
+        persistLearnerState()
+    }
+
+    public func studyStreak(referenceDate: Date = Date()) -> Int {
+        guard !learnerState.studyDays.isEmpty else { return 0 }
+        let daySet = Set(learnerState.studyDays)
+        let cal = Calendar(identifier: .gregorian)
+        var cursor = referenceDate
+
+        if !daySet.contains(Self.todayKey(from: cursor)) {
+            guard let yesterday = cal.date(byAdding: .day, value: -1, to: cursor),
+                  daySet.contains(Self.todayKey(from: yesterday)) else {
+                return 0
+            }
+            cursor = yesterday
+        }
+
+        var streak = 0
+        while daySet.contains(Self.todayKey(from: cursor)) {
+            streak += 1
+            guard let prev = cal.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = prev
+        }
+        return streak
+    }
+
+    public func skillAverages(languageId: String = "all") -> [SkillType: (average: Int, samples: Int)] {
+        var sums: [SkillType: Int] = [:]
+        var counts: [SkillType: Int] = [:]
+
+        for attempt in learnerState.examHistory {
+            if languageId != "all" && attempt.languageId != languageId { continue }
+            for skill in SkillType.allCases {
+                if let s = attempt.skills[skill.rawValue] {
+                    sums[skill, default: 0] += s.score
+                    counts[skill, default: 0] += 1
+                }
+            }
+        }
+
+        for pre in learnerState.preTestHistory {
+            if languageId != "all" && pre.languageId != languageId { continue }
+            for skill in SkillType.allCases {
+                if let s = pre.skillScores[skill.rawValue] {
+                    sums[skill, default: 0] += s
+                    counts[skill, default: 0] += 1
+                }
+            }
+        }
+
+        var result: [SkillType: (average: Int, samples: Int)] = [:]
+        for skill in SkillType.allCases {
+            let count = counts[skill, default: 0]
+            let avg = count > 0 ? Int((Double(sums[skill, default: 0]) / Double(count)).rounded()) : 0
+            result[skill] = (avg, count)
+        }
+        return result
+    }
+
+    public func exportProgressJSON() -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(learnerState),
+              let str = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return str
+    }
+
+    public func importProgressJSON(_ json: String) throws {
+        guard let data = json.data(using: .utf8) else {
+            throw NSError(domain: "LinguaVerve", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid UTF-8 JSON"])
+        }
+        struct Wrapper: Decodable { let state: LearnerProgressState }
+        if let wrapped = try? JSONDecoder().decode(Wrapper.self, from: data) {
+            self.learnerState = wrapped.state
+        } else {
+            self.learnerState = try JSONDecoder().decode(LearnerProgressState.self, from: data)
+        }
+        persistLearnerState()
+    }
+
+    public func resetLearnerProgress() {
+        self.learnerState = LearnerProgressState()
+        persistLearnerState()
+    }
+
+    // MARK: - Cross-Workspace Navigation Shortcuts
+
+    public func openCourse(languageId: String, level: CEFRLevel) {
+        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLevel = level
+        self.activeWorkspace = .courses
+    }
+
+    public func openExamSimulator(languageId: String, level: CEFRLevel) {
+        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.examTargetLevel = level
+        self.activeWorkspace = .simulator
+    }
+
+    public func openAICoach(languageId: String, level: CEFRLevel, skill: SkillType, seedPrompt: String = "") {
+        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.aiCoachLevel = level
+        self.aiCoachSkill = skill
+        self.aiCoachSeedPrompt = seedPrompt
+        self.activeWorkspace = .aiCoach
+    }
+
+    // MARK: - Field Manual Tips Filtering & Bookmarks
 
     public var filteredTips: [TipItem] {
         Self.filterTips(
@@ -120,38 +546,28 @@ public final class CurriculumStore {
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         return tips.filter { tip in
-            // 1. Language filter
             if languageId != "all" {
                 if tip.languageId != languageId && tip.languageId != "meta" {
                     return false
                 }
             }
-
-            // 2. Level filter
             if level != "ALL" {
                 if tip.level != level && tip.level != "ALL" {
                     return false
                 }
             }
-
-            // 3. Category filter
             if category != "all" {
                 if tip.category.rawValue != category {
                     return false
                 }
             }
-
-            // 4. ViewMode filter
             switch viewMode {
-            case .all:
-                break
+            case .all: break
             case .saved:
                 if !bookmarkedIds.contains(tip.id) { return false }
             case .mastered:
                 if !masteredIds.contains(tip.id) { return false }
             }
-
-            // 5. Search query filter
             if !q.isEmpty {
                 let matchesTitle = tip.title.lowercased().contains(q)
                 let matchesSummary = tip.summary.lowercased().contains(q)
@@ -162,7 +578,6 @@ public final class CurriculumStore {
                     return false
                 }
             }
-
             return true
         }
     }
@@ -289,9 +704,7 @@ public final class CurriculumStore {
             switch outcome {
             case .notModified(let etag):
                 if let etag { cachedReleaseETag = etag }
-                if manual {
-                    isUpdateSheetPresented = true
-                }
+                if manual { isUpdateSheetPresented = true }
 
             case .upToDate(_, let latestVersion, let releaseName, let releaseNotes, let releaseURL, _, let asset, let etag):
                 availableUpdate = nil
@@ -301,9 +714,7 @@ public final class CurriculumStore {
                 latestReleaseURL = releaseURL
                 latestReleaseAsset = asset
                 if let etag { cachedReleaseETag = etag }
-                if manual {
-                    isUpdateSheetPresented = true
-                }
+                if manual { isUpdateSheetPresented = true }
 
             case .updateAvailable(let update):
                 availableUpdate = update
@@ -314,15 +725,11 @@ public final class CurriculumStore {
                 latestReleaseAsset = update.asset
                 if let etag = update.etag { cachedReleaseETag = etag }
                 isUpdateBannerDismissed = false
-                if manual {
-                    isUpdateSheetPresented = true
-                }
+                if manual { isUpdateSheetPresented = true }
             }
         } catch {
             updateCheckError = error.localizedDescription
-            if manual {
-                isUpdateSheetPresented = true
-            }
+            if manual { isUpdateSheetPresented = true }
         }
     }
 
@@ -372,6 +779,7 @@ public final class CurriculumStore {
     @MainActor
     public func installReadyUpdate() {
         guard case .ready(let fileURL) = updateDownloadState else { return }
+        #if os(macOS)
         do {
             try updateService.installAndRelaunch(
                 downloadedFile: fileURL,
@@ -383,6 +791,7 @@ public final class CurriculumStore {
         } catch {
             updateDownloadState = .failed(error.localizedDescription)
         }
+        #endif
     }
 
     public func dismissUpdateBanner() {
@@ -393,11 +802,19 @@ public final class CurriculumStore {
         let urlString = availableUpdate?.releaseURL
             ?? latestReleaseURL
             ?? UpdateService.releasesPageURL.absoluteString
-        guard UpdateService.isAllowedReleasePageURL(urlString),
-              let url = URL(string: urlString) else {
-            NSWorkspace.shared.open(UpdateService.releasesPageURL)
-            return
+        let resolvedURL: URL = {
+            if UpdateService.isAllowedReleasePageURL(urlString), let url = URL(string: urlString) {
+                return url
+            }
+            return UpdateService.releasesPageURL
+        }()
+
+        #if os(macOS)
+        NSWorkspace.shared.open(resolvedURL)
+        #elseif canImport(UIKit)
+        DispatchQueue.main.async {
+            UIApplication.shared.open(resolvedURL)
         }
-        NSWorkspace.shared.open(url)
+        #endif
     }
 }

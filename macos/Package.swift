@@ -4,11 +4,13 @@ import PackageDescription
 let package = Package(
     name: "LinguaVerve",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v17)
     ],
     products: [
         .executable(name: "LinguaVerve", targets: ["LinguaVerve"]),
-        .library(name: "LinguaVerveCore", targets: ["LinguaVerveCore"])
+        .library(name: "LinguaVerveCore", targets: ["LinguaVerveCore"]),
+        .library(name: "LinguaVerveUI", targets: ["LinguaVerveUI"])
     ],
     targets: [
         .target(
@@ -18,9 +20,14 @@ let package = Package(
                 .copy("Resources/curriculum.json")
             ]
         ),
+        .target(
+            name: "LinguaVerveUI",
+            dependencies: ["LinguaVerveCore"],
+            path: "Sources/LinguaVerveUI"
+        ),
         .executableTarget(
             name: "LinguaVerve",
-            dependencies: ["LinguaVerveCore"],
+            dependencies: ["LinguaVerveCore", "LinguaVerveUI"],
             path: "Sources/LinguaVerve"
         ),
         .testTarget(

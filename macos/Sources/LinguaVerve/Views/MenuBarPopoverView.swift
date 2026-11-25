@@ -1,5 +1,6 @@
 import SwiftUI
 import LinguaVerveCore
+import LinguaVerveUI
 
 public struct MenuBarPopoverView: View {
     @Bindable var store: CurriculumStore

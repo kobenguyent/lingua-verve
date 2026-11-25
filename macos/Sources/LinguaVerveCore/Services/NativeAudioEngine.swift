@@ -1,7 +1,13 @@
 import Foundation
 import AVFoundation
-import AppKit
 import Observation
+
+#if os(macOS)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+import AudioToolbox
+#endif
 
 @Observable
 public final class NativeAudioEngine {
@@ -24,21 +30,42 @@ public final class NativeAudioEngine {
 
     public func playClickSound() {
         guard !isMuted else { return }
+        #if os(macOS)
         NSSound(named: NSSound.Name("Tink"))?.play()
+        #elseif canImport(UIKit)
+        DispatchQueue.main.async {
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        }
+        #endif
     }
 
     public func playSuccessChime() {
         guard !isMuted else { return }
+        #if os(macOS)
         if let glass = NSSound(named: NSSound.Name("Glass")) {
             glass.play()
         } else {
             NSSound.beep()
         }
+        #elseif canImport(UIKit)
+        DispatchQueue.main.async {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
+        AudioServicesPlaySystemSound(1057)
+        #endif
     }
 
     public func speak(_ text: String, languageId: String = "english", slow: Bool? = nil) {
         guard !isMuted else { return }
         let useSlow = slow ?? slowPace
+
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? session.setActive(true)
+        #endif
 
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)

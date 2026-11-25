@@ -8,6 +8,10 @@ import {
   FALSE_FRIENDS,
   DIAGNOSTIC_QUESTIONS,
   LANGUAGES,
+  INTENSIVE_COURSES,
+  OFFICIAL_EXAM_REFERENCES,
+  PRETEST_QUESTIONS,
+  MOCK_EXAMS,
   filterTips, 
   calculateDiagnosticLevel,
   getLanguage
@@ -154,12 +158,16 @@ describe('Diagnostic Level Calculator Tests', () => {
   });
 });
 
-describe('macOS Native Curriculum JSON Sync Parity', () => {
+describe('Apple Native (macOS/iPadOS/iOS) Curriculum JSON Sync Parity', () => {
   it('should keep macos/Sources/LinguaVerveCore/Resources/curriculum.json in sync with src/data/', () => {
     expect(curriculumJson.languages.length).toBe(LANGUAGES.length);
     expect(curriculumJson.levels.length).toBe(CEFR_LEVELS.length);
     expect(curriculumJson.tips.length).toBe(ALL_TIPS.length);
     expect(curriculumJson.falseFriends.length).toBe(FALSE_FRIENDS.length);
     expect(curriculumJson.diagnosticQuestions.length).toBe(DIAGNOSTIC_QUESTIONS.length);
+    expect(curriculumJson.intensiveCourses.length).toBe(INTENSIVE_COURSES.length);
+    expect(curriculumJson.examReferences.length).toBe(OFFICIAL_EXAM_REFERENCES.length);
+    expect(curriculumJson.preTestQuestions.length).toBe(PRETEST_QUESTIONS.length);
+    expect(curriculumJson.mockExams.length).toBe(MOCK_EXAMS.length);
   });
 });
