@@ -1,4 +1,4 @@
-import { TipItem, CEFRLevel, Category } from '../types';
+import { TipItem, CEFRLevel, Category, IntensiveCourse } from '../types';
 import { ENGLISH_TIPS } from './tips/english';
 import { GERMAN_TIPS } from './tips/german';
 import { META_TIPS } from './tips/polyglotMeta';
@@ -6,6 +6,11 @@ import { LANGUAGES, getLanguage, getActiveLanguages } from './languages';
 import { CEFR_LEVELS, getLevelDetail } from './levels';
 import { FALSE_FRIENDS } from './falseFriends';
 import { DIAGNOSTIC_QUESTIONS } from './diagnostic';
+import { OFFICIAL_EXAM_REFERENCES, getExamReferences } from './examReferences';
+import { GERMAN_INTENSIVE_COURSES } from './courses/germanCourses';
+import { ENGLISH_INTENSIVE_COURSES } from './courses/englishCourses';
+import { PRETEST_QUESTIONS, getPreTestQuestions, evaluatePreTest } from './pretests';
+import { MOCK_EXAMS, getMockExams, getMockExamById } from './mockExams';
 
 export {
   LANGUAGES,
@@ -17,14 +22,40 @@ export {
   DIAGNOSTIC_QUESTIONS,
   ENGLISH_TIPS,
   GERMAN_TIPS,
-  META_TIPS
+  META_TIPS,
+  OFFICIAL_EXAM_REFERENCES,
+  getExamReferences,
+  GERMAN_INTENSIVE_COURSES,
+  ENGLISH_INTENSIVE_COURSES,
+  PRETEST_QUESTIONS,
+  getPreTestQuestions,
+  evaluatePreTest,
+  MOCK_EXAMS,
+  getMockExams,
+  getMockExamById,
 };
 
 export const ALL_TIPS: TipItem[] = [
   ...ENGLISH_TIPS,
   ...GERMAN_TIPS,
-  ...META_TIPS
+  ...META_TIPS,
 ];
+
+export const INTENSIVE_COURSES: IntensiveCourse[] = [
+  ...ENGLISH_INTENSIVE_COURSES,
+  ...GERMAN_INTENSIVE_COURSES,
+];
+
+export function getCoursesByLanguage(languageId: string): IntensiveCourse[] {
+  if (languageId === 'all' || languageId === 'meta') {
+    return INTENSIVE_COURSES;
+  }
+  return INTENSIVE_COURSES.filter((c) => c.languageId === languageId);
+}
+
+export function getCourseById(courseId: string): IntensiveCourse | undefined {
+  return INTENSIVE_COURSES.find((c) => c.id === courseId);
+}
 
 export interface TipFilterOptions {
   languageId?: string;
@@ -44,46 +75,41 @@ export function filterTips(options: TipFilterOptions): TipItem[] {
     searchQuery = '',
     bookmarkedIds = [],
     masteredIds = [],
-    viewMode = 'all'
+    viewMode = 'all',
   } = options;
 
   return ALL_TIPS.filter((tip) => {
-    // 1. Language filter
     if (languageId !== 'all') {
       if (tip.languageId !== languageId && tip.languageId !== 'meta') {
         return false;
       }
     }
 
-    // 2. Level filter
     if (level !== 'ALL') {
       if (tip.level !== level && tip.level !== 'ALL') {
         return false;
       }
     }
 
-    // 3. Category filter
     if (category !== 'all') {
       if (tip.category !== category) {
         return false;
       }
     }
 
-    // 4. View mode filter (saved / mastered)
     if (viewMode === 'saved') {
       if (!bookmarkedIds.includes(tip.id)) return false;
     } else if (viewMode === 'mastered') {
       if (!masteredIds.includes(tip.id)) return false;
     }
 
-    // 5. Search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchesTitle = tip.title.toLowerCase().includes(q);
       const matchesSummary = tip.summary.toLowerCase().includes(q);
       const matchesGoldenRule = tip.goldenRule.toLowerCase().includes(q);
-      const matchesTags = tip.tags.some(tag => tag.toLowerCase().includes(q));
-      const matchesTactics = tip.tactics.some(t => t.toLowerCase().includes(q));
+      const matchesTags = tip.tags.some((tag) => tag.toLowerCase().includes(q));
+      const matchesTactics = tip.tactics.some((t) => t.toLowerCase().includes(q));
 
       if (!matchesTitle && !matchesSummary && !matchesGoldenRule && !matchesTags && !matchesTactics) {
         return false;
@@ -95,10 +121,11 @@ export function filterTips(options: TipFilterOptions): TipItem[] {
 }
 
 export function getRandomTip(languageId?: string): TipItem {
-  const candidateTips = languageId && languageId !== 'all'
-    ? ALL_TIPS.filter(t => t.languageId === languageId || t.languageId === 'meta')
-    : ALL_TIPS;
-  
+  const candidateTips =
+    languageId && languageId !== 'all'
+      ? ALL_TIPS.filter((t) => t.languageId === languageId || t.languageId === 'meta')
+      : ALL_TIPS;
+
   const randomIndex = Math.floor(Math.random() * candidateTips.length);
   return candidateTips[randomIndex] || ALL_TIPS[0];
 }
@@ -110,7 +137,7 @@ export function calculateDiagnosticLevel(answers: Record<string, CEFRLevel>): CE
     B1: 3,
     B2: 4,
     C1: 5,
-    C2: 6
+    C2: 6,
   };
 
   const selectedLevels = Object.values(answers);
@@ -125,7 +152,7 @@ export function calculateDiagnosticLevel(answers: Record<string, CEFRLevel>): CE
     3: 'B1',
     4: 'B2',
     5: 'C1',
-    6: 'C2'
+    6: 'C2',
   };
 
   return levelMap[Math.min(6, Math.max(1, average))] || 'B1';

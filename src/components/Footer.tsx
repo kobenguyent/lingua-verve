@@ -1,16 +1,21 @@
 import React from 'react';
 import { BrandMark } from './BrandMark';
+import { WorkspaceTab } from '../types';
 
 interface FooterProps {
   onOpenDiagnostic: () => void;
   onOpenExtensibility: () => void;
   onOpenFalseFriends: () => void;
+  onSelectWorkspace?: (tab: WorkspaceTab) => void;
+  onOpenAISettings?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenDiagnostic,
   onOpenExtensibility,
   onOpenFalseFriends,
+  onSelectWorkspace,
+  onOpenAISettings,
 }) => {
   return (
     <footer className="mt-16 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 transition-colors">
@@ -24,18 +29,68 @@ export const Footer: React.FC<FooterProps> = ({
                 LinguaVerve
               </span>
               <span className="px-1.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Open Polyglot
+                Open Polyglot Academy
               </span>
             </div>
 
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-md">
-              A tactical language learning field manual built for polyglots and autodidacts—covering CEFR tiers A1 through C2 for English, German, and beyond.
+              A complete A1–C2 intensive language academy, 4-skill certification exam simulator, AI coach hub, and tactical field manual for English, German, and beyond.
             </p>
           </div>
 
           <div className="space-y-3">
             <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-              Interactive Tools
+              Academy &amp; Simulators
+            </h4>
+            <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              {onSelectWorkspace && (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => onSelectWorkspace('courses')}
+                      className="hover:text-sky-700 dark:hover:text-sky-400 transition-colors text-left"
+                    >
+                      A1–C2 Intensive Courses &amp; Official Mocks
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => onSelectWorkspace('pretest')}
+                      className="hover:text-sky-700 dark:hover:text-sky-400 transition-colors text-left"
+                    >
+                      Scored 4-Skill Placement Pre-Test
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => onSelectWorkspace('simulator')}
+                      className="hover:text-sky-700 dark:hover:text-sky-400 transition-colors text-left"
+                    >
+                      High-Pressure 4-Skill Exam Arena
+                    </button>
+                  </li>
+                </>
+              )}
+              {onOpenAISettings && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={onOpenAISettings}
+                    className="hover:text-sky-700 dark:hover:text-sky-400 transition-colors text-left"
+                  >
+                    Connect Local / Cloud AI Provider
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+              Field Tools
             </h4>
             <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
               <li>
@@ -44,7 +99,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={onOpenDiagnostic}
                   className="hover:text-sky-700 dark:hover:text-sky-400 transition-colors text-left"
                 >
-                  CEFR Level Diagnostic Finder
+                  Quick CEFR Self-Check
                 </button>
               </li>
               <li>
@@ -67,23 +122,11 @@ export const Footer: React.FC<FooterProps> = ({
               </li>
             </ul>
           </div>
-
-          <div className="space-y-3">
-            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-              Polyglot Iron Laws
-            </h4>
-            <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
-              <li>• Output early: Speak from week two</li>
-              <li>• Prioritize core lemmas &amp; frequency</li>
-              <li>• Phonetics before vocabulary</li>
-              <li>• Comprehensible input (i + 1)</li>
-            </ul>
-          </div>
         </div>
 
         <div className="pt-8 mt-8 border-t border-slate-200/70 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-          <p>© {new Date().getFullYear()} LinguaVerve. Crafted for polyglots and language autodidacts.</p>
-          <span className="font-mono">Static · Offline-Ready</span>
+          <p>© {new Date().getFullYear()} LinguaVerve. Built for polyglots, exam candidates, and autodidacts.</p>
+          <span className="font-mono">GitHub Pages Ready · Local &amp; Cloud AI · 4-Skill CEFR</span>
         </div>
       </div>
     </footer>
