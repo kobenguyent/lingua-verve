@@ -134,6 +134,31 @@ public struct RootNavigationView: View {
                             .font(.system(size: 13))
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        Task { await store.checkForUpdates(manual: true) }
+                    } label: {
+                        HStack {
+                            Label(
+                                store.isUpdateAvailable
+                                    ? "Update Available (v\(store.availableUpdate?.latestVersion ?? ""))"
+                                    : "Check for Updates",
+                                systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
+                            )
+                            .font(.system(size: 13))
+                            Spacer()
+                            if store.isUpdateAvailable {
+                                Circle()
+                                    .fill(BrandTheme.emeraldMint)
+                                    .frame(width: 7, height: 7)
+                            } else {
+                                Text("v\(store.currentAppVersion)")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .listStyle(.sidebar)
@@ -248,6 +273,15 @@ public struct RootNavigationView: View {
                 showAISettingsSheet = true
             } label: {
                 Label("AI Setup", systemImage: "cpu")
+            }
+
+            Button {
+                Task { await store.checkForUpdates(manual: true) }
+            } label: {
+                Label(
+                    store.isUpdateAvailable ? "Update Available" : "Updates",
+                    systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
+                )
             }
 
             Button {

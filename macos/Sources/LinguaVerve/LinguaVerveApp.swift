@@ -28,9 +28,7 @@ struct LinguaVerveApp: App {
                 UpdateSheetView(store: store)
             }
             .task {
-                if store.autoCheckForUpdates && store.lastUpdateCheckDate == nil {
-                    await store.checkForUpdates(manual: false)
-                }
+                await store.startPeriodicUpdateChecks()
             }
         }
         #if os(macOS)

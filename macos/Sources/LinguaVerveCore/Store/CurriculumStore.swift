@@ -34,11 +34,16 @@ public final class CurriculumStore {
     public private(set) var learnerState: LearnerProgressState
     public var aiConfig: AIProviderConfig
 
-    // Software Update State (GitHub Releases — macOS)
+    // Software Update State (GitHub Releases — MacBook / iPad / iPhone)
     public let currentAppVersion: String
     public var autoCheckForUpdates: Bool {
         didSet {
             defaults.set(autoCheckForUpdates, forKey: autoUpdateKey)
+        }
+    }
+    public var autoInstallAfterDownload: Bool {
+        didSet {
+            defaults.set(autoInstallAfterDownload, forKey: autoInstallKey)
         }
     }
     public var isCheckingForUpdates: Bool = false
@@ -48,6 +53,7 @@ public final class CurriculumStore {
     public var latestReleaseNotes: String?
     public var latestReleaseURL: String?
     public var latestReleaseAsset: GitHubReleaseAsset?
+    public var latestChecksumsAsset: GitHubReleaseAsset?
     public var lastUpdateCheckDate: Date?
     public var updateCheckError: String?
     public var isUpdateSheetPresented: Bool = false
@@ -56,10 +62,13 @@ public final class CurriculumStore {
 
     private var cachedReleaseETag: String?
     private let updateService: any UpdateServiceProtocol
+    private let terminateAppHandler: @MainActor () -> Void
+    private let terminationDelayMs: UInt64
     private let defaults: UserDefaults
     private let bookmarksKey = "linguaverve.macos.bookmarks"
     private let masteredKey = "linguaverve.macos.mastered"
     private let autoUpdateKey = "linguaverve.macos.autoCheckForUpdates"
+    private let autoInstallKey = "linguaverve.macos.autoInstallAfterDownload"
     private let learnerStateKey = "linguaverve.apple.learnerState.v1"
     private let aiConfigKey = "linguaverve.apple.aiConfig.v1"
 
@@ -67,15 +76,28 @@ public final class CurriculumStore {
         bundle: CurriculumBundle? = nil,
         defaults: UserDefaults = .standard,
         updateService: any UpdateServiceProtocol = UpdateService(),
-        currentAppVersion: String = SemanticVersion.currentAppVersion()
+        currentAppVersion: String = SemanticVersion.currentAppVersion(),
+        terminationDelayMs: UInt64 = 250,
+        terminateAppHandler: (@MainActor () -> Void)? = nil
     ) {
         self.defaults = defaults
         self.updateService = updateService
         self.currentAppVersion = SemanticVersion.normalize(currentAppVersion)
+        self.terminationDelayMs = terminationDelayMs
+        self.terminateAppHandler = terminateAppHandler ?? {
+            #if os(macOS)
+            NSApplication.shared.terminate(nil)
+            #endif
+        }
         if defaults.object(forKey: autoUpdateKey) == nil {
             self.autoCheckForUpdates = true
         } else {
             self.autoCheckForUpdates = defaults.bool(forKey: autoUpdateKey)
+        }
+        if defaults.object(forKey: autoInstallKey) == nil {
+            self.autoInstallAfterDownload = true
+        } else {
+            self.autoInstallAfterDownload = defaults.bool(forKey: autoInstallKey)
         }
         let loaded = bundle ?? Self.loadDefaultBundle()
         self.bundle = loaded
@@ -725,6 +747,7 @@ public final class CurriculumStore {
                 latestReleaseNotes = update.releaseNotes
                 latestReleaseURL = update.releaseURL
                 latestReleaseAsset = update.asset
+                latestChecksumsAsset = update.checksumsAsset
                 if let etag = update.etag { cachedReleaseETag = etag }
                 isUpdateBannerDismissed = false
                 if manual { isUpdateSheetPresented = true }
@@ -735,9 +758,31 @@ public final class CurriculumStore {
         }
     }
 
+    /// Runs an initial GitHub Releases check on launch (when auto-check is enabled)
+    /// and re-checks periodically while the app stays open.
+    @MainActor
+    public func startPeriodicUpdateChecks(intervalSeconds: TimeInterval = 6 * 3600) async {
+        if autoCheckForUpdates && lastUpdateCheckDate == nil {
+            await checkForUpdates(manual: false)
+        }
+        let sleepNs = UInt64(max(60, intervalSeconds) * 1_000_000_000)
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: sleepNs)
+            guard !Task.isCancelled else { break }
+            if autoCheckForUpdates {
+                await checkForUpdates(manual: false)
+            }
+        }
+    }
+
     @MainActor
     public func downloadUpdate() async {
-        if case .downloading = updateDownloadState { return }
+        switch updateDownloadState {
+        case .downloading, .verifying, .installing:
+            return
+        case .idle, .ready, .failed:
+            break
+        }
 
         if availableUpdate == nil && latestReleaseAsset == nil {
             await checkForUpdates(manual: false)
@@ -764,12 +809,25 @@ public final class CurriculumStore {
                     }
                 }
             }
+
+            let checksumsAsset = availableUpdate?.checksumsAsset ?? latestChecksumsAsset
+            if checksumsAsset != nil {
+                updateDownloadState = .verifying
+                _ = try await updateService.verifyChecksum(
+                    of: fileURL,
+                    assetName: asset.name,
+                    checksumsAsset: checksumsAsset
+                )
+            }
+
             updateDownloadState = .ready(fileURL: fileURL)
         } catch {
             updateDownloadState = .failed(error.localizedDescription)
         }
     }
 
+    /// Downloads the latest GitHub Release artifact, verifies its SHA-256 checksum,
+    /// spawns the detached updater helper, and closes the current app to apply the update & relaunch.
     @MainActor
     public func downloadAndInstallUpdate() async {
         await downloadUpdate()
@@ -783,16 +841,26 @@ public final class CurriculumStore {
         guard case .ready(let fileURL) = updateDownloadState else { return }
         #if os(macOS)
         do {
+            updateDownloadState = .installing
             try updateService.installAndRelaunch(
                 downloadedFile: fileURL,
-                currentBundlePath: Bundle.main.bundlePath
+                currentBundlePath: Bundle.main.bundlePath,
+                parentPID: ProcessInfo.processInfo.processIdentifier
             )
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                NSApplication.shared.terminate(nil)
+            if terminationDelayMs == 0 {
+                terminateAppHandler()
+            } else {
+                let delayNs = terminationDelayMs * 1_000_000
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: delayNs)
+                    self?.terminateAppHandler()
+                }
             }
         } catch {
             updateDownloadState = .failed(error.localizedDescription)
         }
+        #else
+        openReleasePage()
         #endif
     }
 

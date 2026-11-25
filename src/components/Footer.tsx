@@ -120,6 +120,16 @@ export const Footer: React.FC<FooterProps> = ({
                   Add a New Language Guide
                 </button>
               </li>
+              <li>
+                <a
+                  href="https://github.com/kobenguyent/lingua-verve/releases/latest"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-sky-700 dark:text-sky-400 hover:underline"
+                >
+                  Download Native Apple App (macOS / iOS) ↗
+                </a>
+              </li>
             </ul>
           </div>
         </div>

@@ -260,13 +260,13 @@ public struct AIClientService: Sendable {
         let sentenceCount = cleaned.components(separatedBy: CharacterSet(charactersIn: ".!?")).filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).count > 2 }.count
         let punctuationRatio = sentenceCount >= 2 ? 1.0 : 0.6
 
-        let rawScore = Int((
-            lengthRatio * 35.0
-                + min(1.0, keywordRatio + 0.25) * 25.0
-                + min(1.0, diversity * 1.45) * 20.0
-                + cohesionRatio * 12.0
-                + punctuationRatio * 8.0
-        ).rounded())
+        let lengthScore: Double = lengthRatio * 35.0
+        let keywordScore: Double = min(1.0, keywordRatio + 0.25) * 25.0
+        let diversityScore: Double = min(1.0, diversity * 1.45) * 20.0
+        let cohesionScore: Double = cohesionRatio * 12.0
+        let punctuationScore: Double = punctuationRatio * 8.0
+        let totalScore: Double = lengthScore + keywordScore + diversityScore + cohesionScore + punctuationScore
+        let rawScore = Int(totalScore.rounded())
         let score = max(15, min(96, rawScore))
 
         let estRank = score >= 62 ? level.numericRank : max(1, level.numericRank - 1)

@@ -1,6 +1,5 @@
 import SwiftUI
 import LinguaVerveCore
-import LinguaVerveUI
 
 public struct UpdateNotificationBanner: View {
     @Bindable var store: CurriculumStore
@@ -17,25 +16,20 @@ public struct UpdateNotificationBanner: View {
                 .font(.system(size: 14))
                 .foregroundStyle(BrandTheme.emeraldMint)
 
-            Text("New release available: **LinguaVerve v\(update.latestVersion)** (installed: v\(store.currentAppVersion))")
+            Text("New release: **LinguaVerve v\(update.latestVersion)** (installed: v\(store.currentAppVersion))")
                 .font(.system(size: 12))
                 .lineLimit(1)
 
-            if case .downloading(let progress) = store.updateDownloadState {
-                ProgressView(value: progress, total: 1.0)
-                    .frame(width: 110)
-                Text("\(Int(progress * 100))%")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
+            statusAccessory
 
             Spacer()
 
+            #if os(macOS)
             if case .ready = store.updateDownloadState {
                 Button {
                     store.installReadyUpdate()
                 } label: {
-                    Label("Install & Relaunch", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Close App & Install", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BrandTheme.emeraldMint)
@@ -44,15 +38,25 @@ public struct UpdateNotificationBanner: View {
                 Button {
                     Task { await store.downloadAndInstallUpdate() }
                 } label: {
-                    Label("Update Now", systemImage: "arrow.down.to.line")
+                    Label("Download & Update", systemImage: "arrow.down.to.line")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BrandTheme.celestialSky)
                 .controlSize(.small)
-                .disabled(isDownloading)
+                .disabled(isBusy)
             }
+            #else
+            Button {
+                store.openReleasePage()
+            } label: {
+                Label("Get Release", systemImage: "arrow.up.right.square")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(BrandTheme.celestialSky)
+            .controlSize(.small)
+            #endif
 
-            Button("Release Notes…") {
+            Button("Notes…") {
                 store.isUpdateSheetPresented = true
             }
             .controlSize(.small)
@@ -67,9 +71,37 @@ public struct UpdateNotificationBanner: View {
         .background(BrandTheme.celestialSky.opacity(0.12))
     }
 
-    private var isDownloading: Bool {
-        if case .downloading = store.updateDownloadState { return true }
-        return false
+    @ViewBuilder
+    private var statusAccessory: some View {
+        switch store.updateDownloadState {
+        case .downloading(let progress):
+            ProgressView(value: progress, total: 1.0)
+                .frame(width: 96)
+            Text("\(Int(progress * 100))%")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+        case .verifying:
+            ProgressView().controlSize(.small)
+            Text("Verifying SHA-256…")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        case .installing:
+            ProgressView().controlSize(.small)
+            Text("Closing app to update…")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(BrandTheme.emeraldMint)
+        default:
+            EmptyView()
+        }
+    }
+
+    private var isBusy: Bool {
+        switch store.updateDownloadState {
+        case .downloading, .verifying, .installing:
+            return true
+        default:
+            return false
+        }
     }
 }
 
@@ -85,6 +117,7 @@ public struct UpdateSheetView: View {
         let hasUpdate = store.isUpdateAvailable
         let latestVersion = store.availableUpdate?.latestVersion ?? store.latestKnownVersion
         let asset = store.availableUpdate?.asset ?? store.latestReleaseAsset
+        let hasChecksums = (store.availableUpdate?.checksumsAsset ?? store.latestChecksumsAsset) != nil
         let releaseName = store.availableUpdate?.releaseName ?? store.latestReleaseName ?? "Release Notes"
         let releaseNotes = store.availableUpdate?.releaseNotes ?? store.latestReleaseNotes
 
@@ -95,7 +128,7 @@ public struct UpdateSheetView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(hasUpdate ? "New Version Available" : "LinguaVerve Software Update")
                         .font(.system(size: 17, weight: .bold, design: .serif))
-                    Text("Source: GitHub Releases (kobenguyent/lingua-verve)")
+                    Text("Source: GitHub Releases (\(UpdateService.repoOwner)/\(UpdateService.repoName))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -112,7 +145,7 @@ public struct UpdateSheetView: View {
                     }
                 }
                 .controlSize(.small)
-                .disabled(store.isCheckingForUpdates)
+                .disabled(store.isCheckingForUpdates || isBusy)
             }
 
             Divider()
@@ -161,10 +194,16 @@ public struct UpdateSheetView: View {
                         .foregroundStyle(.secondary)
                     Text("Asset: \(asset.name)")
                         .font(.system(size: 11, design: .monospaced))
+                        .lineLimit(1)
                     if asset.size > 0 {
                         Text("(\(ByteCountFormatter.string(fromByteCount: asset.size, countStyle: .file)))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                    if hasChecksums {
+                        Label("SHA-256", systemImage: "checkmark.shield.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(BrandTheme.emeraldMint)
                     }
                     Spacer()
                     if let checkedAt = store.lastUpdateCheckDate {
@@ -183,7 +222,9 @@ public struct UpdateSheetView: View {
                     Button("View on GitHub ↗") {
                         store.openReleasePage()
                     }
+                    #if os(macOS)
                     .buttonStyle(.link)
+                    #endif
                     .font(.caption)
                 }
 
@@ -204,7 +245,7 @@ public struct UpdateSheetView: View {
                 .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Toggle("Automatically check GitHub Releases for updates on launch", isOn: $store.autoCheckForUpdates)
+            Toggle("Automatically check GitHub Releases for updates on launch & every 6 hours", isOn: $store.autoCheckForUpdates)
                 .font(.caption)
 
             switch store.updateDownloadState {
@@ -213,7 +254,7 @@ public struct UpdateSheetView: View {
             case .downloading(let progress):
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Downloading update from GitHub Releases…")
+                        Text("Downloading release from GitHub Releases…")
                             .font(.caption.weight(.medium))
                         Spacer()
                         Text("\(Int(progress * 100))%")
@@ -221,10 +262,23 @@ public struct UpdateSheetView: View {
                     }
                     ProgressView(value: progress, total: 1.0)
                 }
+            case .verifying:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Verifying SHA-256 checksum against GitHub Release…")
+                        .font(.caption.weight(.medium))
+                }
             case .ready(let fileURL):
-                Label("Downloaded \(fileURL.lastPathComponent) — ready to install & relaunch!", systemImage: "checkmark.circle.fill")
+                Label("Verified \(fileURL.lastPathComponent) — closing current app to install & relaunch!", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(BrandTheme.emeraldMint)
+            case .installing:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Closing current LinguaVerve app to install update and relaunch…")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                }
             case .failed(let msg):
                 Label(msg, systemImage: "xmark.octagon.fill")
                     .font(.caption)
@@ -240,6 +294,7 @@ public struct UpdateSheetView: View {
                         dismiss()
                     }
                     .controlSize(.small)
+                    .disabled(isBusy)
                 }
 
                 Spacer()
@@ -250,11 +305,12 @@ public struct UpdateSheetView: View {
                 .keyboardShortcut(.cancelAction)
 
                 if hasUpdate {
+                    #if os(macOS)
                     if case .ready = store.updateDownloadState {
                         Button {
                             store.installReadyUpdate()
                         } label: {
-                            Label("Install & Relaunch Now", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Close App & Install Now", systemImage: "arrow.triangle.2.circlepath")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(BrandTheme.emeraldMint)
@@ -263,22 +319,39 @@ public struct UpdateSheetView: View {
                         Button {
                             Task { await store.downloadAndInstallUpdate() }
                         } label: {
-                            Label("Download & Install Update", systemImage: "arrow.down.to.line")
+                            Label("Download, Close & Update", systemImage: "arrow.down.to.line")
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(BrandTheme.celestialSky)
-                        .disabled(isDownloading)
+                        .disabled(isBusy)
                         .keyboardShortcut(.defaultAction)
                     }
+                    #else
+                    Button {
+                        store.openReleasePage()
+                    } label: {
+                        Label("Download Release on GitHub ↗", systemImage: "arrow.up.right.square")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.celestialSky)
+                    #endif
                 }
             }
         }
         .padding(18)
-        .frame(width: 560)
+        #if os(macOS)
+        .frame(width: 580)
+        #else
+        .frame(maxWidth: 580)
+        #endif
     }
 
-    private var isDownloading: Bool {
-        if case .downloading = store.updateDownloadState { return true }
-        return false
+    private var isBusy: Bool {
+        switch store.updateDownloadState {
+        case .downloading, .verifying, .installing:
+            return true
+        default:
+            return false
+        }
     }
 }

@@ -29,8 +29,9 @@ targets:
         product: LinguaVerveUI
     settings:
       base:
+        PRODUCT_NAME: LinguaVerve
         PRODUCT_BUNDLE_IDENTIFIER: com.linguaverve.app
-        MARKETING_VERSION: "2.0.0"
+        MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
@@ -49,3 +50,13 @@ targets:
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+
+schemes:
+  LinguaVerveApp:
+    build:
+      targets:
+        LinguaVerve: all
+    run:
+      config: Debug
+    archive:
+      config: Release

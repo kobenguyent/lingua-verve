@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 
 // MARK: - Semantic Versioning
 
@@ -128,6 +131,7 @@ public struct AvailableAppUpdate: Codable, Sendable, Equatable, Hashable {
     public var releaseURL: String
     public var publishedAt: String?
     public var asset: GitHubReleaseAsset?
+    public var checksumsAsset: GitHubReleaseAsset?
     public var etag: String?
 
     public init(
@@ -138,6 +142,7 @@ public struct AvailableAppUpdate: Codable, Sendable, Equatable, Hashable {
         releaseURL: String,
         publishedAt: String? = nil,
         asset: GitHubReleaseAsset? = nil,
+        checksumsAsset: GitHubReleaseAsset? = nil,
         etag: String? = nil
     ) {
         self.currentVersion = currentVersion
@@ -147,6 +152,7 @@ public struct AvailableAppUpdate: Codable, Sendable, Equatable, Hashable {
         self.releaseURL = releaseURL
         self.publishedAt = publishedAt
         self.asset = asset
+        self.checksumsAsset = checksumsAsset
         self.etag = etag
     }
 }
@@ -169,7 +175,9 @@ public enum UpdateCheckOutcome: Sendable, Equatable {
 public enum UpdateDownloadState: Sendable, Equatable {
     case idle
     case downloading(progress: Double)
+    case verifying
     case ready(fileURL: URL)
+    case installing
     case failed(String)
 }
 
@@ -179,6 +187,7 @@ public enum UpdateServiceError: LocalizedError, Sendable, Equatable {
     case missingTagName
     case untrustedDownloadURL(String)
     case archiveNotFound(String)
+    case checksumMismatch(expected: String, actual: String)
 
     public var errorDescription: String? {
         switch self {
@@ -192,6 +201,8 @@ public enum UpdateServiceError: LocalizedError, Sendable, Equatable {
             return "Refused to download update from untrusted URL (\(reason))."
         case .archiveNotFound(let path):
             return "Downloaded update archive not found at \(path)."
+        case .checksumMismatch(let expected, let actual):
+            return "SHA-256 verification failed (expected \(expected.prefix(12))…, got \(actual.prefix(12))…)."
         }
     }
 }
@@ -217,10 +228,38 @@ public protocol UpdateServiceProtocol: Sendable {
         onProgress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL
 
+    func verifyChecksum(
+        of downloadedFile: URL,
+        assetName: String,
+        checksumsAsset: GitHubReleaseAsset?
+    ) async throws -> Bool
+
+    func installAndRelaunch(
+        downloadedFile: URL,
+        currentBundlePath: String,
+        parentPID: Int32
+    ) throws
+}
+
+public extension UpdateServiceProtocol {
+    func verifyChecksum(
+        of downloadedFile: URL,
+        assetName: String,
+        checksumsAsset: GitHubReleaseAsset?
+    ) async throws -> Bool {
+        true
+    }
+
     func installAndRelaunch(
         downloadedFile: URL,
         currentBundlePath: String
-    ) throws
+    ) throws {
+        try installAndRelaunch(
+            downloadedFile: downloadedFile,
+            currentBundlePath: currentBundlePath,
+            parentPID: ProcessInfo.processInfo.processIdentifier
+        )
+    }
 }
 
 // MARK: - UpdateService Implementation
@@ -280,7 +319,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
     }
 
     /// Picks the best macOS release asset (`LinguaVerve*.zip` or `LinguaVerve*.dmg`) matching
-    /// the current CPU architecture or generic macOS archive from trusted GitHub release hosts.
+    /// universal macOS or current CPU architecture from trusted GitHub release hosts.
     public static func pickBestNativeAsset(
         from assets: [GitHubReleaseAsset]?,
         arch: String = currentArchitecture
@@ -288,10 +327,14 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
         guard let assets, !assets.isEmpty else { return nil }
         let eligible = assets.filter { asset in
             let lower = asset.name.lowercased()
-            return (lower.hasSuffix(".dmg") || lower.hasSuffix(".zip"))
-                && !lower.contains("win")
-                && !lower.contains("linux")
-                && isAllowedDownloadURL(asset.browser_download_url)
+            let isMacArchive = lower.hasSuffix(".dmg") || lower.hasSuffix(".zip")
+            let isOtherPlatform = lower.contains("win")
+                || lower.contains("linux")
+                || lower.contains("ios")
+                || lower.contains("ipados")
+                || lower.contains("simulator")
+                || lower.hasSuffix(".ipa")
+            return isMacArchive && !isOtherPlatform && isAllowedDownloadURL(asset.browser_download_url)
         }
         guard !eligible.isEmpty else { return nil }
 
@@ -304,28 +347,80 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
             return archTokens.contains { lower.contains($0) }
         }
 
-        func hasAnyArchToken(_ name: String) -> Bool {
+        func isUniversalOrGeneric(_ name: String) -> Bool {
             let lower = name.lowercased()
-            return ["arm64", "aarch64", "x86_64", "x64", "amd64"].contains { lower.contains($0) }
+            if lower.contains("universal") { return true }
+            return !["arm64", "aarch64", "x86_64", "x64", "amd64"].contains { lower.contains($0) }
         }
 
-        // 1. Arch-specific .zip
+        // 1. Arch-specific .zip (fastest extraction for in-app auto-update)
         if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".zip") && matchesArch($0.name) }) {
             return match
         }
-        // 2. Generic / universal .zip (e.g. LinguaVerve.zip)
-        if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".zip") && !hasAnyArchToken($0.name) }) {
+        // 2. Universal / generic .zip (e.g. LinguaVerve-1.1.0-macOS-universal.zip or LinguaVerve.zip)
+        if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".zip") && isUniversalOrGeneric($0.name) }) {
             return match
         }
         // 3. Arch-specific .dmg
         if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".dmg") && matchesArch($0.name) }) {
             return match
         }
-        // 4. Generic / universal .dmg (e.g. LinguaVerve.dmg)
-        if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".dmg") && !hasAnyArchToken($0.name) }) {
+        // 4. Universal / generic .dmg (e.g. LinguaVerve-1.1.0-macOS-universal.dmg or LinguaVerve.dmg)
+        if let match = eligible.first(where: { $0.name.lowercased().hasSuffix(".dmg") && isUniversalOrGeneric($0.name) }) {
             return match
         }
         return eligible.first
+    }
+
+    /// Finds the release's SHA256SUMS.txt asset if published on GitHub Releases.
+    public static func pickChecksumsAsset(from assets: [GitHubReleaseAsset]?) -> GitHubReleaseAsset? {
+        guard let assets else { return nil }
+        return assets.first { asset in
+            let lower = asset.name.lowercased()
+            return (lower == "sha256sums.txt" || lower.hasSuffix("sha256sums.txt"))
+                && isAllowedDownloadURL(asset.browser_download_url)
+        }
+    }
+
+    /// Parses standard `shasum -a 256` lines (`<64-hex>  <filename>`) into `[filename: lowercaseHex]`.
+    public static func parseSHA256Sums(_ text: String) -> [String: String] {
+        var table: [String: String] = [:]
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            let parts = line.split(maxSplits: 1, whereSeparator: { $0 == " " || $0 == "\t" })
+            guard parts.count == 2 else { continue }
+            let digest = String(parts[0]).lowercased()
+            guard digest.count == 64, digest.allSatisfy({ $0.isHexDigit }) else { continue }
+            var fileName = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if fileName.hasPrefix("*") { fileName.removeFirst() }
+            let base = (fileName as NSString).lastPathComponent
+            if !base.isEmpty {
+                table[base] = digest
+            }
+        }
+        return table
+    }
+
+    /// Computes lowercase hex SHA-256 of a file on disk using streaming chunks.
+    public static func sha256Hex(of fileURL: URL) throws -> String {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw UpdateServiceError.archiveNotFound(fileURL.path)
+        }
+        #if canImport(CryptoKit)
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            let chunk = try handle.read(upToCount: 65_536) ?? Data()
+            if chunk.isEmpty { break }
+            hasher.update(data: chunk)
+        }
+        let digest = hasher.finalize()
+        return digest.map { String(format: "%02x", $0) }.joined()
+        #else
+        return ""
+        #endif
     }
 
     public func checkForUpdates(
@@ -337,7 +432,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
         request.httpMethod = "GET"
         request.timeoutInterval = 15
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("LinguaVerve-Native-macOS/\(SemanticVersion.normalize(currentVersion))", forHTTPHeaderField: "User-Agent")
+        request.setValue("LinguaVerve-Native-Apple/\(SemanticVersion.normalize(currentVersion))", forHTTPHeaderField: "User-Agent")
         if !force, let etag, !etag.isEmpty {
             request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         }
@@ -383,6 +478,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
             ? release.html_url!
             : Self.releasesPageURL.absoluteString
         let asset = Self.pickBestNativeAsset(from: release.assets)
+        let checksumsAsset = Self.pickChecksumsAsset(from: release.assets)
         let releaseName = (release.name?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
             ? release.name!
             : "LinguaVerve v\(normalizedLatest)"
@@ -400,6 +496,7 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
                     releaseURL: releaseURL,
                     publishedAt: release.published_at,
                     asset: asset,
+                    checksumsAsset: checksumsAsset,
                     etag: responseETag
                 )
             )
@@ -432,13 +529,13 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
 
         let rawFileName = assetName ?? url.lastPathComponent
         let baseComponent = (rawFileName as NSString).lastPathComponent
-        let safeFileName = baseComponent.isEmpty ? "LinguaVerve.dmg" : baseComponent
+        let safeFileName = baseComponent.isEmpty ? "LinguaVerve.zip" : baseComponent
         let destURL = stageDir.appendingPathComponent(safeFileName)
         try? FileManager.default.removeItem(at: destURL)
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 300
-        request.setValue("LinguaVerve-Native-macOS-Updater", forHTTPHeaderField: "User-Agent")
+        request.setValue("LinguaVerve-Native-Apple-Updater", forHTTPHeaderField: "User-Agent")
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -485,9 +582,46 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
         return destURL
     }
 
+    public func verifyChecksum(
+        of downloadedFile: URL,
+        assetName: String,
+        checksumsAsset: GitHubReleaseAsset?
+    ) async throws -> Bool {
+        guard let checksumsAsset,
+              Self.isAllowedDownloadURL(checksumsAsset.browser_download_url),
+              let url = URL(string: checksumsAsset.browser_download_url) else {
+            return true
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 20
+        request.setValue("LinguaVerve-Native-Apple-Updater", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await transport.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let text = String(data: data, encoding: .utf8) else {
+            return true
+        }
+
+        let table = Self.parseSHA256Sums(text)
+        let baseName = (assetName as NSString).lastPathComponent
+        guard let expected = table[baseName] ?? table[downloadedFile.lastPathComponent] else {
+            return true
+        }
+
+        let actual = try Self.sha256Hex(of: downloadedFile)
+        guard !actual.isEmpty else { return true }
+        if actual != expected {
+            throw UpdateServiceError.checksumMismatch(expected: expected, actual: actual)
+        }
+        return true
+    }
+
     public func installAndRelaunch(
         downloadedFile: URL,
-        currentBundlePath: String = Bundle.main.bundlePath
+        currentBundlePath: String = Bundle.main.bundlePath,
+        parentPID: Int32 = ProcessInfo.processInfo.processIdentifier
     ) throws {
         guard FileManager.default.fileExists(atPath: downloadedFile.path) else {
             throw UpdateServiceError.archiveNotFound(downloadedFile.path)
@@ -508,27 +642,39 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
 
         let updateDir = downloadedFile.deletingLastPathComponent()
         let scriptURL = updateDir.appendingPathComponent("install-update.sh")
+        let logURL = updateDir.appendingPathComponent("install-update.log")
         let script = Self.buildInstallerScript(
             downloadedFile: downloadedFile.path,
             targetAppPath: targetAppPath,
-            workDir: updateDir.path
+            workDir: updateDir.path,
+            parentPID: parentPID
         )
         try Data(script.utf8).write(to: scriptURL, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/bin/bash")
-        proc.arguments = [scriptURL.path]
-        proc.standardOutput = FileHandle.nullDevice
-        proc.standardError = FileHandle.nullDevice
-        try proc.run()
+        // Launch fully detached (nohup + background subshell) so terminating the current app
+        // never interrupts the updater while it waits for exit, replaces the bundle, and relaunches.
+        let launcher = Process()
+        launcher.executableURL = URL(fileURLWithPath: "/bin/sh")
+        launcher.arguments = [
+            "-c",
+            "nohup /bin/bash \"$1\" >\"$2\" 2>&1 </dev/null &",
+            "_",
+            scriptURL.path,
+            logURL.path
+        ]
+        launcher.standardOutput = FileHandle.nullDevice
+        launcher.standardError = FileHandle.nullDevice
+        try launcher.run()
+        launcher.waitUntilExit()
         #endif
     }
 
     public static func buildInstallerScript(
         downloadedFile: String,
         targetAppPath: String,
-        workDir: String
+        workDir: String,
+        parentPID: Int32 = 0
     ) -> String {
         func shQuote(_ s: String) -> String {
             "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
@@ -536,23 +682,44 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
         return """
         #!/usr/bin/env bash
         set -euo pipefail
-        sleep 1.2
+
+        APP_PID=\(parentPID)
         ARCHIVE=\(shQuote(downloadedFile))
         TARGET_APP=\(shQuote(targetAppPath))
         STAGE_DIR=\(shQuote(workDir))/extracted-\(UUID().uuidString)
-        mkdir -p "$STAGE_DIR"
-
-        EXT="${ARCHIVE##*.}"
-        EXT_LOWER="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
+        NEW_STAGE="${TARGET_APP}.new"
+        BACKUP_APP="${TARGET_APP}.backup"
         MOUNT_POINT=""
 
         cleanup() {
           if [ -n "$MOUNT_POINT" ] && [ -d "$MOUNT_POINT" ]; then
             hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null || true
           fi
-          rm -rf "$STAGE_DIR" 2>/dev/null || true
+          rm -rf "$STAGE_DIR" "$NEW_STAGE" 2>/dev/null || true
         }
         trap cleanup EXIT
+
+        # 1. Wait for the currently running LinguaVerve process to finish closing cleanly
+        if [ "$APP_PID" -gt 1 ]; then
+          WAIT_STEPS=0
+          while kill -0 "$APP_PID" 2>/dev/null; do
+            WAIT_STEPS=$((WAIT_STEPS + 1))
+            if [ "$WAIT_STEPS" -eq 60 ]; then
+              kill -TERM "$APP_PID" 2>/dev/null || true
+            elif [ "$WAIT_STEPS" -ge 80 ]; then
+              kill -KILL "$APP_PID" 2>/dev/null || true
+              break
+            fi
+            sleep 0.25
+          done
+        else
+          sleep 1.2
+        fi
+
+        mkdir -p "$STAGE_DIR"
+
+        EXT="${ARCHIVE##*.}"
+        EXT_LOWER="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
 
         if [ "$EXT_LOWER" = "zip" ]; then
           ditto -x -k "$ARCHIVE" "$STAGE_DIR"
@@ -570,11 +737,34 @@ public struct UpdateService: UpdateServiceProtocol, Sendable {
           exit 1
         fi
 
-        rm -rf "$TARGET_APP"
-        ditto "$NEW_APP" "$TARGET_APP"
+        # 2. Stage new bundle alongside target, clear quarantine, and re-sign locally
+        rm -rf "$NEW_STAGE" "$BACKUP_APP"
+        ditto "$NEW_APP" "$NEW_STAGE"
+        xattr -cr "$NEW_STAGE" 2>/dev/null || true
+        codesign --force --deep --sign - "$NEW_STAGE" 2>/dev/null || true
+
+        # 3. Atomic swap with automatic rollback if anything fails
+        if [ -d "$TARGET_APP" ]; then
+          mv "$TARGET_APP" "$BACKUP_APP"
+        fi
+
+        if mv "$NEW_STAGE" "$TARGET_APP"; then
+          rm -rf "$BACKUP_APP" 2>/dev/null || true
+        else
+          if [ -d "$BACKUP_APP" ]; then
+            mv "$BACKUP_APP" "$TARGET_APP" 2>/dev/null || true
+          fi
+          exit 1
+        fi
+
         xattr -cr "$TARGET_APP" 2>/dev/null || true
         codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || true
-        open "$TARGET_APP"
+        touch "$TARGET_APP"
+        /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$TARGET_APP" >/dev/null 2>&1 || true
+        rm -f "$ARCHIVE" 2>/dev/null || true
+
+        # 4. Relaunch updated LinguaVerve app
+        open -n "$TARGET_APP" || open "$TARGET_APP"
         """
     }
 }

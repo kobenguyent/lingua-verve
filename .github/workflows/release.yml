@@ -1,4 +1,4 @@
-name: Release
+name: Release Native Apple Apps
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release version tag (e.g. v1.0.0)"
+        description: "Release version tag (e.g. v1.1.0)"
         required: true
-        default: "v1.0.0"
+        default: "v1.1.0"
         type: string
       prerelease:
         description: "Mark as pre-release"
@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   release:
-    name: Build & Publish GitHub Release
+    name: Build & Publish Native GitHub Release
     runs-on: macos-15
 
     steps:
@@ -36,6 +36,12 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+
+      - name: Ensure xcodegen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
 
       - name: Cache SwiftPM Build Products
         uses: actions/cache@v4
@@ -68,35 +74,41 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Full Test Suite (Web Vitest + macOS XCTest)
+      - name: Run Web Vitest Suite & Production Build
         run: |
           npm run test
-          npm run macos:test
+          npm run build
 
-      - name: Build Web Production Site
-        run: npm run build
+      - name: Verify Universal Apple Targets & Package iOS/iPadOS IPA
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: bash scripts/build-apple-apps.sh --package-ipa
 
-      - name: Build Native macOS App, DMG & ZIP Artifacts
+      - name: Build Universal Native macOS App, DMG, ZIP & SHA256SUMS.txt
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: npm run macos:app
 
-      - name: Verify Release Assets
+      - name: Verify All Release Assets & SHA-256 Checksums
         run: |
           test -d "dist-macos/LinguaVerve.app"
+          lipo -info "dist-macos/LinguaVerve.app/Contents/MacOS/LinguaVerve"
           codesign --verify --deep --strict --verbose=2 "dist-macos/LinguaVerve.app"
           test -f "dist-macos/LinguaVerve.dmg"
           test -f "dist-macos/LinguaVerve.zip"
+          test -f "dist-macos/LinguaVerve-iOS-iPadOS-unsigned.ipa"
           test -f "dist-macos/SHA256SUMS.txt"
+          (cd dist-macos && shasum -a 256 -c SHA256SUMS.txt)
           cat "dist-macos/SHA256SUMS.txt"
 
       - name: Upload Release Artifacts to Workflow Run
         uses: actions/upload-artifact@v4
         with:
-          name: LinguaVerve-${{ steps.meta.outputs.tag }}-macOS
+          name: LinguaVerve-${{ steps.meta.outputs.tag }}-Native-Apple
           path: |
             dist-macos/LinguaVerve*.dmg
             dist-macos/LinguaVerve*.zip
+            dist-macos/LinguaVerve*.ipa
             dist-macos/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90
@@ -104,26 +116,30 @@ jobs:
       - name: Prepare Release Notes Header
         run: |
           cat << 'EOF' > dist-macos/RELEASE_HEADER.md
-          ### 📦 Direct Downloads (Native macOS App)
+          ### 📦 Direct Downloads (Universal Native Apple Apps)
 
-          | Package | Format | Description |
+          | Package | Platform | Description |
           | :--- | :--- | :--- |
-          | **`LinguaVerve.dmg`** | **macOS Disk Image (Recommended)** | Double-click to mount, then drag **LinguaVerve.app** into **Applications** or run the included one-click installer. |
-          | **`LinguaVerve.zip`** | **macOS App Archive** | Double-click in Finder to extract **LinguaVerve.app** directly. |
-          | **`SHA256SUMS.txt`** | **Checksums** | SHA-256 integrity hashes for all release packages. |
+          | **`LinguaVerve.dmg`** | **macOS 14+ (Apple Silicon & Intel)** | Recommended macOS Disk Image — drag **LinguaVerve.app** to **Applications** or run the included one-click installer. |
+          | **`LinguaVerve.zip`** | **macOS 14+ (Apple Silicon & Intel)** | Universal `.app` archive — also downloaded automatically by the built-in GitHub Releases auto-updater. |
+          | **`LinguaVerve-iOS-iPadOS-unsigned.ipa`** | **iPhone & iPad (iOS/iPadOS 17+)** | Unsigned native iOS/iPadOS package for AltStore, Sideloadly, or personal Xcode signing. |
+          | **`SHA256SUMS.txt`** | **All Platforms** | SHA-256 cryptographic checksums verified automatically by LinguaVerve's in-app updater. |
 
           ---
 
-          ### 🚀 Quick Installation (macOS 14.0+ Sonoma / Sequoia)
+          ### 🚀 Quick Installation (macOS 14.0+ Sonoma / Sequoia / Tahoe)
 
           1. Download **`LinguaVerve.dmg`** below and double-click to open it.
           2. **Option A (One-Click Installer):** Double-click **`Install LinguaVerve (No Apple Dev Account).command`** inside the mounted disk image.
           3. **Option B (Drag & Drop):** Drag **`LinguaVerve.app`** into the **`Applications`** folder shortcut.
-          4. **First Launch (Gatekeeper Note):** Because LinguaVerve is ad-hoc signed (requiring no paid Apple Developer account), macOS flags browser-downloaded apps with quarantine. Run this command once in Terminal before opening:
+          4. **First Launch (Gatekeeper Note):** Because LinguaVerve is ad-hoc signed (requiring no paid Apple Developer account), macOS flags browser-downloaded apps with quarantine. Run once in Terminal before opening:
              ```bash
              xattr -cr /Applications/LinguaVerve.app
              ```
              *(Or right-click `LinguaVerve.app` in Finder → choose **Open** → click **Open**).*
+
+          ### 🔄 Built-In Auto-Updates
+          LinguaVerve checks **GitHub Releases** automatically on launch (and every 6 hours) or anytime via **LinguaVerve → Check for Updates…** When a newer release is found, clicking **Download, Close & Update** downloads the release archive, verifies its SHA-256 digest against `SHA256SUMS.txt`, closes the running app cleanly, atomically swaps `LinguaVerve.app`, and relaunches the new version automatically.
           EOF
 
       - name: Publish GitHub Release
@@ -140,4 +156,17 @@ jobs:
             dist-macos/LinguaVerve.zip
             dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.dmg
             dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.zip
+            dist-macos/LinguaVerve-iOS-iPadOS-unsigned.ipa
+            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-iOS-iPadOS-unsigned.ipa
             dist-macos/SHA256SUMS.txt
+
+      - name: Publish Release Step Summary
+        run: |
+          echo "## 🚀 Published LinguaVerve ${{ steps.meta.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🔐 SHA-256 Checksums" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat dist-macos/SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

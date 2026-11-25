@@ -1,4 +1,4 @@
-name: CI & Native macOS Build
+name: CI & Native Apple Builds
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Test & Package Native macOS App
+    name: Test & Package Native Apple Apps (macOS, iPadOS, iOS) + Web
     runs-on: macos-15
 
     steps:
@@ -29,6 +29,12 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Ensure xcodegen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+
       - name: Cache SwiftPM Build Products
         uses: actions/cache@v4
         with:
@@ -37,30 +43,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-
 
-      - name: Install Dependencies
+      - name: Install Web Dependencies
         run: npm ci
 
       - name: Run Web Vitest Suite
         run: npm run test
 
-      - name: Run Native macOS Swift XCTest Suite
-        run: npm run macos:test
-
       - name: Build Web Production Bundle
         run: npm run build
 
-      - name: Build & Package Native macOS App (.app, .dmg, .zip, SHA256SUMS.txt)
+      - name: Verify Universal Apple App (Swift XCTests + iOS/iPadOS IPA + macOS Xcode)
+        run: bash scripts/build-apple-apps.sh --package-ipa
+
+      - name: Build & Package Universal Native macOS App (.app, .dmg, .zip, SHA256SUMS.txt)
         run: npm run macos:app
 
-      - name: Verify Bundle & Installer Integrity
+      - name: Verify Bundle, Architecture & Checksum Integrity
         run: |
           test -d "dist-macos/LinguaVerve.app"
+          lipo -info "dist-macos/LinguaVerve.app/Contents/MacOS/LinguaVerve"
           codesign --verify --deep --strict --verbose=2 "dist-macos/LinguaVerve.app"
           test -f "dist-macos/LinguaVerve.dmg"
           test -f "dist-macos/LinguaVerve.zip"
+          test -f "dist-macos/LinguaVerve-iOS-iPadOS-unsigned.ipa"
           test -f "dist-macos/SHA256SUMS.txt"
+          (cd dist-macos && shasum -a 256 -c SHA256SUMS.txt)
           cat "dist-macos/SHA256SUMS.txt"
-          echo "✅ Native macOS application bundle and installers verified!"
+          echo "✅ Native Apple bundles, installers, and SHA-256 checksums verified!"
 
       - name: Upload Native macOS DMG Artifact
         uses: actions/upload-artifact@v4
@@ -78,13 +87,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Complete macOS Release Bundle (DMG, ZIP & SHA256SUMS)
+      - name: Upload Native iOS / iPadOS Unsigned IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LinguaVerve-macOS-Release
+          name: LinguaVerve-iOS-iPadOS-IPA
+          path: dist-macos/LinguaVerve-iOS-iPadOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Complete Native Release Bundle (DMG, ZIP, IPA & SHA256SUMS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinguaVerve-Native-Release-Bundle
           path: |
             dist-macos/LinguaVerve*.dmg
             dist-macos/LinguaVerve*.zip
+            dist-macos/LinguaVerve*.ipa
             dist-macos/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -92,12 +110,13 @@ jobs:
       - name: Publish Build & Installation Summary
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## 🍎 LinguaVerve — Native macOS App (`SwiftUI` + `MenuBarExtra`)
+          ## 🍎 LinguaVerve — Universal Native Apple Builds (`macOS` · `iPadOS` · `iOS`)
 
-          Download the **ad-hoc signed** native macOS application directly from the **Artifacts** section of this workflow run:
-          - **`LinguaVerve-macOS-DMG`** — Apple Disk Image (`LinguaVerve.dmg`) with drag-to-Applications shortcut and one-click installer
-          - **`LinguaVerve-macOS-ZIP`** — Compressed `LinguaVerve.app` bundle (`LinguaVerve.zip`)
-          - **`LinguaVerve-macOS-Release`** — Complete release bundle including versioned packages and `SHA256SUMS.txt`
+          Download the native application builds directly from the **Artifacts** section of this workflow run:
+          - **`LinguaVerve-macOS-DMG`** — Universal Apple Silicon + Intel Disk Image (`LinguaVerve.dmg`) with drag-to-Applications shortcut and one-click installer
+          - **`LinguaVerve-macOS-ZIP`** — Universal `LinguaVerve.app` archive (`LinguaVerve.zip`) used for fast in-app auto-updates
+          - **`LinguaVerve-iOS-iPadOS-IPA`** — Unsigned iPhone & iPad archive (`LinguaVerve-iOS-iPadOS-unsigned.ipa`) for AltStore, Sideloadly, or Xcode signing
+          - **`LinguaVerve-Native-Release-Bundle`** — Complete versioned release bundle including `SHA256SUMS.txt`
 
           ### 🚀 Installing on macOS (No Apple Developer Account Required)
           1. **Option A (One-Click DMG Installer):** Open `LinguaVerve.dmg` and double-click **`Install LinguaVerve (No Apple Dev Account).command`** (or drag `LinguaVerve.app` to `Applications`).
@@ -105,6 +124,7 @@ jobs:
              ```bash
              xattr -cr /Applications/LinguaVerve.app && open /Applications/LinguaVerve.app
              ```
+          3. **Built-in Auto-Updater:** Future updates check GitHub Releases automatically, verify `SHA256SUMS.txt`, download, close the running app, swap the bundle safely, and relaunch!
           EOF
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### 🔐 SHA-256 Checksums" >> "$GITHUB_STEP_SUMMARY"
