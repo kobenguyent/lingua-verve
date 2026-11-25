@@ -15,6 +15,7 @@ import {
   PreTestResult,
   SkillType,
   UnitStudyProgress,
+  VoiceSettings,
   WorkspaceTab,
 } from './types';
 import { soundEngine } from './utils/audio';
@@ -42,6 +43,7 @@ import { ExamSimulatorView } from './components/ExamSimulatorView';
 import { AICoachView } from './components/AICoachView';
 import { ProgressDashboardView } from './components/ProgressDashboardView';
 import { AIProviderModal } from './components/AIProviderModal';
+import { VoiceSettingsModal } from './components/VoiceSettingsModal';
 import { DiagnosticModal } from './components/DiagnosticModal';
 import { FalseFriendsModal } from './components/FalseFriendsModal';
 import { ExtensibilityModal } from './components/ExtensibilityModal';
@@ -87,6 +89,23 @@ export const App: React.FC = () => {
 
   // Persistent AI Provider Config (Local Ollama/LM Studio or Cloud APIs)
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>(() => loadAIConfig());
+
+  // Persistent Human Voice & Multi-Accent Settings
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() =>
+    soundEngine.getVoiceSettings()
+  );
+  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    return soundEngine.subscribe(() => {
+      setVoiceSettings(soundEngine.getVoiceSettings());
+    });
+  }, []);
+
+  const handleSaveVoiceSettings = (next: VoiceSettings) => {
+    soundEngine.updateVoiceSettings(next);
+    setVoiceSettings(next);
+  };
 
   // Persistent Learner Progress, Courses, Pre-Tests, Simulated Exams & AI Logs
   const [learnerState, setLearnerState] = useState<LearnerProgressState>(() => loadLearnerState());
@@ -283,6 +302,9 @@ export const App: React.FC = () => {
         onSelectTab={setActiveTab}
         aiConfig={aiConfig}
         onOpenAISettings={() => setIsAISettingsOpen(true)}
+        voiceSettings={voiceSettings}
+        activeLanguageId={activeLanguageId}
+        onOpenVoiceSettings={() => setIsVoiceSettingsOpen(true)}
         completedModulesCount={learnerState.completedModuleIds.length}
         examAttemptsCount={learnerState.examHistory.length}
       />
@@ -373,6 +395,7 @@ export const App: React.FC = () => {
             unitProgressMap={learnerState.unitProgress ?? {}}
             onSaveUnitProgress={handleSaveUnitProgress}
             aiConfig={aiConfig}
+            onOpenVoiceSettings={() => setIsVoiceSettingsOpen(true)}
             onLaunchExam={handleLaunchExam}
             onLaunchAICoach={handleLaunchAICoach}
             onLaunchPreTest={(langId) => {
@@ -483,6 +506,14 @@ export const App: React.FC = () => {
         onClose={() => setIsAISettingsOpen(false)}
         config={aiConfig}
         onSaveConfig={handleSaveAIConfig}
+      />
+
+      <VoiceSettingsModal
+        isOpen={isVoiceSettingsOpen}
+        onClose={() => setIsVoiceSettingsOpen(false)}
+        settings={voiceSettings}
+        onSaveSettings={handleSaveVoiceSettings}
+        activeLanguageId={activeLanguageId}
       />
     </div>
   );

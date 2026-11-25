@@ -16,6 +16,7 @@ import {
   Sparkles,
   Gauge,
   Play,
+  AudioLines,
 } from 'lucide-react';
 import {
   AIProviderConfig,
@@ -29,7 +30,7 @@ import {
   INTENSIVE_COURSES,
   OFFICIAL_EXAM_REFERENCES,
 } from '../data';
-import { soundEngine } from '../utils/audio';
+import { getAccentsForLanguage, soundEngine } from '../utils/audio';
 import { UnitLessonPlayer } from './UnitLessonPlayer';
 
 interface IntensiveCoursesViewProps {
@@ -44,6 +45,7 @@ interface IntensiveCoursesViewProps {
   unitProgressMap?: Record<string, UnitStudyProgress>;
   onSaveUnitProgress?: (progress: UnitStudyProgress) => void;
   aiConfig?: AIProviderConfig;
+  onOpenVoiceSettings?: () => void;
   onLaunchExam: (languageId: string, level: CEFRLevel) => void;
   onLaunchAICoach: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
   onLaunchPreTest: (languageId: string) => void;
@@ -84,6 +86,7 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
   unitProgressMap,
   onSaveUnitProgress,
   aiConfig,
+  onOpenVoiceSettings,
   onLaunchExam,
   onLaunchAICoach,
   onLaunchPreTest,
@@ -94,6 +97,18 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
   const [showAllRefs, setShowAllRefs] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [localUnitProgress, setLocalUnitProgress] = useState<Record<string, UnitStudyProgress>>({});
+  const [activeAccent, setActiveAccent] = useState<string>(() =>
+    soundEngine.getActiveAccentCode(courseLang)
+  );
+
+  useEffect(() => {
+    setActiveAccent(soundEngine.getActiveAccentCode(courseLang));
+    return soundEngine.subscribe(() => {
+      setActiveAccent(soundEngine.getActiveAccentCode(courseLang));
+    });
+  }, [courseLang]);
+
+  const availableAccents = useMemo(() => getAccentsForLanguage(courseLang), [courseLang]);
 
   const effectiveUnitProgress = unitProgressMap ?? localUnitProgress;
 
@@ -228,6 +243,7 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
         slowAudio={slowAudio}
         onToggleSlowAudio={() => setSlowAudio((prev) => !prev)}
         aiConfig={aiConfig}
+        onOpenVoiceSettings={onOpenVoiceSettings}
         onSaveProgress={handleSaveProgress}
         onCompleteUnit={(score) => handleCompleteGuidedUnit(activeModule, score)}
         onExit={() => setActiveModuleId(null)}
@@ -478,23 +494,54 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
           })}
         </div>
 
-        {/* Course Module Progress + Pace Toggle */}
+        {/* Course Module Progress + Accent & Pace Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="text-xs font-mono text-slate-600 dark:text-slate-400">
             <strong>{currentCourse.level} Course Completion:</strong> {currentCourseProgress.done}/{currentCourseProgress.total} modules ({currentCourseProgress.percent}%) · Pass Criteria: {currentCourse.passingCriteria}
           </div>
-          <button
-            type="button"
-            onClick={() => setSlowAudio(!slowAudio)}
-            className={`inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded-lg border transition-colors ${
-              slowAudio
-                ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 font-bold'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <Gauge className="w-3.5 h-3.5" />
-            <span>Audio Pace: {slowAudio ? '0.75x Slow' : '1.0x Normal'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Course voice accent"
+              value={activeAccent}
+              onChange={(e) => {
+                soundEngine.playClickSound();
+                soundEngine.setAccent(courseLang, e.target.value);
+                setActiveAccent(e.target.value);
+              }}
+              className="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+            >
+              {availableAccents.map((acc) => (
+                <option key={acc.code} value={acc.code}>
+                  {acc.flag} {acc.label}
+                </option>
+              ))}
+            </select>
+            {onOpenVoiceSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  onOpenVoiceSettings();
+                }}
+                className="inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25 hover:bg-sky-500/20 transition-colors"
+              >
+                <AudioLines className="w-3.5 h-3.5" />
+                <span>Voice Studio</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSlowAudio(!slowAudio)}
+              className={`inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded-lg border transition-colors ${
+                slowAudio
+                  ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 font-bold'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span>Audio Pace: {slowAudio ? '0.75x Slow' : '1.0x Normal'}</span>
+            </button>
+          </div>
         </div>
       </section>
 

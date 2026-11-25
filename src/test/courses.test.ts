@@ -10,6 +10,14 @@ import {
   getMockExams,
 } from '../data';
 import { CEFRLevel, SkillType } from '../types';
+import {
+  computeOfficialGradeLabel,
+  computeRubricBreakdown,
+  getExamListeningTracks,
+  getExamReadingParts,
+  getExamSpeakingParts,
+  getExamWritingTasks,
+} from '../utils/examScoring';
 
 const ALL_CEFR: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const FOUR_SKILLS: SkillType[] = ['reading', 'listening', 'writing', 'speaking'];
@@ -56,9 +64,10 @@ describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
     });
   });
 
-  it('provides complete 5-step guided lesson content for all 36 units across A1–C2 English and German', () => {
+  it('provides complete 5-step guided lesson content for all 72 units (6 per level) across A1–C2 English and German', () => {
     let totalModules = 0;
     INTENSIVE_COURSES.forEach((course) => {
+      expect(course.modules.length, `Expected 6 units in ${course.id}`).toBe(6);
       course.modules.forEach((mod) => {
         totalModules += 1;
         expect(mod.lesson, `Missing guided lesson for ${mod.id}`).toBeDefined();
@@ -81,7 +90,7 @@ describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
         expect(lesson.checkpointModelAnswer.length).toBeGreaterThan(50);
       });
     });
-    expect(totalModules).toBe(36);
+    expect(totalModules).toBe(72);
   });
 });
 
@@ -159,8 +168,9 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
     expect(MOCK_EXAMS.length).toBe(12);
   });
 
-  it('ensures every mock exam has Reading, Listening/Hearing, Writing, and Speaking sections', () => {
+  it('ensures every mock exam has realistic multi-part Reading (3 parts/9 Qs), Multi-Accent Listening (3 tracks/9 Qs), 2 Writing Tasks, and 3 Speaking Parts', () => {
     MOCK_EXAMS.forEach((exam) => {
+      // Legacy top-level fields remain intact for backward compatibility
       expect(exam.reading.passage.length).toBeGreaterThan(60);
       expect(exam.reading.questions.length).toBeGreaterThanOrEqual(3);
       expect(exam.listening.audioScript.length).toBeGreaterThan(60);
@@ -170,6 +180,81 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
       expect(exam.writing.modelAnswer.length).toBeGreaterThan(80);
       expect(exam.speaking.bulletPoints.length).toBeGreaterThanOrEqual(3);
       expect(exam.speaking.modelResponseScript.length).toBeGreaterThan(80);
+
+      // Multi-part real-world expansion checks
+      expect(exam.requireAllSkillsPass).toBe(true);
+      const readingParts = getExamReadingParts(exam);
+      expect(readingParts.length, `Expected 3 reading parts in ${exam.id}`).toBe(3);
+      const totalReadQs = readingParts.reduce((s, p) => s + p.questions.length, 0);
+      expect(totalReadQs).toBe(9);
+      readingParts.forEach((part) => {
+        expect(part.passage.length).toBeGreaterThan(40);
+        part.questions.forEach((q) => {
+          expect(q.correctIndex).toBeGreaterThanOrEqual(0);
+          expect(q.correctIndex).toBeLessThan(q.options.length);
+        });
+      });
+
+      const listeningTracks = getExamListeningTracks(exam);
+      expect(listeningTracks.length, `Expected 3 listening tracks in ${exam.id}`).toBe(3);
+      const totalListenQs = listeningTracks.reduce((s, t) => s + t.questions.length, 0);
+      expect(totalListenQs).toBe(9);
+      const accents = new Set(listeningTracks.map((t) => t.accentCode).filter(Boolean));
+      expect(accents.size, `Expected multiple regional accents in ${exam.id}`).toBeGreaterThanOrEqual(2);
+
+      const writingTasks = getExamWritingTasks(exam);
+      expect(writingTasks.length, `Expected 2 writing tasks in ${exam.id}`).toBe(2);
+      const weightSum = writingTasks.reduce((s, t) => s + t.weightPercent, 0);
+      expect(weightSum).toBe(100);
+
+      const speakingParts = getExamSpeakingParts(exam);
+      expect(speakingParts.length, `Expected 3 speaking parts in ${exam.id}`).toBe(3);
+      speakingParts.forEach((part) => {
+        expect(part.examinerPromptAudio && part.examinerPromptAudio.length > 15).toBe(true);
+        expect(part.modelResponseScript.length).toBeGreaterThan(40);
+      });
     });
+
+    // Official grade label & 4-criterion rubric checks
+    expect(
+      computeOfficialGradeLabel({
+        languageId: 'german',
+        level: 'B2',
+        overallScore: 84,
+        allModulesPassed: true,
+        passingScorePercent: 60,
+      })
+    ).toContain('Goethe/telc: gut');
+
+    expect(
+      computeOfficialGradeLabel({
+        languageId: 'german',
+        level: 'B2',
+        overallScore: 78,
+        allModulesPassed: false,
+        passingScorePercent: 60,
+      })
+    ).toContain('nicht bestanden');
+
+    expect(
+      computeOfficialGradeLabel({
+        languageId: 'english',
+        level: 'C1',
+        overallScore: 88,
+        allModulesPassed: true,
+        passingScorePercent: 65,
+      })
+    ).toMatch(/Cambridge Grade A.*Est\. IELTS/);
+
+    const rubric = computeRubricBreakdown({
+      text: 'Meiner Meinung nach ist lebenslanges Lernen unverzichtbar, weil sich die Arbeitswelt rasch verändert. Deshalb sollten Unternehmen Weiterbildung gezielt fördern.',
+      score: 82,
+      minWords: 20,
+      expectedKeywords: ['Meinung', 'weil', 'Deshalb'],
+    });
+    expect(rubric.taskFulfillment).toBeGreaterThanOrEqual(60);
+    expect(rubric.coherenceCohesion).toBeGreaterThanOrEqual(60);
+    expect(rubric.lexicalRange).toBeGreaterThanOrEqual(60);
+    expect(rubric.grammaticalAccuracy).toBeGreaterThanOrEqual(60);
   });
 });

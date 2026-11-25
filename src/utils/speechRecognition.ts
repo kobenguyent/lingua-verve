@@ -2,6 +2,7 @@
  * Safe browser Web Speech Recognition wrapper for live Speaking practice & simulated exams.
  * Gracefully degrades to manual transcript mode in unsupported browsers or jsdom.
  */
+import { soundEngine } from './audio';
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -68,14 +69,7 @@ export function startSpeechRecognition(options: {
   }
 
   const recognition = new Ctor();
-  recognition.lang =
-    options.languageId === 'german' || options.languageId === 'de'
-      ? 'de-DE'
-      : options.languageId === 'spanish'
-      ? 'es-ES'
-      : options.languageId === 'french'
-      ? 'fr-FR'
-      : 'en-US';
+  recognition.lang = soundEngine.getActiveAccentCode(options.languageId);
   recognition.continuous = true;
   recognition.interimResults = true;
 

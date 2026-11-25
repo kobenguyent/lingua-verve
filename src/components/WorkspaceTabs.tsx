@@ -7,16 +7,20 @@ import {
   Bot,
   BarChart3,
   Cpu,
+  AudioLines,
 } from 'lucide-react';
-import { AIProviderConfig, WorkspaceTab } from '../types';
+import { AIProviderConfig, VoiceSettings, WorkspaceTab } from '../types';
 import { AI_PROVIDER_PRESETS, isAIConfigReady } from '../utils/aiClient';
-import { soundEngine } from '../utils/audio';
+import { getAccentOption, soundEngine } from '../utils/audio';
 
 interface WorkspaceTabsProps {
   activeTab: WorkspaceTab;
   onSelectTab: (tab: WorkspaceTab) => void;
   aiConfig: AIProviderConfig;
   onOpenAISettings: () => void;
+  voiceSettings?: VoiceSettings;
+  activeLanguageId?: string;
+  onOpenVoiceSettings?: () => void;
   completedModulesCount: number;
   examAttemptsCount: number;
 }
@@ -35,11 +39,19 @@ export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({
   onSelectTab,
   aiConfig,
   onOpenAISettings,
+  voiceSettings,
+  activeLanguageId = 'english',
+  onOpenVoiceSettings,
   completedModulesCount,
   examAttemptsCount,
 }) => {
   const aiReady = isAIConfigReady(aiConfig);
   const preset = AI_PROVIDER_PRESETS[aiConfig.provider];
+  const langKey = activeLanguageId === 'german' ? 'german' : 'english';
+  const activeAccentCode =
+    voiceSettings?.accents[langKey] || soundEngine.getActiveAccentCode(langKey);
+  const activeAccent = getAccentOption(activeAccentCode);
+  const neuralActive = voiceSettings ? soundEngine.isNeuralProviderReady(voiceSettings) : false;
 
   return (
     <div className="w-full border-b border-slate-200/80 dark:border-slate-800/90 bg-white/90 dark:bg-slate-900/75 backdrop-blur-sm">
@@ -83,27 +95,52 @@ export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({
             })}
           </nav>
 
-          {/* Compact AI Connection Pill */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine.playClickSound();
-              onOpenAISettings();
-            }}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold whitespace-nowrap border transition-colors shrink-0 ${
-              aiReady
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400 dark:hover:border-sky-500'
-            }`}
-            title="Configure Local (Ollama / LM Studio) or Cloud AI Provider"
-          >
-            <Cpu className="w-3.5 h-3.5 shrink-0" />
-            <span className={`w-1.5 h-1.5 rounded-full ${aiReady ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-            <span className="hidden md:inline">
-              {aiReady ? `AI: ${preset.mode === 'local' ? 'Local' : 'Cloud'} (${aiConfig.model})` : 'Connect Local/Cloud AI'}
-            </span>
-            <span className="md:hidden">{aiReady ? 'AI Ready' : 'AI Setup'}</span>
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenVoiceSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  onOpenVoiceSettings();
+                }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold whitespace-nowrap border transition-colors shrink-0 ${
+                  neuralActive
+                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 hover:bg-sky-500/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400 dark:hover:border-sky-500'
+                }`}
+                title="Configure Human Voice Model & Regional Accents"
+              >
+                <AudioLines className="w-3.5 h-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                <span>{activeAccent?.flag ?? '🎙️'}</span>
+                <span className="hidden lg:inline">
+                  {activeAccent?.code.split('-')[1] ?? 'Voice'} ·{' '}
+                  {neuralActive && voiceSettings ? voiceSettings.neuralVoice : 'Human Voice'}
+                </span>
+              </button>
+            )}
+
+            {/* Compact AI Connection Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClickSound();
+                onOpenAISettings();
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono font-semibold whitespace-nowrap border transition-colors shrink-0 ${
+                aiReady
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400 dark:hover:border-sky-500'
+              }`}
+              title="Configure Local (Ollama / LM Studio) or Cloud AI Provider"
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0" />
+              <span className={`w-1.5 h-1.5 rounded-full ${aiReady ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <span className="hidden md:inline">
+                {aiReady ? `AI: ${preset.mode === 'local' ? 'Local' : 'Cloud'} (${aiConfig.model})` : 'Connect Local/Cloud AI'}
+              </span>
+              <span className="md:hidden">{aiReady ? 'AI Ready' : 'AI Setup'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

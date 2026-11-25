@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  AudioLines,
   Award,
   BookOpen,
   Bot,
@@ -31,7 +32,7 @@ import {
   UnitGuidedLesson,
   UnitStudyProgress,
 } from '../types';
-import { soundEngine } from '../utils/audio';
+import { getAccentsForLanguage, soundEngine } from '../utils/audio';
 import { evaluateWithAIOrFallback, getDefaultAIConfig } from '../utils/aiClient';
 import {
   isSpeechRecognitionSupported,
@@ -51,6 +52,7 @@ interface UnitLessonPlayerProps {
   slowAudio: boolean;
   onToggleSlowAudio: () => void;
   aiConfig?: AIProviderConfig;
+  onOpenVoiceSettings?: () => void;
   onSaveProgress: (progress: UnitStudyProgress) => void;
   onCompleteUnit: (score?: number) => void;
   onExit: () => void;
@@ -144,6 +146,7 @@ export const UnitLessonPlayer: React.FC<UnitLessonPlayerProps> = ({
   slowAudio,
   onToggleSlowAudio,
   aiConfig,
+  onOpenVoiceSettings,
   onSaveProgress,
   onCompleteUnit,
   onExit,
@@ -154,6 +157,20 @@ export const UnitLessonPlayer: React.FC<UnitLessonPlayerProps> = ({
 }) => {
   const lesson = useMemo(() => module.lesson ?? buildFallbackLesson(module), [module]);
   const effectiveAIConfig = aiConfig ?? getDefaultAIConfig('ollama');
+  const availableAccents = useMemo(
+    () => getAccentsForLanguage(course.languageId),
+    [course.languageId]
+  );
+  const [activeAccent, setActiveAccent] = useState<string>(() =>
+    soundEngine.getActiveAccentCode(course.languageId)
+  );
+
+  useEffect(() => {
+    setActiveAccent(soundEngine.getActiveAccentCode(course.languageId));
+    return soundEngine.subscribe(() => {
+      setActiveAccent(soundEngine.getActiveAccentCode(course.languageId));
+    });
+  }, [course.languageId]);
 
   const [step, setStep] = useState<number>(() => {
     const saved = initialProgress?.currentStep ?? 0;
@@ -503,6 +520,35 @@ export const UnitLessonPlayer: React.FC<UnitLessonPlayerProps> = ({
               <Clock className="w-3.5 h-3.5" />
               ~{lesson.estimatedMins} mins
             </span>
+            <select
+              aria-label="Lesson voice accent"
+              value={activeAccent}
+              onChange={(e) => {
+                soundEngine.playClickSound();
+                soundEngine.setAccent(course.languageId, e.target.value);
+                setActiveAccent(e.target.value);
+              }}
+              className="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+            >
+              {availableAccents.map((acc) => (
+                <option key={acc.code} value={acc.code}>
+                  {acc.flag} {acc.label}
+                </option>
+              ))}
+            </select>
+            {onOpenVoiceSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClickSound();
+                  onOpenVoiceSettings();
+                }}
+                className="inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25 hover:bg-sky-500/20 transition-colors"
+              >
+                <AudioLines className="w-3.5 h-3.5" />
+                <span>Voice</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onToggleSlowAudio}

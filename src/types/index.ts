@@ -282,11 +282,34 @@ export interface ExamObjectiveQuestion {
   explanation: string;
 }
 
+export interface ReadingExamPart {
+  id: string;
+  partLabel: string;
+  format: 'comprehension' | 'true-false' | 'tfng' | 'matching' | 'cloze';
+  instruction: string;
+  passageTitle: string;
+  passage: string;
+  questions: ExamObjectiveQuestion[];
+}
+
 export interface ReadingExamSection {
   title: string;
   durationMinutes: number;
   passageTitle: string;
   passage: string;
+  questions: ExamObjectiveQuestion[];
+  parts?: ReadingExamPart[];
+}
+
+export interface ListeningExamTrack {
+  id: string;
+  partLabel: string;
+  contextNote: string;
+  accentCode?: string;
+  maxPlaysStrict: number;
+  preReadSeconds?: number;
+  audioScript: string;
+  hearingFocusTrap: string;
   questions: ExamObjectiveQuestion[];
 }
 
@@ -298,6 +321,19 @@ export interface ListeningExamSection {
   audioScript: string;
   hearingFocusTrap: string;
   questions: ExamObjectiveQuestion[];
+  tracks?: ListeningExamTrack[];
+}
+
+export interface WritingExamTask {
+  id: string;
+  partLabel: string;
+  scenario: string;
+  taskRequirements: string[];
+  minWords: number;
+  maxWords: number;
+  weightPercent: number;
+  keyRubricKeywords: string[];
+  modelAnswer: string;
 }
 
 export interface WritingExamSection {
@@ -309,6 +345,19 @@ export interface WritingExamSection {
   maxWords: number;
   keyRubricKeywords: string[];
   modelAnswer: string;
+  tasks?: WritingExamTask[];
+}
+
+export interface SpeakingExamPart {
+  id: string;
+  partLabel: string;
+  instruction: string;
+  prepSeconds: number;
+  speakSeconds: number;
+  prompts: string[];
+  examinerPromptAudio?: string;
+  keyRubricKeywords: string[];
+  modelResponseScript: string;
 }
 
 export interface SpeakingExamSection {
@@ -321,6 +370,7 @@ export interface SpeakingExamSection {
   followUpQuestion: string;
   keyRubricKeywords: string[];
   modelResponseScript: string;
+  parts?: SpeakingExamPart[];
 }
 
 export interface MockExam {
@@ -331,10 +381,18 @@ export interface MockExam {
   alignedCertificate: string;
   passingScorePercent: number;
   totalMinutes: number;
+  requireAllSkillsPass?: boolean;
   reading: ReadingExamSection;
   listening: ListeningExamSection;
   writing: WritingExamSection;
   speaking: SpeakingExamSection;
+}
+
+export interface OfficialRubricBreakdown {
+  taskFulfillment: number;
+  coherenceCohesion: number;
+  lexicalRange: number;
+  grammaticalAccuracy: number;
 }
 
 export interface SkillExamScore {
@@ -342,6 +400,7 @@ export interface SkillExamScore {
   passed: boolean;
   feedback: string;
   aiGraded?: boolean;
+  rubric?: OfficialRubricBreakdown;
 }
 
 export interface ExamAttemptRecord {
@@ -356,6 +415,7 @@ export interface ExamAttemptRecord {
   durationUsedSeconds: number;
   overallScore: number;
   passed: boolean;
+  officialGradeLabel?: string;
   skills: Record<SkillType, SkillExamScore>;
   writingSubmission?: string;
   speakingTranscript?: string;
@@ -381,6 +441,37 @@ export interface AIProviderConfig {
   apiKey: string;
   temperature: number;
   enabled: boolean;
+}
+
+// ============================================================
+// HUMAN VOICE & MULTI-ACCENT TTS STUDIO
+// ============================================================
+
+export type VoiceProviderType = 'system' | 'openai' | 'elevenlabs' | 'local-openai';
+
+export type VoiceSpeakingStyle = 'natural' | 'tutor' | 'conversational' | 'broadcast';
+
+export interface AccentOption {
+  code: string;        // BCP-47 locale e.g. 'en-GB', 'de-AT'
+  languageId: string;  // 'english' | 'german' | 'spanish' | 'french'
+  flag: string;
+  label: string;       // e.g. 'British (UK)'
+  region: string;      // e.g. 'London · Received Pronunciation'
+  sampleText: string;  // Authentic accent test phrase
+  neuralHint: string;  // Accent coaching instruction for neural models
+}
+
+export interface VoiceSettings {
+  provider: VoiceProviderType;
+  accents: Record<string, string>;               // languageId -> BCP-47 code
+  preferredSystemVoices: Record<string, string>; // BCP-47 code -> voiceURI
+  rateMultiplier: number;                        // 0.75..1.25
+  speakingStyle: VoiceSpeakingStyle;
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  neuralVoice: string;
+  reuseOpenAIKey: boolean;
 }
 
 export interface AIModelInfo {

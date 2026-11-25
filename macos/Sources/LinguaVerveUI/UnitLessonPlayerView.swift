@@ -311,10 +311,33 @@ public struct UnitLessonPlayerView: View {
     }
 
     private var audioControls: some View {
-        HStack(spacing: 12) {
+        let accents = NativeAudioEngine.accents(for: course.languageId)
+        let activeCode = NativeAudioEngine.shared.activeAccentCode(for: course.languageId)
+        let activeOpt = NativeAudioEngine.accentOption(for: activeCode) ?? accents.first
+
+        return HStack(spacing: 10) {
             Label("~\(lesson.estimatedMins)m", systemImage: "clock")
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
+            Menu {
+                ForEach(accents) { acc in
+                    Button {
+                        NativeAudioEngine.shared.playClickSound()
+                        NativeAudioEngine.shared.setAccent(for: course.languageId, accentCode: acc.code)
+                    } label: {
+                        if acc.code == activeCode {
+                            Label("\(acc.flag) \(acc.label)", systemImage: "checkmark")
+                        } else {
+                            Text("\(acc.flag) \(acc.label)")
+                        }
+                    }
+                }
+            } label: {
+                Label("\(activeOpt?.flag ?? "🎙️") \(activeOpt?.label ?? activeCode)", systemImage: "waveform")
+                    .font(.caption.monospaced())
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Toggle("0.75x Slow", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                 .toggleStyle(.switch)
                 .font(.caption.monospaced())
@@ -639,121 +662,7 @@ public struct UnitLessonPlayerView: View {
                 }
 
                 ForEach(Array(questions.enumerated()), id: \.element.id) { idx, q in
-                    let chosen = quizAnswers[q.id]
-                    let isAnswered = chosen != nil
-                    let isCorrect = chosen == q.correctIndex
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Question \(idx + 1) of \(questions.count)")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Label(q.skill.shortName, systemImage: q.skill.systemImage)
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
-                                .foregroundStyle(BrandTheme.celestialSky)
-                        }
-
-                        if let passage = q.passage {
-                            Text(passage)
-                                .font(.caption)
-                                .italic()
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
-                        }
-
-                        if let audioScript = q.audioScript {
-                            Button {
-                                NativeAudioEngine.shared.playClickSound()
-                                NativeAudioEngine.shared.speak(audioScript, languageId: course.languageId)
-                            } label: {
-                                Label("Play Listening Clip", systemImage: "speaker.wave.2.fill")
-                                    .font(.caption.weight(.bold))
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.purple)
-                            .controlSize(.small)
-
-                            if isAnswered {
-                                DisclosureGroup("View Audio Transcript") {
-                                    Text(audioScript)
-                                        .font(.caption)
-                                        .padding(.top, 4)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .font(.caption)
-                            }
-                        }
-
-                        Text(q.prompt)
-                            .font(.subheadline.weight(.semibold))
-
-                        VStack(spacing: 7) {
-                            ForEach(Array(q.options.enumerated()), id: \.offset) { optIdx, opt in
-                                let selected = chosen == optIdx
-                                let optionIsRight = optIdx == q.correctIndex
-
-                                Button {
-                                    handleAnswerQuiz(question: q, optionIndex: optIdx)
-                                } label: {
-                                    HStack {
-                                        Text(opt)
-                                            .font(.caption)
-                                            .multilineTextAlignment(.leading)
-                                        Spacer()
-                                        if isAnswered && optionIsRight {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(BrandTheme.emeraldMint)
-                                        } else if isAnswered && selected && !optionIsRight {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.red)
-                                        }
-                                    }
-                                    .padding(10)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 9)
-                                            .fill(
-                                                isAnswered && optionIsRight
-                                                    ? BrandTheme.emeraldMint.opacity(0.16)
-                                                    : isAnswered && selected && !optionIsRight
-                                                        ? Color.red.opacity(0.14)
-                                                        : Color.primary.opacity(0.04)
-                                            )
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 9)
-                                            .strokeBorder(
-                                                isAnswered && optionIsRight
-                                                    ? BrandTheme.emeraldMint
-                                                    : isAnswered && selected && !optionIsRight
-                                                        ? Color.red
-                                                        : Color.primary.opacity(0.1),
-                                                lineWidth: 1
-                                            )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        if isAnswered {
-                            Text("\(isCorrect ? "✓ Correct: " : "Key Takeaway: ")\(q.explanation)")
-                                .font(.caption)
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(isCorrect ? BrandTheme.emeraldMint.opacity(0.12) : BrandTheme.champagneGold.opacity(0.16))
-                                )
-                        }
-                    }
-                    .padding(13)
-                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.035)))
+                    quizQuestionCard(idx: idx, q: q, totalCount: questions.count)
                 }
             }
             .padding(16)
@@ -762,6 +671,123 @@ public struct UnitLessonPlayerView: View {
 
             stepFooterButtons(back: .vocab, backLabel: "Back to Vocab", next: .drills, nextLabel: "Continue to Drills")
         }
+    }
+
+    @ViewBuilder
+    private func quizQuestionCard(idx: Int, q: UnitPracticeQuestion, totalCount: Int) -> some View {
+        let chosen = quizAnswers[q.id]
+        let isAnswered = chosen != nil
+        let isCorrect = chosen == q.correctIndex
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Question \(idx + 1) of \(totalCount)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Label(q.skill.shortName, systemImage: q.skill.systemImage)
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
+                    .foregroundStyle(BrandTheme.celestialSky)
+            }
+
+            if let passage = q.passage {
+                Text(passage)
+                    .font(.caption)
+                    .italic()
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            if let audioScript = q.audioScript {
+                Button {
+                    NativeAudioEngine.shared.playClickSound()
+                    NativeAudioEngine.shared.speak(audioScript, languageId: course.languageId)
+                } label: {
+                    Label("Play Listening Clip", systemImage: "speaker.wave.2.fill")
+                        .font(.caption.weight(.bold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .controlSize(.small)
+
+                if isAnswered {
+                    DisclosureGroup("View Audio Transcript") {
+                        Text(audioScript)
+                            .font(.caption)
+                            .padding(.top, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .font(.caption)
+                }
+            }
+
+            Text(q.prompt)
+                .font(.subheadline.weight(.semibold))
+
+            VStack(spacing: 7) {
+                ForEach(Array(q.options.enumerated()), id: \.offset) { optIdx, opt in
+                    quizOptionButton(q: q, optIdx: optIdx, opt: opt, chosen: chosen, isAnswered: isAnswered)
+                }
+            }
+
+            if isAnswered {
+                Text("\(isCorrect ? "✓ Correct: " : "Key Takeaway: ")\(q.explanation)")
+                    .font(.caption)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(isCorrect ? BrandTheme.emeraldMint.opacity(0.12) : BrandTheme.champagneGold.opacity(0.16))
+                    )
+            }
+        }
+        .padding(13)
+        .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.035)))
+    }
+
+    @ViewBuilder
+    private func quizOptionButton(
+        q: UnitPracticeQuestion,
+        optIdx: Int,
+        opt: String,
+        chosen: Int?,
+        isAnswered: Bool
+    ) -> some View {
+        let selected = chosen == optIdx
+        let optionIsRight = optIdx == q.correctIndex
+        let fillColor: Color = isAnswered && optionIsRight
+            ? BrandTheme.emeraldMint.opacity(0.16)
+            : (isAnswered && selected && !optionIsRight ? Color.red.opacity(0.14) : Color.primary.opacity(0.04))
+        let strokeColor: Color = isAnswered && optionIsRight
+            ? BrandTheme.emeraldMint
+            : (isAnswered && selected && !optionIsRight ? Color.red : Color.primary.opacity(0.1))
+
+        Button {
+            handleAnswerQuiz(question: q, optionIndex: optIdx)
+        } label: {
+            HStack {
+                Text(opt)
+                    .font(.caption)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                if isAnswered && optionIsRight {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                } else if isAnswered && selected && !optionIsRight {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 9).fill(fillColor))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(strokeColor, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Step 4: Interactive 4-Skill Drills Workbench
@@ -782,148 +808,7 @@ public struct UnitLessonPlayerView: View {
                 }
 
                 ForEach(Array(module.drills.enumerated()), id: \.element.id) { idx, drill in
-                    let practiced = completedDrills.contains(idx)
-                    let isProductive = drill.skill == .writing || drill.skill == .speaking
-                    let noteBinding = Binding<String>(
-                        get: { drillNotes[idx] ?? "" },
-                        set: { drillNotes[idx] = $0 }
-                    )
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(BrandTheme.celestialSky)
-                                Text(drill.title)
-                                    .font(.subheadline.weight(.bold))
-                            }
-                            Spacer()
-                            Button {
-                                toggleDrillPracticed(idx)
-                            } label: {
-                                Label(practiced ? "Practiced" : "Mark Practiced", systemImage: practiced ? "checkmark.circle.fill" : "circle")
-                                    .font(.caption2.weight(.bold))
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(practiced ? BrandTheme.emeraldMint : .accentColor)
-                            .controlSize(.mini)
-                        }
-
-                        Text(drill.instruction)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if let passage = drill.samplePassage {
-                            Text(passage)
-                                .font(.caption)
-                                .italic()
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
-                        }
-
-                        if let script = drill.audioScript {
-                            HStack(spacing: 10) {
-                                Button {
-                                    NativeAudioEngine.shared.playClickSound()
-                                    NativeAudioEngine.shared.speak(script, languageId: course.languageId)
-                                    drillAudioPlays[idx, default: 0] += 1
-                                } label: {
-                                    Label("Play Listening Audio", systemImage: "speaker.wave.2.fill")
-                                        .font(.caption.weight(.bold))
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.purple)
-                                .controlSize(.small)
-
-                                if let count = drillAudioPlays[idx], count > 0 {
-                                    Text("Played \(count)×")
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            DisclosureGroup("Reveal Audio Transcript") {
-                                Text(script)
-                                    .font(.caption)
-                                    .padding(.top, 4)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .font(.caption)
-                        }
-
-                        Text(isProductive ? "Your Practice Response:" : "Your Notes & Comprehension Answers:")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.secondary)
-
-                        TextEditor(text: noteBinding)
-                            .font(.caption)
-                            .frame(minHeight: isProductive ? 84 : 56)
-                            .padding(6)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
-
-                        FlowLayout(spacing: 8, lineSpacing: 8) {
-                            if drill.skill == .speaking {
-                                let recordingThis = speechRecognizer.isRecording && activeMicDrillIdx == idx
-                                Button {
-                                    toggleDrillMic(idx)
-                                } label: {
-                                    Label(
-                                        recordingThis ? "Stop Mic" : "Dictate Live Voice",
-                                        systemImage: recordingThis ? "mic.slash.fill" : "mic.fill"
-                                    )
-                                    .font(.caption.weight(.bold))
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(recordingThis ? .red : BrandTheme.emeraldMint)
-                                .controlSize(.small)
-                            }
-
-                            if isProductive {
-                                Button {
-                                    Task { await evaluateDrill(idx: idx, drill: drill) }
-                                } label: {
-                                    Label(
-                                        evaluatingDrillIdx == idx ? "Evaluating..." : "Evaluate Drill",
-                                        systemImage: "sparkles"
-                                    )
-                                    .font(.caption.weight(.bold))
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(BrandTheme.celestialSky)
-                                .controlSize(.small)
-                                .disabled(evaluatingDrillIdx == idx || (drillNotes[idx] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
-
-                            Button {
-                                store.openAICoach(
-                                    languageId: course.languageId,
-                                    level: course.level,
-                                    skill: drill.skill,
-                                    seedPrompt: "Practice drill: \(drill.title). \(drill.instruction)"
-                                )
-                            } label: {
-                                Label("Open in AI Coach", systemImage: "bubble.left.and.sparkles")
-                                    .font(.caption.weight(.semibold))
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-
-                        if let result = drillEvaluations[idx] {
-                            evaluationBox(result)
-                        }
-                    }
-                    .padding(13)
-                    .background(
-                        RoundedRectangle(cornerRadius: 11)
-                            .fill(practiced ? BrandTheme.emeraldMint.opacity(0.06) : Color.primary.opacity(0.035))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11)
-                            .strokeBorder(practiced ? BrandTheme.emeraldMint.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
-                    )
+                    drillCard(idx: idx, drill: drill)
                 }
             }
             .padding(16)
@@ -932,6 +817,152 @@ public struct UnitLessonPlayerView: View {
 
             stepFooterButtons(back: .quiz, backLabel: "Back to Quiz", next: .checkpoint, nextLabel: "Continue to Checkpoint")
         }
+    }
+
+    @ViewBuilder
+    private func drillCard(idx: Int, drill: CourseDrill) -> some View {
+        let practiced = completedDrills.contains(idx)
+        let isProductive = drill.skill == .writing || drill.skill == .speaking
+        let noteBinding = Binding<String>(
+            get: { drillNotes[idx] ?? "" },
+            set: { drillNotes[idx] = $0 }
+        )
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BrandTheme.celestialSky)
+                    Text(drill.title)
+                        .font(.subheadline.weight(.bold))
+                }
+                Spacer()
+                Button {
+                    toggleDrillPracticed(idx)
+                } label: {
+                    Label(practiced ? "Practiced" : "Mark Practiced", systemImage: practiced ? "checkmark.circle.fill" : "circle")
+                        .font(.caption2.weight(.bold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(practiced ? BrandTheme.emeraldMint : .accentColor)
+                .controlSize(.mini)
+            }
+
+            Text(drill.instruction)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let passage = drill.samplePassage {
+                Text(passage)
+                    .font(.caption)
+                    .italic()
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+            }
+
+            if let script = drill.audioScript {
+                HStack(spacing: 10) {
+                    Button {
+                        NativeAudioEngine.shared.playClickSound()
+                        NativeAudioEngine.shared.speak(script, languageId: course.languageId)
+                        drillAudioPlays[idx, default: 0] += 1
+                    } label: {
+                        Label("Play Listening Audio", systemImage: "speaker.wave.2.fill")
+                            .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .controlSize(.small)
+
+                    if let count = drillAudioPlays[idx], count > 0 {
+                        Text("Played \(count)×")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                DisclosureGroup("Reveal Audio Transcript") {
+                    Text(script)
+                        .font(.caption)
+                        .padding(.top, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.caption)
+            }
+
+            Text(isProductive ? "Your Practice Response:" : "Your Notes & Comprehension Answers:")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            TextEditor(text: noteBinding)
+                .font(.caption)
+                .frame(minHeight: isProductive ? 84 : 56)
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+
+            FlowLayout(spacing: 8, lineSpacing: 8) {
+                if drill.skill == .speaking {
+                    let recordingThis = speechRecognizer.isRecording && activeMicDrillIdx == idx
+                    Button {
+                        toggleDrillMic(idx)
+                    } label: {
+                        Label(
+                            recordingThis ? "Stop Mic" : "Dictate Live Voice",
+                            systemImage: recordingThis ? "mic.slash.fill" : "mic.fill"
+                        )
+                        .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(recordingThis ? .red : BrandTheme.emeraldMint)
+                    .controlSize(.small)
+                }
+
+                if isProductive {
+                    Button {
+                        Task { await evaluateDrill(idx: idx, drill: drill) }
+                    } label: {
+                        Label(
+                            evaluatingDrillIdx == idx ? "Evaluating..." : "Evaluate Drill",
+                            systemImage: "sparkles"
+                        )
+                        .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.celestialSky)
+                    .controlSize(.small)
+                    .disabled(evaluatingDrillIdx == idx || (drillNotes[idx] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                Button {
+                    store.openAICoach(
+                        languageId: course.languageId,
+                        level: course.level,
+                        skill: drill.skill,
+                        seedPrompt: "Practice drill: \(drill.title). \(drill.instruction)"
+                    )
+                } label: {
+                    Label("Open in AI Coach", systemImage: "bubble.left.and.sparkles")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            if let result = drillEvaluations[idx] {
+                evaluationBox(result)
+            }
+        }
+        .padding(13)
+        .background(
+            RoundedRectangle(cornerRadius: 11)
+                .fill(practiced ? BrandTheme.emeraldMint.opacity(0.06) : Color.primary.opacity(0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11)
+                .strokeBorder(practiced ? BrandTheme.emeraldMint.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Step 5: Milestone Checkpoint & Unit Completion

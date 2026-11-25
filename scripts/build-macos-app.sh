@@ -88,6 +88,18 @@ else
 fi
 
 echo "==> [4/5] Packaging & ad-hoc signing standalone macOS app bundle: ${APP_BUNDLE}..."
+if pgrep -x "${APP_NAME}" >/dev/null 2>&1; then
+  echo "    Stopping running ${APP_NAME} instance before replacing app bundle..."
+  killall "${APP_NAME}" 2>/dev/null || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -x "${APP_NAME}" >/dev/null 2>&1 || break
+    sleep 0.2
+  done
+  if pgrep -x "${APP_NAME}" >/dev/null 2>&1; then
+    killall -9 "${APP_NAME}" 2>/dev/null || true
+    sleep 0.2
+  fi
+fi
 rm -rf "${APP_BUNDLE}"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS" "${APP_BUNDLE}/Contents/Resources"
 
@@ -190,15 +202,19 @@ fi
 DEST_APP="${DEST_DIR}/LinguaVerve.app"
 echo "==> Closing any running LinguaVerve instance..."
 killall LinguaVerve 2>/dev/null || true
-sleep 0.5
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  pgrep -x LinguaVerve >/dev/null 2>&1 || break
+  sleep 0.2
+done
 echo "==> Installing LinguaVerve to ${DEST_APP}"
 rm -rf "${DEST_APP}"
 ditto "${APP_SRC}" "${DEST_APP}"
 echo "==> Removing browser quarantine attribute & applying local ad-hoc signature"
 xattr -cr "${DEST_APP}" 2>/dev/null || true
 codesign --force --deep --sign - "${DEST_APP}" 2>/dev/null || true
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "${DEST_APP}" >/dev/null 2>&1 || true
 echo "==> Installed! Launching LinguaVerve..."
-open "${DEST_APP}"
+open -n "${DEST_APP}"
 INSTALLER_EOF
   chmod +x "${DMG_STAGING}/Install LinguaVerve (No Apple Dev Account).command"
 

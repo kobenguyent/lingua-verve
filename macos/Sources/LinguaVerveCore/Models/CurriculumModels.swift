@@ -522,6 +522,42 @@ public struct ExamObjectiveQuestion: Codable, Identifiable, Equatable, Sendable 
     public let options: [String]
     public let correctIndex: Int
     public let explanation: String
+
+    public init(id: String, prompt: String, options: [String], correctIndex: Int, explanation: String) {
+        self.id = id
+        self.prompt = prompt
+        self.options = options
+        self.correctIndex = correctIndex
+        self.explanation = explanation
+    }
+}
+
+public struct ReadingExamPart: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let partLabel: String
+    public let format: String
+    public let instruction: String
+    public let passageTitle: String
+    public let passage: String
+    public let questions: [ExamObjectiveQuestion]
+
+    public init(
+        id: String,
+        partLabel: String,
+        format: String,
+        instruction: String,
+        passageTitle: String,
+        passage: String,
+        questions: [ExamObjectiveQuestion]
+    ) {
+        self.id = id
+        self.partLabel = partLabel
+        self.format = format
+        self.instruction = instruction
+        self.passageTitle = passageTitle
+        self.passage = passage
+        self.questions = questions
+    }
 }
 
 public struct ReadingExamSection: Codable, Equatable, Sendable {
@@ -530,6 +566,56 @@ public struct ReadingExamSection: Codable, Equatable, Sendable {
     public let passageTitle: String
     public let passage: String
     public let questions: [ExamObjectiveQuestion]
+    public let parts: [ReadingExamPart]?
+
+    public var resolvedParts: [ReadingExamPart] {
+        if let parts, !parts.isEmpty { return parts }
+        return [
+            ReadingExamPart(
+                id: "read-p1",
+                partLabel: title,
+                format: "comprehension",
+                instruction: "Read the passage carefully and answer each question.",
+                passageTitle: passageTitle,
+                passage: passage,
+                questions: questions
+            )
+        ]
+    }
+}
+
+public struct ListeningExamTrack: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let partLabel: String
+    public let contextNote: String
+    public let accentCode: String?
+    public let maxPlaysStrict: Int
+    public let preReadSeconds: Int?
+    public let audioScript: String
+    public let hearingFocusTrap: String
+    public let questions: [ExamObjectiveQuestion]
+
+    public init(
+        id: String,
+        partLabel: String,
+        contextNote: String,
+        accentCode: String? = nil,
+        maxPlaysStrict: Int,
+        preReadSeconds: Int? = nil,
+        audioScript: String,
+        hearingFocusTrap: String,
+        questions: [ExamObjectiveQuestion]
+    ) {
+        self.id = id
+        self.partLabel = partLabel
+        self.contextNote = contextNote
+        self.accentCode = accentCode
+        self.maxPlaysStrict = maxPlaysStrict
+        self.preReadSeconds = preReadSeconds
+        self.audioScript = audioScript
+        self.hearingFocusTrap = hearingFocusTrap
+        self.questions = questions
+    }
 }
 
 public struct ListeningExamSection: Codable, Equatable, Sendable {
@@ -540,6 +626,58 @@ public struct ListeningExamSection: Codable, Equatable, Sendable {
     public let audioScript: String
     public let hearingFocusTrap: String
     public let questions: [ExamObjectiveQuestion]
+    public let tracks: [ListeningExamTrack]?
+
+    public var resolvedTracks: [ListeningExamTrack] {
+        if let tracks, !tracks.isEmpty { return tracks }
+        return [
+            ListeningExamTrack(
+                id: "listen-t1",
+                partLabel: title,
+                contextNote: contextNote,
+                accentCode: nil,
+                maxPlaysStrict: maxPlaysStrict,
+                preReadSeconds: 15,
+                audioScript: audioScript,
+                hearingFocusTrap: hearingFocusTrap,
+                questions: questions
+            )
+        ]
+    }
+}
+
+public struct WritingExamTask: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let partLabel: String
+    public let scenario: String
+    public let taskRequirements: [String]
+    public let minWords: Int
+    public let maxWords: Int
+    public let weightPercent: Int
+    public let keyRubricKeywords: [String]
+    public let modelAnswer: String
+
+    public init(
+        id: String,
+        partLabel: String,
+        scenario: String,
+        taskRequirements: [String],
+        minWords: Int,
+        maxWords: Int,
+        weightPercent: Int,
+        keyRubricKeywords: [String],
+        modelAnswer: String
+    ) {
+        self.id = id
+        self.partLabel = partLabel
+        self.scenario = scenario
+        self.taskRequirements = taskRequirements
+        self.minWords = minWords
+        self.maxWords = maxWords
+        self.weightPercent = weightPercent
+        self.keyRubricKeywords = keyRubricKeywords
+        self.modelAnswer = modelAnswer
+    }
 }
 
 public struct WritingExamSection: Codable, Equatable, Sendable {
@@ -551,6 +689,58 @@ public struct WritingExamSection: Codable, Equatable, Sendable {
     public let maxWords: Int
     public let keyRubricKeywords: [String]
     public let modelAnswer: String
+    public let tasks: [WritingExamTask]?
+
+    public var resolvedTasks: [WritingExamTask] {
+        if let tasks, !tasks.isEmpty { return tasks }
+        return [
+            WritingExamTask(
+                id: "write-t1",
+                partLabel: title,
+                scenario: scenario,
+                taskRequirements: taskRequirements,
+                minWords: minWords,
+                maxWords: maxWords,
+                weightPercent: 100,
+                keyRubricKeywords: keyRubricKeywords,
+                modelAnswer: modelAnswer
+            )
+        ]
+    }
+}
+
+public struct SpeakingExamPart: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let partLabel: String
+    public let instruction: String
+    public let prepSeconds: Int
+    public let speakSeconds: Int
+    public let prompts: [String]
+    public let examinerPromptAudio: String?
+    public let keyRubricKeywords: [String]
+    public let modelResponseScript: String
+
+    public init(
+        id: String,
+        partLabel: String,
+        instruction: String,
+        prepSeconds: Int,
+        speakSeconds: Int,
+        prompts: [String],
+        examinerPromptAudio: String? = nil,
+        keyRubricKeywords: [String],
+        modelResponseScript: String
+    ) {
+        self.id = id
+        self.partLabel = partLabel
+        self.instruction = instruction
+        self.prepSeconds = prepSeconds
+        self.speakSeconds = speakSeconds
+        self.prompts = prompts
+        self.examinerPromptAudio = examinerPromptAudio
+        self.keyRubricKeywords = keyRubricKeywords
+        self.modelResponseScript = modelResponseScript
+    }
 }
 
 public struct SpeakingExamSection: Codable, Equatable, Sendable {
@@ -563,6 +753,24 @@ public struct SpeakingExamSection: Codable, Equatable, Sendable {
     public let followUpQuestion: String
     public let keyRubricKeywords: [String]
     public let modelResponseScript: String
+    public let parts: [SpeakingExamPart]?
+
+    public var resolvedParts: [SpeakingExamPart] {
+        if let parts, !parts.isEmpty { return parts }
+        return [
+            SpeakingExamPart(
+                id: "speak-p1",
+                partLabel: title,
+                instruction: cueCardTitle,
+                prepSeconds: prepSeconds,
+                speakSeconds: speakSeconds,
+                prompts: bulletPoints + ["Follow-up: \(followUpQuestion)"],
+                examinerPromptAudio: nil,
+                keyRubricKeywords: keyRubricKeywords,
+                modelResponseScript: modelResponseScript
+            )
+        ]
+    }
 }
 
 public struct MockExam: Codable, Identifiable, Equatable, Sendable {
@@ -573,10 +781,86 @@ public struct MockExam: Codable, Identifiable, Equatable, Sendable {
     public let alignedCertificate: String
     public let passingScorePercent: Int
     public let totalMinutes: Int
+    public let requireAllSkillsPass: Bool?
     public let reading: ReadingExamSection
     public let listening: ListeningExamSection
     public let writing: WritingExamSection
     public let speaking: SpeakingExamSection
+
+    public static func officialGradeLabel(
+        languageId: String,
+        level: CEFRLevel,
+        overallScore: Int,
+        allModulesPassed: Bool,
+        passingScorePercent: Int
+    ) -> String {
+        if languageId == "german" {
+            if !allModulesPassed || overallScore < passingScorePercent {
+                return "Goethe/telc: nicht bestanden (\(overallScore)/100)"
+            }
+            if overallScore >= 90 { return "Goethe/telc: sehr gut (\(overallScore)/100)" }
+            if overallScore >= 80 { return "Goethe/telc: gut (\(overallScore)/100)" }
+            if overallScore >= 70 { return "Goethe/telc: befriedigend (\(overallScore)/100)" }
+            return "Goethe/telc: ausreichend (\(overallScore)/100)"
+        }
+
+        let baseBand: Double
+        switch level {
+        case .A1: baseBand = 2.5
+        case .A2: baseBand = 3.5
+        case .B1: baseBand = 5.0
+        case .B2: baseBand = 6.5
+        case .C1: baseBand = 7.5
+        case .C2: baseBand = 8.5
+        }
+        let delta = (Double(overallScore - 65) / 35.0) * 1.0
+        let band = max(1.0, min(9.0, ((baseBand + delta) * 2.0).rounded() / 2.0))
+        let bandStr = String(format: "%.1f", band)
+        if !allModulesPassed || overallScore < passingScorePercent {
+            return "Below Pass Threshold · Est. IELTS \(bandStr)"
+        }
+        let grade = overallScore >= 85 ? "Grade A (Distinction)" : overallScore >= 75 ? "Grade B (Merit)" : "Grade C (Pass)"
+        return "Cambridge \(grade) · Est. IELTS \(bandStr)"
+    }
+}
+
+public struct OfficialRubricBreakdown: Codable, Equatable, Sendable {
+    public let taskFulfillment: Int
+    public let coherenceCohesion: Int
+    public let lexicalRange: Int
+    public let grammaticalAccuracy: Int
+
+    public init(taskFulfillment: Int, coherenceCohesion: Int, lexicalRange: Int, grammaticalAccuracy: Int) {
+        self.taskFulfillment = taskFulfillment
+        self.coherenceCohesion = coherenceCohesion
+        self.lexicalRange = lexicalRange
+        self.grammaticalAccuracy = grammaticalAccuracy
+    }
+
+    public static func compute(text: String, score: Int, minWords: Int, expectedKeywords: [String]) -> OfficialRubricBreakdown {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else {
+            return OfficialRubricBreakdown(taskFulfillment: 0, coherenceCohesion: 0, lexicalRange: 0, grammaticalAccuracy: 0)
+        }
+        let words = cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
+        let wordCount = words.count
+        let lower = cleaned.lowercased()
+        let sentences = cleaned.split(whereSeparator: { ".!?".contains($0) }).filter { $0.trimmingCharacters(in: .whitespaces).count > 2 }.count
+        let uniqueCount = Set(words.map { $0.lowercased().filter(\.isLetter) }.filter { !$0.isEmpty }).count
+        let diversity = Double(uniqueCount) / Double(max(1, wordCount))
+        let kwHits = expectedKeywords.filter { lower.contains($0.lowercased()) }.count
+        let kwRatio = expectedKeywords.isEmpty ? 0.6 : Double(kwHits) / Double(min(5, expectedKeywords.count))
+        let lengthRatio = min(1.0, Double(wordCount) / Double(max(15, minWords)))
+
+        func clamp(_ v: Double) -> Int { max(0, min(100, Int(v.rounded()))) }
+        let s = Double(score)
+        return OfficialRubricBreakdown(
+            taskFulfillment: clamp(s * 0.65 + lengthRatio * 22.0 + min(1.0, kwRatio) * 13.0),
+            coherenceCohesion: clamp(s * 0.72 + min(1.0, Double(sentences) / 4.0) * 18.0 + (cleaned.contains("\n") ? 10.0 : 5.0)),
+            lexicalRange: clamp(s * 0.68 + min(1.0, diversity / 0.65) * 20.0 + min(1.0, kwRatio) * 12.0),
+            grammaticalAccuracy: clamp(s * 0.80 + (sentences >= 3 ? 16.0 : 8.0))
+        )
+    }
 }
 
 public struct SkillExamScore: Codable, Equatable, Sendable {
@@ -584,12 +868,14 @@ public struct SkillExamScore: Codable, Equatable, Sendable {
     public let passed: Bool
     public let feedback: String
     public let aiGraded: Bool
+    public let rubric: OfficialRubricBreakdown?
 
-    public init(score: Int, passed: Bool, feedback: String, aiGraded: Bool = false) {
+    public init(score: Int, passed: Bool, feedback: String, aiGraded: Bool = false, rubric: OfficialRubricBreakdown? = nil) {
         self.score = score
         self.passed = passed
         self.feedback = feedback
         self.aiGraded = aiGraded
+        self.rubric = rubric
     }
 }
 
@@ -605,6 +891,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let durationUsedSeconds: Int
     public let overallScore: Int
     public let passed: Bool
+    public let officialGradeLabel: String?
     public let skills: [String: SkillExamScore]
     public let writingSubmission: String?
     public let speakingTranscript: String?
@@ -621,6 +908,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         durationUsedSeconds: Int,
         overallScore: Int,
         passed: Bool,
+        officialGradeLabel: String? = nil,
         skills: [String: SkillExamScore],
         writingSubmission: String? = nil,
         speakingTranscript: String? = nil
@@ -636,6 +924,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         self.durationUsedSeconds = durationUsedSeconds
         self.overallScore = overallScore
         self.passed = passed
+        self.officialGradeLabel = officialGradeLabel
         self.skills = skills
         self.writingSubmission = writingSubmission
         self.speakingTranscript = speakingTranscript

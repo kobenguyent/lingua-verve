@@ -1,5 +1,6 @@
 import { IntensiveCourse } from '../../types';
 import { ENGLISH_UNIT_LESSONS } from './englishUnitLessons';
+import { ENGLISH_EXTRA_UNITS } from './englishExtraUnits';
 
 const RAW_ENGLISH_INTENSIVE_COURSES: IntensiveCourse[] = [
   {
@@ -612,8 +613,11 @@ const RAW_ENGLISH_INTENSIVE_COURSES: IntensiveCourse[] = [
 
 export const ENGLISH_INTENSIVE_COURSES: IntensiveCourse[] = RAW_ENGLISH_INTENSIVE_COURSES.map((course) => ({
   ...course,
-  modules: course.modules.map((mod) => ({
-    ...mod,
-    lesson: ENGLISH_UNIT_LESSONS[mod.id],
-  })),
+  modules: [
+    ...course.modules.map((mod) => ({
+      ...mod,
+      lesson: ENGLISH_UNIT_LESSONS[mod.id],
+    })),
+    ...(ENGLISH_EXTRA_UNITS[course.id] ?? []),
+  ],
 }));

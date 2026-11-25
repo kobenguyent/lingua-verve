@@ -9,6 +9,7 @@ public struct RootNavigationView: View {
     @Binding var showDiagnosticSheet: Bool
     @Binding var showFalseFriendsSheet: Bool
     @Binding var showAISettingsSheet: Bool
+    @State private var showVoiceStudioSheet: Bool = false
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -46,6 +47,9 @@ public struct RootNavigationView: View {
         }
         .sheet(isPresented: $showAISettingsSheet) {
             AIProviderSheetView(store: store)
+        }
+        .sheet(isPresented: $showVoiceStudioSheet) {
+            VoiceStudioSheetView(store: store)
         }
     }
 
@@ -115,6 +119,21 @@ public struct RootNavigationView: View {
                             Circle()
                                 .fill(store.aiConfig.isReady ? BrandTheme.emeraldMint : .orange)
                                 .frame(width: 7, height: 7)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showVoiceStudioSheet = true
+                    } label: {
+                        let accent = NativeAudioEngine.shared.activeAccentOption(for: store.courseLanguageId)
+                        HStack {
+                            Label("Voice & Accents", systemImage: "waveform")
+                                .font(.system(size: 13))
+                            Spacer()
+                            Text("\(accent?.flag ?? "🎙️") \(NativeAudioEngine.shared.voiceSettings.provider.shortLabel)")
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -267,6 +286,12 @@ public struct RootNavigationView: View {
                 showFalseFriendsSheet = true
             } label: {
                 Label("False Friends", systemImage: "exclamationmark.shield")
+            }
+
+            Button {
+                showVoiceStudioSheet = true
+            } label: {
+                Label("Voice & Accents", systemImage: "waveform")
             }
 
             Button {

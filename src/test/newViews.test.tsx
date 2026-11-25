@@ -5,8 +5,10 @@ import { PreTestView } from '../components/PreTestView';
 import { ExamSimulatorView } from '../components/ExamSimulatorView';
 import { AICoachView } from '../components/AICoachView';
 import { AIProviderModal } from '../components/AIProviderModal';
+import { VoiceSettingsModal } from '../components/VoiceSettingsModal';
 import { ProgressDashboardView } from '../components/ProgressDashboardView';
 import { getDefaultAIConfig } from '../utils/aiClient';
+import { getDefaultVoiceSettings } from '../utils/audio';
 import { createEmptyLearnerState } from '../utils/progressStore';
 
 describe('IntensiveCoursesView Component', () => {
@@ -60,7 +62,7 @@ describe('IntensiveCoursesView Component', () => {
 
     // Launch Unit 1 from the syllabus card
     fireEvent.click(screen.getByRole('button', { name: /Start Unit 1/i }));
-    expect(screen.getByText(/A1 · Unit 1 of 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/A1 · Unit 1 of 6/i)).toBeInTheDocument();
     expect(screen.getByText(/V2 Verb-Second Engine/i)).toBeInTheDocument();
 
     // Step 1 -> Step 2 (Vocabulary Flashcards)
@@ -101,7 +103,7 @@ describe('IntensiveCoursesView Component', () => {
     expect(onCompleteModule).toHaveBeenCalledTimes(1);
     expect(onCompleteModule.mock.calls[0][0]).toBe('de-a1-m1');
     expect(typeof onCompleteModule.mock.calls[0][1].score).toBe('number');
-    expect(screen.getByText(/A1 · Unit 2 of 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/A1 · Unit 2 of 6/i)).toBeInTheDocument();
   });
 });
 
@@ -149,10 +151,15 @@ describe('ExamSimulatorView Component', () => {
     expect(screen.getByText(/Goethe-Zertifikat A1 Simulation/i)).toBeInTheDocument();
     fireEvent.click(screen.getByText(/Begin A1 Simulated Exam/i));
 
-    // Switch through all 4 skills
+    // Switch through all 4 multi-part skills
     expect(screen.getByText(/Lesen · Teil 1 & 2/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Part 2/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Part 3/i })).toBeInTheDocument();
+
     fireEvent.click(screen.getByText('2. Listening / Hearing'));
     expect(screen.getByText(/Play Official Audio Track/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Track 2/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Track 3/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('3. Writing'));
     const textarea = screen.getByLabelText(/Your Exam Essay/i);
@@ -161,8 +168,10 @@ describe('ExamSimulatorView Component', () => {
         value: 'Sehr geehrte Damen und Herren, ich möchte im August einen Deutschkurs machen. Wie viel kostet der Preis und gibt es noch Platz? Viele Grüße!',
       },
     });
+    expect(screen.getByRole('button', { name: /^Task 2/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('4. Speaking'));
+    expect(screen.getByRole('button', { name: /Play Examiner Prompt/i })).toBeInTheDocument();
     const speakArea = screen.getByLabelText(/Spoken Transcript/i);
     fireEvent.change(speakArea, {
       target: { value: 'Hallo, ich heiße Alex und ich komme aus Kanada. Ich wohne in Berlin und arbeite gern.' },
@@ -173,6 +182,8 @@ describe('ExamSimulatorView Component', () => {
     await waitFor(() => {
       expect(onCompleteExam).toHaveBeenCalledTimes(1);
       expect(screen.getByText(/Overall \d+%/i)).toBeInTheDocument();
+      expect(screen.getByText(/Goethe\/telc:/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Task Fulfillment/i).length).toBeGreaterThanOrEqual(1);
     });
   });
 });
@@ -282,5 +293,35 @@ describe('ProgressDashboardView Component', () => {
     expect(screen.getByText(/Export JSON Backup/i)).toBeInTheDocument();
     expect(screen.getByText(/English Zero-to-Hero Map/i)).toBeInTheDocument();
     expect(screen.getByText(/German Zero-to-Hero Map/i)).toBeInTheDocument();
+  });
+});
+
+describe('VoiceSettingsModal Component', () => {
+  it('switches regional accents and saves a neural human voice profile', () => {
+    const onSave = vi.fn();
+    render(
+      <VoiceSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        settings={getDefaultVoiceSettings()}
+        onSaveSettings={onSave}
+        activeLanguageId="english"
+      />
+    );
+
+    expect(screen.getByText(/Human Voice & Accent Studio/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Australian \(AU\)/i));
+    fireEvent.click(screen.getByText(/German DACH \(3 Accents\)/i));
+    fireEvent.click(screen.getByText(/Austria \(AT\)/i));
+    fireEvent.click(screen.getByText(/OpenAI Human TTS/i));
+    fireEvent.click(screen.getByText(/Sage/i));
+    fireEvent.click(screen.getByRole('button', { name: /Save Voice Profile/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0];
+    expect(saved.accents.english).toBe('en-AU');
+    expect(saved.accents.german).toBe('de-AT');
+    expect(saved.provider).toBe('openai');
+    expect(saved.neuralVoice).toBe('sage');
   });
 });

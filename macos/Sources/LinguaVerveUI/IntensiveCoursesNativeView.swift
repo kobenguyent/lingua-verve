@@ -220,16 +220,32 @@ public struct IntensiveCoursesNativeView: View {
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
 
-                    // Audio Pace Control + Syllabus Units
-                    HStack {
-                        Text("INTENSIVE SYLLABUS UNITS (\(course.modules.count))")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Toggle("0.75x Slow Audio", isOn: Bindable(NativeAudioEngine.shared).slowPace)
-                            .toggleStyle(.switch)
-                            .font(.caption.monospaced())
-                            .fixedSize()
+                    // Audio Pace, Accent Picker + Syllabus Units
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Text("INTENSIVE SYLLABUS UNITS (\(course.modules.count))")
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            accentMenu(for: course.languageId)
+                            Toggle("0.75x Slow Audio", isOn: Bindable(NativeAudioEngine.shared).slowPace)
+                                .toggleStyle(.switch)
+                                .font(.caption.monospaced())
+                                .fixedSize()
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("INTENSIVE SYLLABUS UNITS (\(course.modules.count))")
+                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                accentMenu(for: course.languageId)
+                                Spacer()
+                                Toggle("0.75x Slow Audio", isOn: Bindable(NativeAudioEngine.shared).slowPace)
+                                    .toggleStyle(.switch)
+                                    .font(.caption.monospaced())
+                                    .fixedSize()
+                            }
+                        }
                     }
 
                     ForEach(Array(course.modules.enumerated()), id: \.element.id) { idx, mod in
@@ -322,6 +338,32 @@ public struct IntensiveCoursesNativeView: View {
         .labelsHidden()
         .pickerStyle(.segmented)
         .frame(maxWidth: 240)
+    }
+
+    private func accentMenu(for languageId: String) -> some View {
+        let accents = NativeAudioEngine.accents(for: languageId)
+        let activeCode = NativeAudioEngine.shared.activeAccentCode(for: languageId)
+        let activeOption = NativeAudioEngine.accentOption(for: activeCode) ?? accents.first
+
+        return Menu {
+            ForEach(accents) { acc in
+                Button {
+                    NativeAudioEngine.shared.playClickSound()
+                    NativeAudioEngine.shared.setAccent(for: languageId, accentCode: acc.code)
+                } label: {
+                    if acc.code == activeCode {
+                        Label("\(acc.flag) \(acc.label)", systemImage: "checkmark")
+                    } else {
+                        Text("\(acc.flag) \(acc.label) · \(acc.region)")
+                    }
+                }
+            }
+        } label: {
+            Label("\(activeOption?.flag ?? "🎙️") \(activeOption?.label ?? activeCode)", systemImage: "waveform")
+                .font(.caption.monospaced())
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 
     private func recommendedUnit(for course: IntensiveCourse) -> (module: CourseModule, ctaLabel: String)? {

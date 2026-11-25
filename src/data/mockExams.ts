@@ -1,10 +1,16 @@
 import { CEFRLevel, MockExam } from '../types';
+import { MOCK_EXAM_EXTENSIONS } from './mockExamExtensions';
 
 /**
  * 12 Full 4-Skill Simulated Certification Exams (English A1–C2 + German A1–C2)
  * Modeled on Goethe-Zertifikat / telc / TestDaF (German) and Cambridge / IELTS / TOEFL (English).
+ * Each exam is enriched via MOCK_EXAM_EXTENSIONS into a realistic multi-part format:
+ * - 3 Reading Parts (Comprehension + Richtig/Falsch or TFNG + Sprachbausteine/Use of English = 9 Qs)
+ * - 3 Multi-Accent Listening Tracks (DE/AT/CH or GB/US/AU/IE/IN/ZA = 9 Qs)
+ * - 2 Weighted Writing Tasks
+ * - 3 Interactive Speaking Parts (Warm-Up + Timed Cue Card + Examiner Pushback)
  */
-export const MOCK_EXAMS: MockExam[] = [
+const RAW_MOCK_EXAMS: MockExam[] = [
   // ================================== GERMAN SIMULATED EXAMS (A1–C2) ==================================
   {
     id: 'exam-de-a1',
@@ -1480,6 +1486,98 @@ export const MOCK_EXAMS: MockExam[] = [
     },
   },
 ];
+
+export const MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
+  const ext = MOCK_EXAM_EXTENSIONS[exam.id];
+  if (!ext) return exam;
+
+  const isGerman = exam.languageId === 'german';
+  const task1Weight = Math.max(20, 100 - ext.extraWritingTask.weightPercent);
+
+  return {
+    ...exam,
+    totalMinutes: ext.officialMinutes,
+    requireAllSkillsPass: ext.requireAllSkillsPass,
+    reading: {
+      ...exam.reading,
+      durationMinutes: Math.max(exam.reading.durationMinutes, Math.round(ext.officialMinutes * 0.3)),
+      parts: [
+        {
+          id: `${exam.id}-read-p1`,
+          partLabel: exam.reading.title,
+          format: 'comprehension',
+          instruction: isGerman
+            ? 'Lesen Sie den Text sorgfältig und wählen Sie die beste Antwort für jede Frage.'
+            : 'Read the passage carefully and choose the best answer for each question.',
+          passageTitle: exam.reading.passageTitle,
+          passage: exam.reading.passage,
+          questions: exam.reading.questions,
+        },
+        ...ext.extraReadingParts,
+      ],
+    },
+    listening: {
+      ...exam.listening,
+      durationMinutes: Math.max(exam.listening.durationMinutes, Math.round(ext.officialMinutes * 0.25)),
+      tracks: [
+        {
+          id: `${exam.id}-listen-t1`,
+          partLabel: exam.listening.title,
+          contextNote: exam.listening.contextNote,
+          accentCode: ext.primaryAccentCode,
+          maxPlaysStrict: exam.listening.maxPlaysStrict,
+          preReadSeconds: 15,
+          audioScript: exam.listening.audioScript,
+          hearingFocusTrap: exam.listening.hearingFocusTrap,
+          questions: exam.listening.questions,
+        },
+        ...ext.extraListeningTracks,
+      ],
+    },
+    writing: {
+      ...exam.writing,
+      durationMinutes: Math.max(exam.writing.durationMinutes, Math.round(ext.officialMinutes * 0.28)),
+      tasks: [
+        {
+          id: `${exam.id}-write-t1`,
+          partLabel: exam.writing.title,
+          scenario: exam.writing.scenario,
+          taskRequirements: exam.writing.taskRequirements,
+          minWords: exam.writing.minWords,
+          maxWords: exam.writing.maxWords,
+          weightPercent: task1Weight,
+          keyRubricKeywords: exam.writing.keyRubricKeywords,
+          modelAnswer: exam.writing.modelAnswer,
+        },
+        ext.extraWritingTask,
+      ],
+    },
+    speaking: {
+      ...exam.speaking,
+      durationMinutes: Math.max(exam.speaking.durationMinutes, Math.round(ext.officialMinutes * 0.17)),
+      parts: [
+        ext.speakingPart1,
+        {
+          id: `${exam.id}-speak-p2`,
+          partLabel: exam.speaking.title,
+          instruction: exam.speaking.cueCardTitle,
+          prepSeconds: exam.speaking.prepSeconds,
+          speakSeconds: exam.speaking.speakSeconds,
+          prompts: [
+            ...exam.speaking.bulletPoints,
+            `${isGerman ? 'Nachfrage' : 'Examiner Follow-Up'}: ${exam.speaking.followUpQuestion}`,
+          ],
+          examinerPromptAudio: isGerman
+            ? `Kommen wir nun zu Teil 2. Ihr Thema lautet: ${exam.speaking.cueCardTitle}. Bereiten Sie sich kurz vor und präsentieren Sie Ihre Punkte.`
+            : `Let us move to Part 2. Your topic is: ${exam.speaking.cueCardTitle}. Take a moment to prepare, then speak through your key points.`,
+          keyRubricKeywords: exam.speaking.keyRubricKeywords,
+          modelResponseScript: exam.speaking.modelResponseScript,
+        },
+        ext.speakingPart3,
+      ],
+    },
+  };
+});
 
 export function getMockExams(languageId?: string, level?: CEFRLevel | 'ALL'): MockExam[] {
   return MOCK_EXAMS.filter((exam) => {

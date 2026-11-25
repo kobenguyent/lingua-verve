@@ -284,10 +284,11 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertEqual(appleModels.first?.ownedBy, "Apple Intelligence")
     }
 
-    func testGuidedUnitLessonsDecodeForAll36UnitsAndPersistUnitStudyProgress() throws {
+    func testGuidedUnitLessonsDecodeForAll72UnitsAndPersistUnitStudyProgress() throws {
         let store = makeTestStore()
         var totalModules = 0
         for course in store.bundle.intensiveCourses {
+            XCTAssertEqual(course.modules.count, 6, "Expected 6 units in course \(course.id)")
             for mod in course.modules {
                 totalModules += 1
                 guard let lesson = mod.lesson else {
@@ -300,7 +301,7 @@ final class AcademyAndAITests: XCTestCase {
                 XCTAssertFalse(lesson.checkpointModelAnswer.isEmpty, "Missing checkpoint model answer for \(mod.id)")
             }
         }
-        XCTAssertEqual(totalModules, 36)
+        XCTAssertEqual(totalModules, 72)
 
         guard let course = store.course(for: "german", level: .A1),
               let unit1 = course.modules.first else {
@@ -345,5 +346,96 @@ final class AcademyAndAITests: XCTestCase {
 
         store.closeUnitLesson()
         XCTAssertNil(store.activeLessonModuleId)
+    }
+
+    func testMultiAccentCatalogAndHumanVoiceRankingBlocksRoboticVoices() {
+        let enAccents = NativeAudioEngine.accents(for: "english").map(\.code)
+        let deAccents = NativeAudioEngine.accents(for: "german").map(\.code)
+        XCTAssertEqual(enAccents, ["en-GB", "en-US", "en-AU", "en-IE", "en-IN", "en-ZA"])
+        XCTAssertEqual(deAccents, ["de-DE", "de-AT", "de-CH"])
+
+        let candidates: [VoiceCandidateDescriptor] = [
+            VoiceCandidateDescriptor(identifier: "com.apple.speech.synthesis.voice.Albert", name: "Albert", language: "en-US", qualityRaw: 1),
+            VoiceCandidateDescriptor(identifier: "com.apple.eloquence.en-GB.Eddy", name: "Eddy", language: "en-GB", qualityRaw: 1),
+            VoiceCandidateDescriptor(identifier: "com.apple.voice.super-compact.en-GB.Daniel", name: "Daniel", language: "en-GB", qualityRaw: 1),
+            VoiceCandidateDescriptor(identifier: "com.apple.siri.natural.Quinn", name: "Voice 5", language: "en-US", qualityRaw: 2),
+            VoiceCandidateDescriptor(identifier: "com.apple.eloquence.de-DE.Flo", name: "Flo", language: "de-DE", qualityRaw: 1),
+            VoiceCandidateDescriptor(identifier: "com.apple.siri.natural.Helena", name: "Voice 2", language: "de-DE", qualityRaw: 2)
+        ]
+
+        XCTAssertTrue(NativeAudioEngine.isRoboticVoice(candidates[0]))
+        XCTAssertTrue(NativeAudioEngine.isRoboticVoice(candidates[1]))
+        XCTAssertFalse(NativeAudioEngine.isRoboticVoice(candidates[3]))
+
+        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "en-GB")?.name, "Daniel")
+        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "en-US")?.identifier, "com.apple.siri.natural.Quinn")
+        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "de-DE")?.identifier, "com.apple.siri.natural.Helena")
+
+        let defaults = UserDefaults(suiteName: "LinguaVerveVoiceTests.\(UUID().uuidString)")!
+        let engine = NativeAudioEngine(defaults: defaults)
+        engine.setAccent(for: "english", accentCode: "en-AU")
+        engine.setAccent(for: "german", accentCode: "de-CH")
+        XCTAssertEqual(engine.activeAccentCode(for: "english"), "en-AU")
+        XCTAssertEqual(engine.activeAccentCode(for: "german"), "de-CH")
+
+        let reloaded = NativeAudioEngine(defaults: defaults)
+        XCTAssertEqual(reloaded.activeAccentCode(for: "english"), "en-AU")
+        XCTAssertEqual(reloaded.activeAccentCode(for: "german"), "de-CH")
+
+        let prompt = NativeAudioEngine.buildNeuralInstructions(accentCode: "de-AT", style: .tutor, slow: true)
+        XCTAssertTrue(prompt.contains("Austrian"))
+        XCTAssertTrue(prompt.contains("0.8x"))
+
+        let phrases = NativeAudioEngine.splitIntoNaturalPhrases("Guten Tag! Heute sprechen wir über moderne Verkehrskonzepte in großen Städten. Einerseits sparen Züge viel Zeit. Andererseits müssen Tickets bezahlbar bleiben.")
+        XCTAssertGreaterThanOrEqual(phrases.count, 2)
+    }
+
+    func testMultiPartRealWorldExamsDecodeWithOfficialGradesAndRubrics() {
+        let store = makeTestStore()
+        XCTAssertEqual(store.bundle.mockExams.count, 12)
+
+        for exam in store.bundle.mockExams {
+            XCTAssertEqual(exam.requireAllSkillsPass, true, "Expected modular pass gate on \(exam.id)")
+
+            let readParts = exam.reading.resolvedParts
+            XCTAssertEqual(readParts.count, 3, "Expected 3 reading parts in \(exam.id)")
+            XCTAssertEqual(readParts.reduce(0) { $0 + $1.questions.count }, 9, "Expected 9 reading items in \(exam.id)")
+
+            let tracks = exam.listening.resolvedTracks
+            XCTAssertEqual(tracks.count, 3, "Expected 3 listening tracks in \(exam.id)")
+            XCTAssertEqual(tracks.reduce(0) { $0 + $1.questions.count }, 9, "Expected 9 listening items in \(exam.id)")
+            let accents = Set(tracks.compactMap(\.accentCode))
+            XCTAssertGreaterThanOrEqual(accents.count, 2, "Expected multiple accents in \(exam.id)")
+
+            let tasks = exam.writing.resolvedTasks
+            XCTAssertEqual(tasks.count, 2, "Expected 2 writing tasks in \(exam.id)")
+            XCTAssertEqual(tasks.reduce(0) { $0 + $1.weightPercent }, 100, "Expected writing weights summing to 100 in \(exam.id)")
+
+            let speakParts = exam.speaking.resolvedParts
+            XCTAssertEqual(speakParts.count, 3, "Expected 3 speaking parts in \(exam.id)")
+            for part in speakParts {
+                XCTAssertFalse((part.examinerPromptAudio ?? "").isEmpty, "Missing examiner prompt audio in \(part.id)")
+            }
+        }
+
+        let dePass = MockExam.officialGradeLabel(languageId: "german", level: .B2, overallScore: 86, allModulesPassed: true, passingScorePercent: 60)
+        XCTAssertTrue(dePass.contains("Goethe/telc: gut"))
+
+        let deFail = MockExam.officialGradeLabel(languageId: "german", level: .B2, overallScore: 82, allModulesPassed: false, passingScorePercent: 60)
+        XCTAssertTrue(deFail.contains("nicht bestanden"))
+
+        let enPass = MockExam.officialGradeLabel(languageId: "english", level: .C1, overallScore: 88, allModulesPassed: true, passingScorePercent: 65)
+        XCTAssertTrue(enPass.contains("Cambridge Grade A") && enPass.contains("Est. IELTS"))
+
+        let rubric = OfficialRubricBreakdown.compute(
+            text: "Although remote work increases flexibility, structured in-person workshops remain indispensable for building long-term institutional trust.",
+            score: 84,
+            minWords: 15,
+            expectedKeywords: ["Although", "flexibility", "indispensable"]
+        )
+        XCTAssertGreaterThanOrEqual(rubric.taskFulfillment, 60)
+        XCTAssertGreaterThanOrEqual(rubric.coherenceCohesion, 60)
+        XCTAssertGreaterThanOrEqual(rubric.lexicalRange, 60)
+        XCTAssertGreaterThanOrEqual(rubric.grammaticalAccuracy, 60)
     }
 }
