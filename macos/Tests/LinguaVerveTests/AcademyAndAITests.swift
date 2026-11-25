@@ -14,6 +14,26 @@ private final class MockAITransport: AIHTTPTransport, @unchecked Sendable {
     }
 }
 
+private struct MockAppleFoundationBackend: AppleFoundationModelBackend {
+    let available: Bool
+    let reply: String
+
+    func availability() -> AppleFoundationAvailability {
+        AppleFoundationAvailability(
+            isAvailable: available,
+            statusTitle: available ? "Ready On-Device" : "Unavailable",
+            detail: available ? "Mock Apple Intelligence Ready" : "Mock unavailable"
+        )
+    }
+
+    func respond(messages: [AIChatMessage], temperature: Double) async throws -> String {
+        guard available else {
+            throw AppleFoundationError.unavailable("Mock unavailable")
+        }
+        return reply
+    }
+}
+
 final class AcademyAndAITests: XCTestCase {
 
     private func makeTestStore() -> CurriculumStore {
@@ -146,5 +166,54 @@ final class AcademyAndAITests: XCTestCase {
         )
         XCTAssertEqual(offline.source, "offline-rubric")
         XCTAssertGreaterThanOrEqual(offline.score, 65)
+    }
+
+    func testAppleFoundationModelOnDeviceProviderAndGracefulFallback() async throws {
+        // Metadata checks
+        XCTAssertTrue(AIProviderType.appleFoundation.isLocal)
+        XCTAssertTrue(AIProviderType.appleFoundation.isOnDeviceApple)
+        XCTAssertFalse(AIProviderType.appleFoundation.requiresAPIKey)
+        let cfg = AIProviderConfig(provider: .appleFoundation, enabled: true)
+        XCTAssertTrue(cfg.isReady)
+
+        // Live availability probe never crashes on host macOS
+        let liveStatus = LiveAppleFoundationModelBackend().availability()
+        XCTAssertFalse(liveStatus.statusTitle.isEmpty)
+
+        // Mock on-device Apple Foundation Model chat + structured exam grading
+        let jsonReply = """
+        {"score":91,"cefrEstimate":"C1","strengths":["Crisp Nominalstil"],"corrections":["Minor comma"],"upgradedVersion":"Angesichts der Entwicklung...","examinerSummary":"Excellent C1 German response."}
+        """
+        let client = AIClientService(appleBackend: MockAppleFoundationBackend(available: true, reply: jsonReply))
+        let testConn = await client.testConnection(config: cfg)
+        XCTAssertTrue(testConn.ok)
+
+        let eval = await client.evaluateWithAIOrFallback(
+            config: cfg,
+            text: "Angesichts der rasanten Entwicklung ist lebenslanges Lernen unverzichtbar.",
+            languageId: "german",
+            level: .C1,
+            skill: .writing,
+            taskPrompt: "Diskutieren Sie lebenslanges Lernen.",
+            minWords: 10,
+            expectedKeywords: ["angesichts"]
+        )
+        XCTAssertEqual(eval.source, "ai")
+        XCTAssertEqual(eval.score, 91)
+        XCTAssertEqual(eval.cefrEstimate, .C1)
+
+        // When on-device Apple Intelligence is unavailable, cleanly falls back to offline rubric
+        let unavailableClient = AIClientService(appleBackend: MockAppleFoundationBackend(available: false, reply: ""))
+        let fallbackEval = await unavailableClient.evaluateWithAIOrFallback(
+            config: cfg,
+            text: "Meiner Meinung nach ist diese Frage wichtig, weil Bildung entscheidend bleibt.",
+            languageId: "german",
+            level: .B1,
+            skill: .writing,
+            taskPrompt: "Bildung",
+            minWords: 10,
+            expectedKeywords: ["Meinung", "weil"]
+        )
+        XCTAssertEqual(fallbackEval.source, "offline-rubric")
     }
 }

@@ -26,17 +26,30 @@ public protocol AIHTTPTransport: Sendable {
 
 extension URLSession: AIHTTPTransport {}
 
-/// Native Swift multi-provider AI client supporting Local (Ollama, LM Studio, LAN Mac)
-/// and Cloud (OpenAI, Google Gemini, OpenRouter, Custom OpenAI-Compatible) APIs,
+/// Native Swift multi-provider AI client supporting On-Device Apple Intelligence Foundation Models,
+/// Local (Ollama, LM Studio, LAN Mac), and Cloud (OpenAI, Google Gemini, OpenRouter, Custom) APIs,
 /// plus a built-in offline CEFR rubric evaluator fallback.
 public struct AIClientService: Sendable {
     private let transport: any AIHTTPTransport
+    private let appleBackend: any AppleFoundationModelBackend
 
-    public init(transport: any AIHTTPTransport = URLSession.shared) {
+    public init(
+        transport: any AIHTTPTransport = URLSession.shared,
+        appleBackend: any AppleFoundationModelBackend = LiveAppleFoundationModelBackend()
+    ) {
         self.transport = transport
+        self.appleBackend = appleBackend
+    }
+
+    public func appleFoundationAvailability() -> AppleFoundationAvailability {
+        appleBackend.availability()
     }
 
     public func chat(config: AIProviderConfig, messages: [AIChatMessage]) async throws -> String {
+        if config.provider == .appleFoundation {
+            return try await appleBackend.respond(messages: messages, temperature: config.temperature)
+        }
+
         let trimmedEndpoint = config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEndpoint.isEmpty else {
             throw AIClientError.invalidURL(trimmedEndpoint)

@@ -33,7 +33,9 @@ struct LinguaVerveApp: App {
                 }
             }
         }
+        #if os(macOS)
         .defaultSize(width: 1260, height: 820)
+        #endif
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
@@ -66,9 +68,11 @@ struct LinguaVerveApp: App {
             }
         }
 
+        #if os(macOS)
         MenuBarExtra("LinguaVerve", systemImage: "globe.europe.africa.fill") {
             MenuBarPopoverView(store: store)
         }
         .menuBarExtraStyle(.window)
+        #endif
     }
 }

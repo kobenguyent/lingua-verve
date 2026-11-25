@@ -521,6 +521,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
 // MARK: - Local & Cloud AI Providers
 
 public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendable {
+    case appleFoundation
     case ollama
     case lmstudio
     case openai
@@ -531,11 +532,16 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
     public var id: String { rawValue }
 
     public var isLocal: Bool {
-        self == .ollama || self == .lmstudio
+        self == .appleFoundation || self == .ollama || self == .lmstudio
+    }
+
+    public var isOnDeviceApple: Bool {
+        self == .appleFoundation
     }
 
     public var label: String {
         switch self {
+        case .appleFoundation: return "Apple Foundation Model (On-Device)"
         case .ollama: return "Ollama (Local / LAN)"
         case .lmstudio: return "LM Studio (Local / LAN)"
         case .openai: return "OpenAI (Cloud)"
@@ -547,6 +553,7 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var defaultEndpoint: String {
         switch self {
+        case .appleFoundation: return "on-device://apple-foundation-models"
         case .ollama: return "http://localhost:11434/v1/chat/completions"
         case .lmstudio: return "http://localhost:1234/v1/chat/completions"
         case .openai: return "https://api.openai.com/v1/chat/completions"
@@ -558,6 +565,7 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var defaultModel: String {
         switch self {
+        case .appleFoundation: return "Apple Intelligence On-Device"
         case .ollama: return "llama3.2"
         case .lmstudio: return "local-model"
         case .openai: return "gpt-4o-mini"
@@ -569,6 +577,7 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var suggestedModels: [String] {
         switch self {
+        case .appleFoundation: return ["Apple Intelligence On-Device"]
         case .ollama: return ["llama3.2", "qwen2.5:7b", "gemma3", "mistral"]
         case .lmstudio: return ["local-model", "qwen2.5-7b-instruct", "llama-3.2-3b-instruct"]
         case .openai: return ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"]
@@ -581,12 +590,14 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
     public var requiresAPIKey: Bool {
         switch self {
         case .openai, .gemini, .openrouter: return true
-        case .ollama, .lmstudio, .custom: return false
+        case .appleFoundation, .ollama, .lmstudio, .custom: return false
         }
     }
 
     public var setupHint: String {
         switch self {
+        case .appleFoundation:
+            return "Runs 100% locally and privately via Apple's native FoundationModels framework on Apple Silicon MacBooks (macOS 26+), iPads (iPadOS 26+), and iPhones (iOS 26+). No API key or server required."
         case .ollama:
             return "On MacBook use localhost:11434. On iPhone/iPad, point to your Mac's Wi-Fi IP (e.g. http://192.168.1.10:11434/v1/chat/completions) with OLLAMA_HOST=0.0.0.0."
         case .lmstudio:
@@ -628,8 +639,11 @@ public struct AIProviderConfig: Codable, Equatable, Sendable {
     }
 
     public var isReady: Bool {
-        guard enabled,
-              !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        guard enabled else { return false }
+        if provider == .appleFoundation {
+            return true
+        }
+        guard !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
         }

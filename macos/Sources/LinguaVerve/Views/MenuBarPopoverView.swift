@@ -147,7 +147,9 @@ public struct MenuBarPopoverView: View {
             HStack {
                 Button {
                     openWindow(id: "main")
+                    #if os(macOS)
                     NSApp.activate(ignoringOtherApps: true)
+                    #endif
                 } label: {
                     Label("Open Workspace", systemImage: "macwindow")
                         .font(.system(size: 12.5))
@@ -156,7 +158,9 @@ public struct MenuBarPopoverView: View {
 
                 Button {
                     openWindow(id: "main")
+                    #if os(macOS)
                     NSApp.activate(ignoringOtherApps: true)
+                    #endif
                     Task { await store.checkForUpdates(manual: true) }
                 } label: {
                     Label(
@@ -168,12 +172,14 @@ public struct MenuBarPopoverView: View {
                 .controlSize(.regular)
 
                 Spacer()
+                #if os(macOS)
                 Button("Quit") {
                     NSApp.terminate(nil)
                 }
                 .font(.system(size: 12.5))
                 .controlSize(.regular)
                 .foregroundStyle(.secondary)
+                #endif
             }
         }
         .padding(16)

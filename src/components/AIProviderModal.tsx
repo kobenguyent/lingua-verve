@@ -183,11 +183,14 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
           </div>
 
           {/* Setup Hint */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 space-y-1.5">
             <span className="font-mono font-bold uppercase text-[10px] text-sky-700 dark:text-sky-400 block">
               {preset.label} Setup Tip
             </span>
             <p className="font-mono text-[11px] break-words">{preset.setupHint}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+              <strong>Apple Intelligence On-Device Model:</strong> Available directly with zero setup inside the native <strong>LinguaVerve MacBook / iPad / iPhone</strong> app (via Apple&apos;s native <code>FoundationModels</code> framework on macOS 26 / iOS 26+).
+            </p>
           </div>
 
           {/* Fields */}

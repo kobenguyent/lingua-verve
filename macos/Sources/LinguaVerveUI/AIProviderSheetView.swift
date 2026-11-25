@@ -15,9 +15,11 @@ public struct AIProviderSheetView: View {
     }
 
     public var body: some View {
+        let appleStatus = LiveAppleFoundationModelBackend().availability()
+
         NavigationStack {
             Form {
-                Section("Provider (Local or Cloud)") {
+                Section("Provider (On-Device Apple, Local, or Cloud)") {
                     Picker("AI Provider", selection: $draft.provider) {
                         ForEach(AIProviderType.allCases) { p in
                             Text(p.label).tag(p)
@@ -34,38 +36,62 @@ public struct AIProviderSheetView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Connection Settings") {
-                    TextField("Endpoint URL", text: $draft.endpoint)
-                        .font(.system(size: 13, design: .monospaced))
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        #endif
-
-                    TextField("Model Name", text: $draft.model)
-                        .font(.system(size: 13, design: .monospaced))
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        #endif
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(draft.provider.suggestedModels, id: \.self) { m in
-                                Button(m) { draft.model = m }
-                                    .font(.caption2.monospaced())
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
+                if draft.provider == .appleFoundation {
+                    Section("On-Device Apple Intelligence Status") {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: appleStatus.isAvailable ? "apple.intelligence" : "exclamationmark.triangle.fill")
+                                .font(.title3)
+                                .foregroundStyle(appleStatus.isAvailable ? BrandTheme.emeraldMint : .orange)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(appleStatus.statusTitle)
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(appleStatus.isAvailable ? BrandTheme.emeraldMint : .primary)
+                                Text(appleStatus.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
-                    }
+                        .padding(.vertical, 4)
 
-                    SecureField(
-                        draft.provider.requiresAPIKey ? "API Key (Required)" : "API Key (Optional for Local)",
-                        text: $draft.apiKey
-                    )
-                    .font(.system(size: 13, design: .monospaced))
+                        LabeledContent("Model", value: "SystemLanguageModel.default")
+                            .font(.caption.monospaced())
+                        LabeledContent("Privacy", value: "100% On-Device · Zero API Key")
+                            .font(.caption)
+                    }
+                } else {
+                    Section("Connection Settings") {
+                        TextField("Endpoint URL", text: $draft.endpoint)
+                            .font(.system(size: 13, design: .monospaced))
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            #endif
+
+                        TextField("Model Name", text: $draft.model)
+                            .font(.system(size: 13, design: .monospaced))
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            #endif
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(draft.provider.suggestedModels, id: \.self) { m in
+                                    Button(m) { draft.model = m }
+                                        .font(.caption2.monospaced())
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.mini)
+                                }
+                            }
+                        }
+
+                        SecureField(
+                            draft.provider.requiresAPIKey ? "API Key (Required)" : "API Key (Optional for Local)",
+                            text: $draft.apiKey
+                        )
+                        .font(.system(size: 13, design: .monospaced))
+                    }
                 }
 
                 Section("Diagnostics") {
@@ -83,17 +109,19 @@ public struct AIProviderSheetView: View {
                             if isTesting {
                                 ProgressView().controlSize(.small)
                             } else {
-                                Image(systemName: "bolt.horizontal.circle")
+                                Image(systemName: draft.provider == .appleFoundation ? "sparkles" : "bolt.horizontal.circle")
                             }
-                            Text(isTesting ? "Testing Connection..." : "Test Connection Now")
+                            Text(isTesting
+                                 ? "Testing Model..."
+                                 : (draft.provider == .appleFoundation ? "Test On-Device Apple Model" : "Test Connection Now"))
                         }
                     }
-                    .disabled(isTesting)
+                    .disabled(isTesting || (draft.provider == .appleFoundation && !appleStatus.isAvailable))
 
                     if let status = testStatus {
                         Label(
                             status.ok
-                                ? "Connected (\(status.latencyMs)ms): \(status.message)"
+                                ? "Ready (\(status.latencyMs)ms): \(status.message)"
                                 : "Failed (\(status.latencyMs)ms): \(status.message)",
                             systemImage: status.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                         )
@@ -104,7 +132,7 @@ public struct AIProviderSheetView: View {
 
                 if store.aiConfig.enabled {
                     Section {
-                        Button("Disconnect & Clear API Key", role: .destructive) {
+                        Button("Disconnect AI Provider", role: .destructive) {
                             var cleared = draft
                             cleared.enabled = false
                             cleared.apiKey = ""
@@ -128,11 +156,12 @@ public struct AIProviderSheetView: View {
                         NativeAudioEngine.shared.playSuccessChime()
                         dismiss()
                     }
+                    .disabled(draft.provider == .appleFoundation && !appleStatus.isAvailable)
                 }
             }
         }
         #if os(macOS)
-        .frame(minWidth: 480, idealWidth: 560, minHeight: 460, idealHeight: 540)
+        .frame(minWidth: 480, idealWidth: 580, minHeight: 460, idealHeight: 560)
         #endif
     }
 }

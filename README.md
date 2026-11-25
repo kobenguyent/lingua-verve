@@ -53,7 +53,7 @@ npm run build    # Type-check & build static GitHub Pages bundle -> ./dist
 ### 📱 Native Apple Universal App (MacBook · iPad · iPhone)
 LinguaVerve shares one single source of truth (`src/data/` → `curriculum.json`) with a 100% native **SwiftUI Multiplatform App** (`LinguaVerveCore` + `LinguaVerveUI`) supporting **macOS 14+**, **iPadOS 17+**, and **iOS 17+**:
 - **Adaptive Layout:** Native `NavigationSplitView` sidebar on **MacBook** & **iPad**, and native bottom `TabView` on **iPhone**.
-- **Native Hardware Integration:** `AVSpeechSynthesizer` native voices (`0.75x` slow & `1.0x`), Apple `Speech` (`SFSpeechRecognizer`) live voice dictation for Speaking Exams & AI Roleplays, iOS haptics, and `NSAllowsLocalNetworking` so your **iPhone/iPad** can connect to **Local Ollama / LM Studio** running on your MacBook over Wi-Fi!
+- **Native Hardware & On-Device AI:** Built-in **Apple Intelligence On-Device Foundation Model** (`FoundationModels.framework` on macOS 26 / iPadOS 26 / iOS 26 — zero API key, 100% private & offline), `AVSpeechSynthesizer` native voices (`0.75x` slow & `1.0x`), Apple `Speech` (`SFSpeechRecognizer`) live voice dictation for Speaking Exams & AI Roleplays, iOS haptics, and `NSAllowsLocalNetworking` so your **iPhone/iPad** can also connect to **Local Ollama / LM Studio** on your MacBook over Wi-Fi!
 - **MacBook Extras:** Standalone signed `.app` bundle (`dist-macos/LinguaVerve.app`), macOS Menu Bar quick-drill popover, keyboard shortcuts (`⌘1`–`⌘6`), and GitHub Releases auto-updater.
 
 ```bash

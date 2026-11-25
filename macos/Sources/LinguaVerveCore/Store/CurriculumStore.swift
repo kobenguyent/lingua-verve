@@ -93,8 +93,10 @@ public final class CurriculumStore {
         if let aiData = defaults.data(forKey: aiConfigKey),
            let decodedAI = try? JSONDecoder().decode(AIProviderConfig.self, from: aiData) {
             self.aiConfig = decodedAI
+        } else if LiveAppleFoundationModelBackend().availability().isAvailable {
+            self.aiConfig = AIProviderConfig(provider: .appleFoundation, enabled: true)
         } else {
-            self.aiConfig = AIProviderConfig()
+            self.aiConfig = AIProviderConfig(provider: .appleFoundation, enabled: false)
         }
     }
 

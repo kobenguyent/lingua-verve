@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import LinguaVerveCore
 import LinguaVerveUI
