@@ -1,6 +1,7 @@
 import {
   AIChatMessage,
   AIEvaluationResult,
+  AIModelInfo,
   AIProviderConfig,
   AIProviderType,
   CEFRLevel,
@@ -129,6 +130,250 @@ export function isAIConfigReady(config: AIProviderConfig): boolean {
   const preset = AI_PROVIDER_PRESETS[config.provider];
   if (preset.requiresKey && !config.apiKey.trim()) return false;
   return true;
+}
+
+/**
+ * Derives candidate model-listing endpoint URL(s) for a configured provider & chat endpoint.
+ * For Ollama, returns both the OpenAI-compatible `/v1/models` and native `/api/tags` endpoints
+ * so model discovery works regardless of proxy or Ollama version.
+ */
+export function resolveModelsEndpoints(
+  provider: AIProviderType,
+  endpoint: string,
+  apiKey = ''
+): string[] {
+  const trimmed = endpoint.trim().replace(/\/+$/, '');
+  if (!trimmed) return [];
+
+  if (provider === 'gemini') {
+    const base = trimmed.replace(/:generateContent.*$/i, '').replace(/\/models\/[^/]+$/i, '/models');
+    const modelsBase = /\/models$/i.test(base) ? base : `${base}/models`;
+    const sep = modelsBase.includes('?') ? '&' : '?';
+    const keyParam = apiKey.trim() ? `key=${encodeURIComponent(apiKey.trim())}&` : '';
+    return [`${modelsBase}${sep}${keyParam}pageSize=100`];
+  }
+
+  const deriveOpenAIModelsUrl = (raw: string): string => {
+    if (/\/chat\/completions$/i.test(raw)) return raw.replace(/\/chat\/completions$/i, '/models');
+    if (/\/completions$/i.test(raw)) return raw.replace(/\/completions$/i, '/models');
+    if (/\/api\/chat$/i.test(raw)) return raw.replace(/\/api\/chat$/i, '/api/tags');
+    if (/\/models$/i.test(raw) || /\/api\/tags$/i.test(raw)) return raw;
+    return `${raw}/models`;
+  };
+
+  const primary = deriveOpenAIModelsUrl(trimmed);
+
+  if (provider === 'ollama') {
+    let originTags = '';
+    try {
+      const parsed = new URL(trimmed);
+      originTags = `${parsed.origin}/api/tags`;
+    } catch {
+      originTags = '';
+    }
+    const urls = [primary];
+    if (originTags && !urls.includes(originTags)) {
+      urls.push(originTags);
+    }
+    return urls;
+  }
+
+  return [primary];
+}
+
+function isLikelyOpenAINonChatModel(id: string): boolean {
+  const lower = id.toLowerCase();
+  return (
+    lower.includes('embedding') ||
+    lower.startsWith('whisper') ||
+    lower.startsWith('tts-') ||
+    lower.startsWith('dall-e') ||
+    lower.startsWith('gpt-image') ||
+    lower.startsWith('babbage') ||
+    lower.startsWith('davinci') ||
+    lower.startsWith('text-') ||
+    lower.includes('moderation') ||
+    lower.includes('transcribe') ||
+    lower.includes('realtime') ||
+    lower.includes('audio-preview')
+  );
+}
+
+function parseModelsPayload(provider: AIProviderType, payload: unknown): AIModelInfo[] {
+  const rawModels: AIModelInfo[] = [];
+
+  if (provider === 'gemini' && payload && typeof payload === 'object') {
+    const models = (payload as { models?: Array<Record<string, unknown>> }).models;
+    if (Array.isArray(models)) {
+      for (const item of models) {
+        const rawName = typeof item.name === 'string' ? item.name.trim() : '';
+        if (!rawName) continue;
+        const methods = Array.isArray(item.supportedGenerationMethods)
+          ? (item.supportedGenerationMethods as unknown[]).filter((m): m is string => typeof m === 'string')
+          : [];
+        if (methods.length > 0 && !methods.includes('generateContent')) continue;
+        const id = rawName.replace(/^models\//i, '');
+        if (id.toLowerCase().includes('embedding')) continue;
+        const displayName = typeof item.displayName === 'string' ? item.displayName.trim() : undefined;
+        const inputTokenLimit = typeof item.inputTokenLimit === 'number' ? item.inputTokenLimit : undefined;
+        rawModels.push({
+          id,
+          displayName: displayName && displayName !== id ? displayName : undefined,
+          ownedBy: 'google',
+          contextLength: inputTokenLimit,
+        });
+      }
+    }
+  } else if (payload && typeof payload === 'object') {
+    const obj = payload as {
+      data?: Array<Record<string, unknown>>;
+      models?: Array<Record<string, unknown>>;
+    };
+
+    if (Array.isArray(obj.data)) {
+      for (const item of obj.data) {
+        const id =
+          typeof item.id === 'string'
+            ? item.id.trim()
+            : typeof item.name === 'string'
+            ? item.name.trim()
+            : '';
+        if (!id) continue;
+        const displayName = typeof item.name === 'string' && item.name.trim() !== id ? item.name.trim() : undefined;
+        const ownedBy = typeof item.owned_by === 'string' ? item.owned_by : undefined;
+        const contextLength = typeof item.context_length === 'number' ? item.context_length : undefined;
+        rawModels.push({ id, displayName, ownedBy, contextLength });
+      }
+    } else if (Array.isArray(obj.models)) {
+      // Ollama `/api/tags` format
+      for (const item of obj.models) {
+        const id =
+          typeof item.name === 'string'
+            ? item.name.trim()
+            : typeof item.model === 'string'
+            ? item.model.trim()
+            : typeof item.id === 'string'
+            ? item.id.trim()
+            : '';
+        if (!id) continue;
+        const details = item.details as { parameter_size?: string; family?: string } | undefined;
+        const paramSize = typeof details?.parameter_size === 'string' ? details.parameter_size.trim() : '';
+        rawModels.push({
+          id,
+          displayName: paramSize ? `${id} (${paramSize})` : undefined,
+          ownedBy: typeof details?.family === 'string' ? details.family : 'ollama',
+        });
+      }
+    }
+  } else if (Array.isArray(payload)) {
+    for (const item of payload) {
+      if (typeof item === 'string' && item.trim()) {
+        rawModels.push({ id: item.trim() });
+      } else if (item && typeof item === 'object') {
+        const rec = item as Record<string, unknown>;
+        const id = typeof rec.id === 'string' ? rec.id.trim() : typeof rec.name === 'string' ? rec.name.trim() : '';
+        if (id) rawModels.push({ id });
+      }
+    }
+  }
+
+  // Deduplicate by id
+  const seen = new Set<string>();
+  let deduped = rawModels.filter((m) => {
+    if (seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+
+  // For OpenAI specifically, filter out non-chat models (embeddings, whisper, tts, dall-e) when chat models exist
+  if (provider === 'openai') {
+    const chatOnly = deduped.filter((m) => !isLikelyOpenAINonChatModel(m.id));
+    if (chatOnly.length > 0) {
+      deduped = chatOnly;
+    }
+    deduped.sort((a, b) => {
+      const priority = (id: string) => {
+        if (/^gpt-4\.1|^gpt-4o|^gpt-5/i.test(id)) return 0;
+        if (/^o[1-9]/i.test(id)) return 1;
+        if (/^gpt-/i.test(id)) return 2;
+        return 3;
+      };
+      const diff = priority(a.id) - priority(b.id);
+      return diff !== 0 ? diff : a.id.localeCompare(b.id);
+    });
+  } else if (provider === 'gemini') {
+    deduped.sort((a, b) => {
+      const rank = (id: string) => (/2\.5/i.test(id) ? 0 : /2\.0/i.test(id) ? 1 : /1\.5/i.test(id) ? 2 : 3);
+      const diff = rank(a.id) - rank(b.id);
+      return diff !== 0 ? diff : a.id.localeCompare(b.id);
+    });
+  }
+
+  return deduped;
+}
+
+/**
+ * Fetches live available models directly from the configured Local or Cloud AI provider.
+ */
+export async function fetchAvailableModels(
+  config: Pick<AIProviderConfig, 'provider' | 'endpoint' | 'apiKey'>,
+  fetchImpl: typeof fetch = fetch
+): Promise<AIModelInfo[]> {
+  const preset = AI_PROVIDER_PRESETS[config.provider];
+  const trimmedEndpoint = config.endpoint.trim();
+  if (!trimmedEndpoint) {
+    throw new Error('AI endpoint URL is required to fetch available models.');
+  }
+
+  const trimmedKey = config.apiKey.trim();
+  const requiresKeyForListing = config.provider === 'openai' || config.provider === 'gemini';
+  if (requiresKeyForListing && !trimmedKey) {
+    throw new Error(`Enter your ${preset.label} API key first to fetch available models.`);
+  }
+
+  const candidateUrls = resolveModelsEndpoints(config.provider, trimmedEndpoint, trimmedKey);
+  if (candidateUrls.length === 0) {
+    throw new Error('Could not resolve a models endpoint URL for this provider.');
+  }
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  if (config.provider !== 'gemini' && trimmedKey) {
+    headers.Authorization = `Bearer ${trimmedKey}`;
+  }
+  if (config.provider === 'openrouter') {
+    headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://linguaverve.local';
+    headers['X-Title'] = 'LinguaVerve Polyglot Studio';
+  }
+
+  let lastError: Error | null = null;
+
+  for (const url of candidateUrls) {
+    try {
+      const res = await fetchImpl(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        lastError = new Error(`${preset.label} HTTP ${res.status}: ${errText.slice(0, 160) || res.statusText}`);
+        continue;
+      }
+
+      const data = (await res.json()) as unknown;
+      const models = parseModelsPayload(config.provider, data);
+      if (models.length > 0) {
+        return models;
+      }
+      lastError = new Error(`No models were returned by ${preset.label}.`);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error('Failed to fetch models.');
+    }
+  }
+
+  throw lastError ?? new Error(`Unable to fetch models from ${preset.label}.`);
 }
 
 /**

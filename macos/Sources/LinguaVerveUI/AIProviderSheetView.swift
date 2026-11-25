@@ -9,9 +9,23 @@ public struct AIProviderSheetView: View {
     @State private var isTesting = false
     @State private var testStatus: (ok: Bool, latencyMs: Int, message: String)?
 
+    @State private var isFetchingModels = false
+    @State private var fetchedModels: [AIModelInfo] = []
+    @State private var fetchModelsError: String?
+    @State private var modelFilterText = ""
+
     public init(store: CurriculumStore) {
         self.store = store
         self._draft = State(initialValue: store.aiConfig)
+    }
+
+    private var filteredFetchedModels: [AIModelInfo] {
+        let q = modelFilterText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return fetchedModels }
+        return fetchedModels.filter {
+            $0.id.lowercased().contains(q)
+                || ($0.displayName?.lowercased().contains(q) ?? false)
+        }
     }
 
     public var body: some View {
@@ -29,6 +43,9 @@ public struct AIProviderSheetView: View {
                         draft.endpoint = newProvider.defaultEndpoint
                         draft.model = newProvider.defaultModel
                         testStatus = nil
+                        fetchedModels = []
+                        fetchModelsError = nil
+                        modelFilterText = ""
                     }
 
                     Text(draft.provider.setupHint)
@@ -67,6 +84,16 @@ public struct AIProviderSheetView: View {
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                             #endif
+                            .onChange(of: draft.endpoint) { _, _ in
+                                fetchedModels = []
+                                fetchModelsError = nil
+                            }
+
+                        SecureField(
+                            draft.provider.requiresAPIKey ? "API Key (Required)" : "API Key (Optional for Local)",
+                            text: $draft.apiKey
+                        )
+                        .font(.system(size: 13, design: .monospaced))
 
                         TextField("Model Name", text: $draft.model)
                             .font(.system(size: 13, design: .monospaced))
@@ -74,6 +101,72 @@ public struct AIProviderSheetView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             #endif
+
+                        HStack(spacing: 10) {
+                            Button {
+                                Task { await fetchModels() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if isFetchingModels {
+                                        ProgressView().controlSize(.small)
+                                    } else {
+                                        Image(systemName: "arrow.down.circle")
+                                    }
+                                    Text(isFetchingModels ? "Fetching Models…" : "Fetch Available Models")
+                                }
+                            }
+                            .disabled(isFetchingModels)
+
+                            Spacer()
+
+                            if !fetchedModels.isEmpty {
+                                Text("\(fetchedModels.count) loaded")
+                                    .font(.caption2.monospaced().bold())
+                                    .foregroundStyle(BrandTheme.emeraldMint)
+                            }
+                        }
+
+                        if let fetchModelsError {
+                            Label(fetchModelsError, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+
+                        if !fetchedModels.isEmpty {
+                            if fetchedModels.count > 8 {
+                                TextField("Filter fetched models…", text: $modelFilterText)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    #if os(iOS)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    #endif
+                            }
+
+                            let visibleModels = filteredFetchedModels
+                            if visibleModels.isEmpty {
+                                Text("No models match \"\(modelFilterText)\".")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Picker(
+                                    "Select Model",
+                                    selection: Binding(
+                                        get: {
+                                            visibleModels.contains(where: { $0.id == draft.model })
+                                                ? draft.model
+                                                : visibleModels[0].id
+                                        },
+                                        set: { draft.model = $0 }
+                                    )
+                                ) {
+                                    ForEach(visibleModels) { item in
+                                        Text(item.pickerLabel)
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .tag(item.id)
+                                    }
+                                }
+                            }
+                        }
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -85,12 +178,6 @@ public struct AIProviderSheetView: View {
                                 }
                             }
                         }
-
-                        SecureField(
-                            draft.provider.requiresAPIKey ? "API Key (Required)" : "API Key (Optional for Local)",
-                            text: $draft.apiKey
-                        )
-                        .font(.system(size: 13, design: .monospaced))
                     }
                 }
 
@@ -161,7 +248,30 @@ public struct AIProviderSheetView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 480, idealWidth: 580, minHeight: 460, idealHeight: 560)
+        .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 620)
         #endif
+    }
+
+    @MainActor
+    private func fetchModels() async {
+        isFetchingModels = true
+        fetchModelsError = nil
+        defer { isFetchingModels = false }
+
+        do {
+            let models = try await AIClientService().fetchAvailableModels(config: draft)
+            fetchedModels = models
+            modelFilterText = ""
+            if let first = models.first,
+               draft.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || draft.model == "local-model"
+                || !models.contains(where: { $0.id == draft.model }) {
+                draft.model = first.id
+            }
+            NativeAudioEngine.shared.playSuccessChime()
+        } catch {
+            fetchedModels = []
+            fetchModelsError = error.localizedDescription
+        }
     }
 }

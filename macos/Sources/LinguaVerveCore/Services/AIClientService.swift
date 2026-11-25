@@ -45,6 +45,282 @@ public struct AIClientService: Sendable {
         appleBackend.availability()
     }
 
+    /// Derives candidate model-listing URLs for any supported AI provider.
+    public static func resolveModelsEndpoints(
+        provider: AIProviderType,
+        endpoint: String,
+        apiKey: String = ""
+    ) -> [URL] {
+        var trimmed = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasSuffix("/") {
+            trimmed.removeLast()
+        }
+        guard !trimmed.isEmpty else { return [] }
+
+        if provider == .gemini {
+            var base = trimmed
+            if let range = base.range(of: ":generateContent", options: .caseInsensitive) {
+                base = String(base[..<range.lowerBound])
+            }
+            if !base.lowercased().hasSuffix("/models") {
+                if let modelsIdx = base.range(of: "/models/", options: .caseInsensitive) {
+                    base = String(base[..<modelsIdx.lowerBound]) + "/models"
+                } else {
+                    base += "/models"
+                }
+            }
+            let sep = base.contains("?") ? "&" : "?"
+            let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            let encodedKey = trimmedKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmedKey
+            let keySegment = trimmedKey.isEmpty ? "" : "key=\(encodedKey)&"
+            if let url = URL(string: "\(base)\(sep)\(keySegment)pageSize=100") {
+                return [url]
+            }
+            return []
+        }
+
+        let primaryString: String
+        if trimmed.lowercased().hasSuffix("/chat/completions") {
+            primaryString = String(trimmed.dropLast("/chat/completions".count)) + "/models"
+        } else if trimmed.lowercased().hasSuffix("/completions") {
+            primaryString = String(trimmed.dropLast("/completions".count)) + "/models"
+        } else if trimmed.lowercased().hasSuffix("/api/chat") {
+            primaryString = String(trimmed.dropLast("/api/chat".count)) + "/api/tags"
+        } else if trimmed.lowercased().hasSuffix("/models") || trimmed.lowercased().hasSuffix("/api/tags") {
+            primaryString = trimmed
+        } else {
+            primaryString = "\(trimmed)/models"
+        }
+
+        var urls: [URL] = []
+        if let primaryURL = URL(string: primaryString) {
+            urls.append(primaryURL)
+        }
+
+        if provider == .ollama,
+           let parsed = URL(string: trimmed),
+           let scheme = parsed.scheme,
+           let host = parsed.host {
+            let portPart = parsed.port.map { ":\($0)" } ?? ""
+            if let tagsURL = URL(string: "\(scheme)://\(host)\(portPart)/api/tags"),
+               !urls.contains(tagsURL) {
+                urls.append(tagsURL)
+            }
+        }
+
+        return urls
+    }
+
+    private static func isLikelyOpenAINonChatModel(_ id: String) -> Bool {
+        let lower = id.lowercased()
+        let excludedPrefixes = ["whisper", "tts-", "dall-e", "gpt-image", "babbage", "davinci", "text-"]
+        if excludedPrefixes.contains(where: { lower.hasPrefix($0) }) { return true }
+        let excludedContains = ["embedding", "moderation", "transcribe", "realtime", "audio-preview"]
+        return excludedContains.contains(where: { lower.contains($0) })
+    }
+
+    private static func parseModelsPayload(provider: AIProviderType, data: Data) -> [AIModelInfo] {
+        var rawModels: [AIModelInfo] = []
+
+        if provider == .gemini {
+            struct GeminiModelsList: Decodable {
+                struct Item: Decodable {
+                    let name: String?
+                    let displayName: String?
+                    let supportedGenerationMethods: [String]?
+                    let inputTokenLimit: Int?
+                }
+                let models: [Item]?
+            }
+            if let decoded = try? JSONDecoder().decode(GeminiModelsList.self, from: data),
+               let items = decoded.models {
+                for item in items {
+                    guard let rawName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !rawName.isEmpty else { continue }
+                    if let methods = item.supportedGenerationMethods,
+                       !methods.isEmpty,
+                       !methods.contains("generateContent") {
+                        continue
+                    }
+                    let id = rawName.hasPrefix("models/") ? String(rawName.dropFirst("models/".count)) : rawName
+                    if id.lowercased().contains("embedding") { continue }
+                    let display = item.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    rawModels.append(
+                        AIModelInfo(
+                            id: id,
+                            displayName: (display != nil && display != id) ? display : nil,
+                            ownedBy: "google",
+                            contextLength: item.inputTokenLimit
+                        )
+                    )
+                }
+            }
+        } else {
+            struct OpenAIModelsList: Decodable {
+                struct Item: Decodable {
+                    let id: String?
+                    let name: String?
+                    let owned_by: String?
+                    let context_length: Int?
+                }
+                let data: [Item]?
+            }
+
+            struct OllamaTagsList: Decodable {
+                struct Details: Decodable {
+                    let parameter_size: String?
+                    let family: String?
+                }
+                struct Item: Decodable {
+                    let name: String?
+                    let model: String?
+                    let details: Details?
+                }
+                let models: [Item]?
+            }
+
+            if let openAI = try? JSONDecoder().decode(OpenAIModelsList.self, from: data),
+               let items = openAI.data, !items.isEmpty {
+                for item in items {
+                    let id = (item.id ?? item.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !id.isEmpty else { continue }
+                    let display = item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    rawModels.append(
+                        AIModelInfo(
+                            id: id,
+                            displayName: (display != nil && display != id) ? display : nil,
+                            ownedBy: item.owned_by,
+                            contextLength: item.context_length
+                        )
+                    )
+                }
+            } else if let ollama = try? JSONDecoder().decode(OllamaTagsList.self, from: data),
+                      let items = ollama.models, !items.isEmpty {
+                for item in items {
+                    let id = (item.name ?? item.model ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !id.isEmpty else { continue }
+                    let param = item.details?.parameter_size?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    rawModels.append(
+                        AIModelInfo(
+                            id: id,
+                            displayName: param.isEmpty ? nil : "\(id) (\(param))",
+                            ownedBy: item.details?.family ?? "ollama"
+                        )
+                    )
+                }
+            }
+        }
+
+        // Deduplicate while preserving order
+        var seen = Set<String>()
+        var deduped = rawModels.filter { seen.insert($0.id).inserted }
+
+        if provider == .openai {
+            let chatOnly = deduped.filter { !isLikelyOpenAINonChatModel($0.id) }
+            if !chatOnly.isEmpty {
+                deduped = chatOnly
+            }
+            deduped.sort { a, b in
+                func rank(_ id: String) -> Int {
+                    let l = id.lowercased()
+                    if l.hasPrefix("gpt-5") || l.hasPrefix("gpt-4.1") || l.hasPrefix("gpt-4o") { return 0 }
+                    if l.hasPrefix("o1") || l.hasPrefix("o3") || l.hasPrefix("o4") { return 1 }
+                    if l.hasPrefix("gpt-") { return 2 }
+                    return 3
+                }
+                let ra = rank(a.id), rb = rank(b.id)
+                return ra != rb ? ra < rb : a.id < b.id
+            }
+        } else if provider == .gemini {
+            deduped.sort { a, b in
+                func rank(_ id: String) -> Int {
+                    if id.contains("2.5") { return 0 }
+                    if id.contains("2.0") { return 1 }
+                    if id.contains("1.5") { return 2 }
+                    return 3
+                }
+                let ra = rank(a.id), rb = rank(b.id)
+                return ra != rb ? ra < rb : a.id < b.id
+            }
+        }
+
+        return deduped
+    }
+
+    /// Fetches live available models from On-Device Apple Intelligence, Local (Ollama/LM Studio),
+    /// or Cloud (OpenAI, Google Gemini, OpenRouter, Custom OpenAI-compatible) providers.
+    public func fetchAvailableModels(config: AIProviderConfig) async throws -> [AIModelInfo] {
+        if config.provider == .appleFoundation {
+            let status = appleBackend.availability()
+            guard status.isAvailable else {
+                throw AppleFoundationError.unavailable(status.detail)
+            }
+            return [
+                AIModelInfo(
+                    id: AIProviderType.appleFoundation.defaultModel,
+                    displayName: "SystemLanguageModel.default (On-Device)",
+                    ownedBy: "Apple Intelligence"
+                )
+            ]
+        }
+
+        let trimmedEndpoint = config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEndpoint.isEmpty else {
+            throw AIClientError.invalidURL(trimmedEndpoint)
+        }
+        let trimmedKey = config.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if config.provider.requiresAPIKeyForModelList && trimmedKey.isEmpty {
+            throw AIClientError.missingAPIKey(config.provider.label)
+        }
+
+        let candidateURLs = Self.resolveModelsEndpoints(
+            provider: config.provider,
+            endpoint: trimmedEndpoint,
+            apiKey: trimmedKey
+        )
+        guard !candidateURLs.isEmpty else {
+            throw AIClientError.invalidURL(trimmedEndpoint)
+        }
+
+        var lastError: Error?
+
+        for url in candidateURLs {
+            do {
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.timeoutInterval = 20
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                if config.provider != .gemini && !trimmedKey.isEmpty {
+                    request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
+                }
+                if config.provider == .openrouter {
+                    request.setValue("LinguaVerve Native", forHTTPHeaderField: "X-Title")
+                }
+
+                let (data, response) = try await transport.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    lastError = AIClientError.emptyResponse
+                    continue
+                }
+                guard (200..<300).contains(http.statusCode) else {
+                    let preview = String(data: data, encoding: .utf8)?.prefix(160) ?? ""
+                    lastError = AIClientError.httpStatus(http.statusCode, String(preview))
+                    continue
+                }
+
+                let models = Self.parseModelsPayload(provider: config.provider, data: data)
+                if !models.isEmpty {
+                    return models
+                }
+                lastError = AIClientError.emptyResponse
+            } catch {
+                lastError = error
+            }
+        }
+
+        throw lastError ?? AIClientError.emptyResponse
+    }
+
     public func chat(config: AIProviderConfig, messages: [AIChatMessage]) async throws -> String {
         if config.provider == .appleFoundation {
             return try await appleBackend.respond(messages: messages, temperature: config.temperature)

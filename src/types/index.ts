@@ -337,6 +337,13 @@ export interface AIProviderConfig {
   enabled: boolean;
 }
 
+export interface AIModelInfo {
+  id: string;
+  displayName?: string;
+  ownedBy?: string;
+  contextLength?: number;
+}
+
 export interface AIChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;

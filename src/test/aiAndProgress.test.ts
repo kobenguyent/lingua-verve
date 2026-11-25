@@ -5,8 +5,10 @@ import {
   callAIProvider,
   evaluateSubmissionOffline,
   evaluateWithAIOrFallback,
+  fetchAvailableModels,
   getDefaultAIConfig,
   isAIConfigReady,
+  resolveModelsEndpoints,
   testAIProviderConnection,
 } from '../utils/aiClient';
 import {
@@ -144,6 +146,111 @@ describe('Local & Cloud AI Provider Client', () => {
     expect(result.source).toBe('ai');
     expect(result.score).toBe(88);
     expect(result.cefrEstimate).toBe('B2');
+  });
+
+  it('fetches available models across Ollama (/v1/models & /api/tags fallback), OpenAI, Gemini, and OpenRouter', async () => {
+    // 1. Ollama fallback from /v1/models failure to native /api/tags
+    expect(resolveModelsEndpoints('ollama', 'http://localhost:11434/v1/chat/completions')).toEqual([
+      'http://localhost:11434/v1/models',
+      'http://localhost:11434/api/tags',
+    ]);
+
+    const ollamaFallbackFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found', text: async () => 'not found' })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'qwen2.5:7b', details: { parameter_size: '7.6B', family: 'qwen2' } },
+            { name: 'llama3.2:latest', details: { parameter_size: '3.2B', family: 'llama' } },
+          ],
+        }),
+      });
+    const ollamaModels = await fetchAvailableModels(
+      getDefaultAIConfig('ollama'),
+      ollamaFallbackFetch as unknown as typeof fetch
+    );
+    expect(ollamaModels.map((m) => m.id)).toEqual(['qwen2.5:7b', 'llama3.2:latest']);
+    expect(ollamaModels[0].displayName).toContain('7.6B');
+
+    // 2. OpenAI filters out embeddings/whisper/tts and prioritizes chat models
+    const openaiFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'text-embedding-3-small', owned_by: 'openai' },
+          { id: 'whisper-1', owned_by: 'openai' },
+          { id: 'gpt-4o-mini', owned_by: 'openai' },
+          { id: 'o3-mini', owned_by: 'openai' },
+        ],
+      }),
+    });
+    const openaiModels = await fetchAvailableModels(
+      { ...getDefaultAIConfig('openai'), apiKey: 'sk-test' },
+      openaiFetch as unknown as typeof fetch
+    );
+    expect(openaiModels.map((m) => m.id)).toEqual(['gpt-4o-mini', 'o3-mini']);
+    expect(openaiFetch).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer sk-test' }),
+      })
+    );
+
+    // Missing OpenAI API key rejects clearly
+    await expect(
+      fetchAvailableModels({ ...getDefaultAIConfig('openai'), apiKey: '' }, openaiFetch as unknown as typeof fetch)
+    ).rejects.toThrow(/API key/i);
+
+    // 3. Google Gemini strips `models/` prefix and filters to generateContent-capable models
+    const geminiFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [
+          {
+            name: 'models/gemini-2.5-flash',
+            displayName: 'Gemini 2.5 Flash',
+            supportedGenerationMethods: ['generateContent'],
+            inputTokenLimit: 1048576,
+          },
+          {
+            name: 'models/text-embedding-004',
+            displayName: 'Text Embedding',
+            supportedGenerationMethods: ['embedContent'],
+          },
+        ],
+      }),
+    });
+    const geminiModels = await fetchAvailableModels(
+      { ...getDefaultAIConfig('gemini'), apiKey: 'AIza-test' },
+      geminiFetch as unknown as typeof fetch
+    );
+    expect(geminiModels).toEqual([
+      {
+        id: 'gemini-2.5-flash',
+        displayName: 'Gemini 2.5 Flash',
+        ownedBy: 'google',
+        contextLength: 1048576,
+      },
+    ]);
+
+    // 4. OpenRouter lists models even without API key
+    const openRouterFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', context_length: 200000 },
+          { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', context_length: 1000000 },
+        ],
+      }),
+    });
+    const orModels = await fetchAvailableModels(
+      getDefaultAIConfig('openrouter'),
+      openRouterFetch as unknown as typeof fetch
+    );
+    expect(orModels.map((m) => m.id)).toEqual(['anthropic/claude-3.5-sonnet', 'google/gemini-2.5-flash']);
   });
 });
 

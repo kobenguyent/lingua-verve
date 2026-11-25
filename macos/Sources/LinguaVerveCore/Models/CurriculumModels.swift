@@ -594,6 +594,13 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
+    public var requiresAPIKeyForModelList: Bool {
+        switch self {
+        case .openai, .gemini: return true
+        case .appleFoundation, .ollama, .lmstudio, .openrouter, .custom: return false
+        }
+    }
+
     public var setupHint: String {
         switch self {
         case .appleFoundation:
@@ -611,6 +618,32 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .custom:
             return "Works with any OpenAI-compatible local gateway (vLLM, LocalAI) or cloud host (Groq, Mistral)."
         }
+    }
+}
+
+public struct AIModelInfo: Codable, Identifiable, Equatable, Hashable, Sendable {
+    public let id: String
+    public let displayName: String?
+    public let ownedBy: String?
+    public let contextLength: Int?
+
+    public init(
+        id: String,
+        displayName: String? = nil,
+        ownedBy: String? = nil,
+        contextLength: Int? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.ownedBy = ownedBy
+        self.contextLength = contextLength
+    }
+
+    public var pickerLabel: String {
+        if let displayName, !displayName.isEmpty, displayName != id {
+            return "\(id) — \(displayName)"
+        }
+        return id
     }
 }
 

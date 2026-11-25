@@ -216,4 +216,71 @@ final class AcademyAndAITests: XCTestCase {
         )
         XCTAssertEqual(fallbackEval.source, "offline-rubric")
     }
+
+    func testFetchAvailableModelsAcrossAllProviders() async throws {
+        // 1. Ollama falls back from /v1/models 404 to native /api/tags
+        let ollamaEndpoints = AIClientService.resolveModelsEndpoints(
+            provider: .ollama,
+            endpoint: "http://localhost:11434/v1/chat/completions"
+        )
+        XCTAssertEqual(
+            ollamaEndpoints.map(\.absoluteString),
+            ["http://localhost:11434/v1/models", "http://localhost:11434/api/tags"]
+        )
+
+        let ollamaTransport = MockAITransport { request in
+            if request.url?.path == "/v1/models" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!
+                return (Data("not found".utf8), resp)
+            }
+            let body = #"{"models":[{"name":"qwen2.5:7b","details":{"parameter_size":"7.6B","family":"qwen2"}},{"name":"llama3.2:latest","details":{"parameter_size":"3.2B","family":"llama"}}]}"#
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (Data(body.utf8), resp)
+        }
+        let ollamaModels = try await AIClientService(transport: ollamaTransport)
+            .fetchAvailableModels(config: AIProviderConfig(provider: .ollama))
+        XCTAssertEqual(ollamaModels.map(\.id), ["qwen2.5:7b", "llama3.2:latest"])
+        XCTAssertEqual(ollamaModels.first?.displayName, "qwen2.5:7b (7.6B)")
+
+        // 2. OpenAI filters out embeddings/whisper/tts and checks Bearer header
+        let openaiTransport = MockAITransport { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/models")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sk-unit")
+            let body = #"{"data":[{"id":"text-embedding-3-small","owned_by":"openai"},{"id":"whisper-1","owned_by":"openai"},{"id":"gpt-4o-mini","owned_by":"openai"},{"id":"o3-mini","owned_by":"openai"}]}"#
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (Data(body.utf8), resp)
+        }
+        let openaiModels = try await AIClientService(transport: openaiTransport)
+            .fetchAvailableModels(config: AIProviderConfig(provider: .openai, apiKey: "sk-unit"))
+        XCTAssertEqual(openaiModels.map(\.id), ["gpt-4o-mini", "o3-mini"])
+
+        // 3. Google Gemini strips `models/` prefix and keeps generateContent models only
+        let geminiTransport = MockAITransport { request in
+            XCTAssertTrue(request.url?.absoluteString.contains("generativelanguage.googleapis.com/v1beta/models?key=AIza-unit") == true)
+            let body = #"{"models":[{"name":"models/gemini-2.5-flash","displayName":"Gemini 2.5 Flash","supportedGenerationMethods":["generateContent"],"inputTokenLimit":1048576},{"name":"models/text-embedding-004","displayName":"Embedding","supportedGenerationMethods":["embedContent"]}]}"#
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (Data(body.utf8), resp)
+        }
+        let geminiModels = try await AIClientService(transport: geminiTransport)
+            .fetchAvailableModels(config: AIProviderConfig(provider: .gemini, apiKey: "AIza-unit"))
+        XCTAssertEqual(geminiModels.map(\.id), ["gemini-2.5-flash"])
+        XCTAssertEqual(geminiModels.first?.displayName, "Gemini 2.5 Flash")
+
+        // 4. OpenRouter lists models even without an API key
+        let openRouterTransport = MockAITransport { request in
+            XCTAssertEqual(request.url?.absoluteString, "https://openrouter.ai/api/v1/models")
+            let body = #"{"data":[{"id":"anthropic/claude-3.5-sonnet","name":"Claude 3.5 Sonnet","context_length":200000},{"id":"google/gemini-2.5-flash","name":"Gemini 2.5 Flash","context_length":1000000}]}"#
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (Data(body.utf8), resp)
+        }
+        let openRouterModels = try await AIClientService(transport: openRouterTransport)
+            .fetchAvailableModels(config: AIProviderConfig(provider: .openrouter))
+        XCTAssertEqual(openRouterModels.map(\.id), ["anthropic/claude-3.5-sonnet", "google/gemini-2.5-flash"])
+
+        // 5. Apple On-Device Foundation Model returns SystemLanguageModel when available
+        let appleReadyClient = AIClientService(appleBackend: MockAppleFoundationBackend(available: true, reply: "ok"))
+        let appleModels = try await appleReadyClient.fetchAvailableModels(config: AIProviderConfig(provider: .appleFoundation))
+        XCTAssertEqual(appleModels.count, 1)
+        XCTAssertEqual(appleModels.first?.ownedBy, "Apple Intelligence")
+    }
 }

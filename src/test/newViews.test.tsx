@@ -130,6 +130,45 @@ describe('AICoachView & AIProviderModal Components', () => {
     expect(onSaveConfig).toHaveBeenCalledWith(expect.objectContaining({ provider: 'ollama', enabled: true }));
   });
 
+  it('fetches live models in AIProviderModal and lets the user select one before saving', async () => {
+    const onSaveConfig = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'qwen2.5:14b', owned_by: 'ollama' },
+          { id: 'gemma3:12b', owned_by: 'ollama' },
+        ],
+      }),
+    } as unknown as Response);
+
+    try {
+      render(
+        <AIProviderModal
+          isOpen={true}
+          onClose={vi.fn()}
+          config={getDefaultAIConfig('ollama')}
+          onSaveConfig={onSaveConfig}
+        />
+      );
+
+      fireEvent.click(screen.getByText('Fetch Models'));
+
+      const select = await screen.findByLabelText(/Select fetched AI model/i);
+      expect(screen.getByText(/Available Models \(2\)/i)).toBeInTheDocument();
+
+      fireEvent.change(select, { target: { value: 'gemma3:12b' } });
+      expect(screen.getByLabelText(/Model Name/i)).toHaveValue('gemma3:12b');
+
+      fireEvent.click(screen.getByText(/Save & Enable AI/i));
+      expect(onSaveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'ollama', model: 'gemma3:12b', enabled: true })
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('evaluates writing offline in AICoachView when AI provider is not yet connected', async () => {
     const onLog = vi.fn();
     render(

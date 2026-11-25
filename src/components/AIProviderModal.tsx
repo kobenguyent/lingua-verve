@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Cpu,
@@ -10,10 +10,13 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
+  DownloadCloud,
+  Search,
 } from 'lucide-react';
-import { AIProviderConfig, AIProviderType } from '../types';
+import { AIModelInfo, AIProviderConfig, AIProviderType } from '../types';
 import {
   AI_PROVIDER_PRESETS,
+  fetchAvailableModels,
   getDefaultAIConfig,
   testAIProviderConnection,
 } from '../utils/aiClient';
@@ -45,12 +48,30 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
     error?: string;
   } | null>(null);
 
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [availableModels, setAvailableModels] = useState<AIModelInfo[]>([]);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setDraft(config);
       setTestResult(null);
+      setAvailableModels([]);
+      setModelsError(null);
+      setModelSearch('');
     }
   }, [isOpen, config]);
+
+  const filteredFetchedModels = useMemo(() => {
+    const q = modelSearch.trim().toLowerCase();
+    if (!q) return availableModels;
+    return availableModels.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.displayName && m.displayName.toLowerCase().includes(q))
+    );
+  }, [availableModels, modelSearch]);
 
   if (!isOpen) return null;
 
@@ -65,6 +86,34 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
       apiKey: provider === config.provider ? config.apiKey : '',
     });
     setTestResult(null);
+    setAvailableModels([]);
+    setModelsError(null);
+    setModelSearch('');
+  };
+
+  const handleFetchModels = async () => {
+    soundEngine.playClickSound();
+    setFetchingModels(true);
+    setModelsError(null);
+    try {
+      const models = await fetchAvailableModels(draft);
+      setAvailableModels(models);
+      setModelSearch('');
+      if (
+        models.length > 0 &&
+        (!draft.model.trim() ||
+          draft.model === 'local-model' ||
+          !models.some((m) => m.id === draft.model))
+      ) {
+        setDraft((prev) => ({ ...prev, model: models[0].id }));
+      }
+      soundEngine.playSuccessChime();
+    } catch (err) {
+      setAvailableModels([]);
+      setModelsError(err instanceof Error ? err.message : 'Unable to fetch models.');
+    } finally {
+      setFetchingModels(false);
+    }
   };
 
   const handleTest = async () => {
@@ -203,16 +252,36 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                 id="ai-endpoint-input"
                 type="url"
                 value={draft.endpoint}
-                onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
+                onChange={(e) => {
+                  setDraft({ ...draft, endpoint: e.target.value });
+                  setAvailableModels([]);
+                  setModelsError(null);
+                }}
                 className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="ai-model-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Model Name
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label htmlFor="ai-model-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Model Name
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleFetchModels}
+                    disabled={fetchingModels}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/70 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 disabled:opacity-50 transition-colors"
+                  >
+                    {fetchingModels ? (
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="w-3 h-3" />
+                    )}
+                    <span>{fetchingModels ? 'Fetching...' : 'Fetch Models'}</span>
+                  </button>
+                </div>
+
                 <input
                   id="ai-model-input"
                   type="text"
@@ -220,6 +289,66 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                   onChange={(e) => setDraft({ ...draft, model: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
+
+                {/* Fetched Live Models Picker */}
+                {availableModels.length > 0 && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-900 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono font-bold uppercase text-emerald-700 dark:text-emerald-300">
+                        Available Models ({availableModels.length})
+                      </span>
+                      {availableModels.length > 8 && (
+                        <div className="relative flex-1 max-w-[160px]">
+                          <Search className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            aria-label="Filter fetched models"
+                            value={modelSearch}
+                            onChange={(e) => setModelSearch(e.target.value)}
+                            placeholder="Filter..."
+                            className="w-full pl-6 pr-2 py-0.5 rounded-md text-[11px] font-mono bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 text-slate-800 dark:text-slate-100"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <select
+                      aria-label="Select fetched AI model"
+                      value={
+                        filteredFetchedModels.some((m) => m.id === draft.model)
+                          ? draft.model
+                          : ''
+                      }
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setDraft({ ...draft, model: e.target.value });
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 border border-emerald-300 dark:border-emerald-800 text-slate-900 dark:text-slate-100"
+                    >
+                      {!filteredFetchedModels.some((m) => m.id === draft.model) && (
+                        <option value="">
+                          {filteredFetchedModels.length > 0
+                            ? `Choose from ${filteredFetchedModels.length} model(s)...`
+                            : 'No matching models'}
+                        </option>
+                      )}
+                      {filteredFetchedModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.displayName ? `${m.id} — ${m.displayName}` : m.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {modelsError && (
+                  <p className="mt-1.5 text-[11px] text-rose-600 dark:text-rose-400 flex items-start gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span className="break-words">{modelsError}</span>
+                  </p>
+                )}
+
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {preset.suggestedModels.map((m) => (
                     <button
