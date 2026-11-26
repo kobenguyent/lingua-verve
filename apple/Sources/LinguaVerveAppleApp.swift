@@ -13,18 +13,12 @@ struct LinguaVerveAppleApp: App {
 
     var body: some Scene {
         WindowGroup("LinguaVerve") {
-            VStack(spacing: 0) {
-                if store.shouldShowUpdateBanner, let update = store.availableUpdate {
-                    UpdateNotificationBanner(store: store, update: update)
-                    Divider()
-                }
-                RootNavigationView(
-                    store: store,
-                    showDiagnosticSheet: $showDiagnosticSheet,
-                    showFalseFriendsSheet: $showFalseFriendsSheet,
-                    showAISettingsSheet: $showAISettingsSheet
-                )
-            }
+            RootNavigationView(
+                store: store,
+                showDiagnosticSheet: $showDiagnosticSheet,
+                showFalseFriendsSheet: $showFalseFriendsSheet,
+                showAISettingsSheet: $showAISettingsSheet
+            )
             #if os(macOS)
             .frame(minWidth: 720, minHeight: 540)
             #endif
@@ -39,6 +33,7 @@ struct LinguaVerveAppleApp: App {
         }
         #if os(macOS)
         .defaultSize(width: 1260, height: 820)
+        .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {

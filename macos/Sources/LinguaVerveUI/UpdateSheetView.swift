@@ -11,25 +11,81 @@ public struct UpdateNotificationBanner: View {
     }
 
     public var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                bannerSummary
+                statusAccessory
+                Spacer(minLength: 8)
+                bannerActions
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                bannerSummary
+                if isBusy {
+                    HStack(spacing: 8) {
+                        statusAccessory
+                    }
+                }
+                FlowLayout(spacing: 8, lineSpacing: 6) {
+                    bannerActions
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(BrandTheme.celestialSky.opacity(0.08))
+                )
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(BrandTheme.celestialSky.opacity(0.24), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var bannerSummary: some View {
         HStack(spacing: 10) {
-            Image(systemName: "arrow.down.circle.fill")
-                .scaledFont(size: 14)
-                .foregroundStyle(BrandTheme.emeraldMint)
+            ZStack {
+                Circle()
+                    .fill(BrandTheme.emeraldMint.opacity(0.16))
+                    .frame(width: 28, height: 28)
+                Image(systemName: "arrow.down.circle.fill")
+                    .scaledFont(.callout)
+                    .foregroundStyle(BrandTheme.emeraldMint)
+            }
 
-            Text("New release: **LinguaVerve v\(update.latestVersion)** (installed: v\(store.currentAppVersion))")
-                .scaledFont(size: 12)
-                .lineLimit(1)
+            FlowLayout(spacing: 8, lineSpacing: 4) {
+                Text("LinguaVerve v\(update.latestVersion) available")
+                    .scaledFont(.subheadline, weight: .semibold)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            statusAccessory
+                Text("v\(store.currentAppVersion) → v\(update.latestVersion)")
+                    .scaledFont(.caption2, weight: .medium, design: .monospaced, monospacedDigit: true)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(Capsule().fill(Color.primary.opacity(0.07)))
+            }
+        }
+    }
 
-            Spacer()
-
+    @ViewBuilder
+    private var bannerActions: some View {
+        HStack(spacing: 8) {
             #if os(macOS)
             if case .ready = store.updateDownloadState {
                 Button {
                     store.installReadyUpdate()
                 } label: {
-                    Label("Close App & Install", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Install & Relaunch", systemImage: "arrow.triangle.2.circlepath")
+                        .scaledFont(.caption, weight: .semibold)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BrandTheme.emeraldMint)
@@ -38,7 +94,8 @@ public struct UpdateNotificationBanner: View {
                 Button {
                     Task { await store.downloadAndInstallUpdate() }
                 } label: {
-                    Label("Download & Update", systemImage: "arrow.down.to.line")
+                    Label("Update", systemImage: "arrow.down.to.line")
+                        .scaledFont(.caption, weight: .semibold)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BrandTheme.celestialSky)
@@ -50,25 +107,36 @@ public struct UpdateNotificationBanner: View {
                 store.openReleasePage()
             } label: {
                 Label("Get Release", systemImage: "arrow.up.right.square")
+                    .scaledFont(.caption, weight: .semibold)
             }
             .buttonStyle(.borderedProminent)
             .tint(BrandTheme.celestialSky)
             .controlSize(.small)
             #endif
 
-            Button("Notes…") {
+            Button {
                 store.isUpdateSheetPresented = true
+            } label: {
+                Text("Notes")
+                    .scaledFont(.caption, weight: .medium)
             }
+            .buttonStyle(.bordered)
             .controlSize(.small)
 
-            Button("Later") {
+            Button {
                 store.dismissUpdateBanner()
+            } label: {
+                Image(systemName: "xmark")
+                    .scaledFont(.caption2, weight: .bold)
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .background(Circle().fill(Color.primary.opacity(0.07)))
+                    .contentShape(Circle())
             }
-            .controlSize(.small)
+            .buttonStyle(.plain)
+            .help("Remind me later")
+            .accessibilityLabel("Dismiss update banner")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(BrandTheme.celestialSky.opacity(0.12))
     }
 
     @ViewBuilder
@@ -340,9 +408,9 @@ public struct UpdateSheetView: View {
         }
         .padding(18)
         #if os(macOS)
-        .frame(width: 580)
+        .frame(minWidth: 540, idealWidth: 620, maxWidth: 720)
         #else
-        .frame(maxWidth: 580)
+        .frame(maxWidth: 620)
         #endif
     }
 

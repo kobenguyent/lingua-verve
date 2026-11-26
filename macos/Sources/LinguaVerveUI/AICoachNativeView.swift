@@ -4,6 +4,7 @@ import LinguaVerveCore
 public struct AICoachNativeView: View {
     @Bindable var store: CurriculumStore
     @Binding var showAISettingsSheet: Bool
+    @Environment(\.appFontScale) private var fontScale
 
     @State private var messages: [AIChatMessage] = []
     @State private var inputText: String = ""
@@ -48,27 +49,50 @@ public struct AICoachNativeView: View {
                     .controlSize(.small)
                 }
 
-                HStack(spacing: 8) {
-                    Picker("Lang", selection: $store.courseLanguageId) {
-                        Text("🇬🇧 EN").tag("english")
-                        Text("🇩🇪 DE").tag("german")
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 145)
-
-                    Picker("Level", selection: $store.aiCoachLevel) {
-                        ForEach(CEFRLevel.allCases) { lvl in
-                            Text(lvl.rawValue).tag(lvl)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        Picker("Lang", selection: $store.courseLanguageId) {
+                            Text("🇬🇧 EN").tag("english")
+                            Text("🇩🇪 DE").tag("german")
                         }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: AppTypography.scaledControlWidth(160, scale: fontScale, maxCap: 220))
+
+                        Picker("Level", selection: $store.aiCoachLevel) {
+                            ForEach(CEFRLevel.allCases) { lvl in
+                                Text(lvl.rawValue).tag(lvl)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        Spacer()
+
+                        Toggle("Auto-Speak", isOn: $autoSpeak)
+                            .toggleStyle(.switch)
+                            .scaledFont(.caption)
+                            .fixedSize()
                     }
-                    .pickerStyle(.menu)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Picker("Lang", selection: $store.courseLanguageId) {
+                                Text("🇬🇧 EN").tag("english")
+                                Text("🇩🇪 DE").tag("german")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: AppTypography.scaledControlWidth(160, scale: fontScale, maxCap: 220))
 
-                    Spacer()
-
-                    Toggle("Auto-Speak", isOn: $autoSpeak)
-                        .toggleStyle(.switch)
-                        .scaledFont(.caption)
-                        .fixedSize()
+                            Picker("Level", selection: $store.aiCoachLevel) {
+                                ForEach(CEFRLevel.allCases) { lvl in
+                                    Text(lvl.rawValue).tag(lvl)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                        Toggle("Auto-Speak", isOn: $autoSpeak)
+                            .toggleStyle(.switch)
+                            .scaledFont(.caption)
+                            .fixedSize()
+                    }
                 }
 
                 Picker("Skill", selection: $store.aiCoachSkill) {

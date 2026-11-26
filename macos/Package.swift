@@ -32,7 +32,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LinguaVerveTests",
-            dependencies: ["LinguaVerveCore"],
+            dependencies: ["LinguaVerveCore", "LinguaVerveUI"],
             path: "Tests/LinguaVerveTests"
         )
     ]

@@ -3,6 +3,7 @@ import LinguaVerveCore
 
 public struct UnitLessonPlayerView: View {
     @Bindable var store: CurriculumStore
+    @Environment(\.appFontScale) private var fontScale
     public let course: IntensiveCourse
     public let module: CourseModule
     public let unitIndex: Int
@@ -391,7 +392,7 @@ public struct UnitLessonPlayerView: View {
                         .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(265, scale: fontScale)), spacing: 10)], spacing: 10) {
                         ForEach(section.examples) { ex in
                             Button {
                                 NativeAudioEngine.shared.playClickSound()

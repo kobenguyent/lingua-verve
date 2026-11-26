@@ -3,6 +3,7 @@ import LinguaVerveCore
 
 public struct IntensiveCoursesNativeView: View {
     @Bindable var store: CurriculumStore
+    @Environment(\.appFontScale) private var fontScale
     @State private var showAllReferences: Bool = false
 
     public init(store: CurriculumStore) {
@@ -201,7 +202,7 @@ public struct IntensiveCoursesNativeView: View {
                         Divider()
 
                         // 4-Skill Exam Blueprint Grid
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(225, scale: fontScale)), spacing: 10)], spacing: 10) {
                             ForEach(SkillType.allCases) { skill in
                                 VStack(alignment: .leading, spacing: 5) {
                                     Label(skill.displayName, systemImage: skill.systemImage)
@@ -271,7 +272,7 @@ public struct IntensiveCoursesNativeView: View {
                         }
 
                         let refs = store.examReferences(for: course, showAllForLanguage: showAllReferences)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(290, scale: fontScale)), spacing: 12)], spacing: 12) {
                             ForEach(refs) { ref in
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
@@ -315,7 +316,7 @@ public struct IntensiveCoursesNativeView: View {
                 }
             }
             .padding(16)
-            .frame(maxWidth: 1020)
+            .frame(maxWidth: 1080)
             .frame(maxWidth: .infinity)
         }
     }
@@ -337,7 +338,7 @@ public struct IntensiveCoursesNativeView: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(maxWidth: 240)
+        .frame(maxWidth: AppTypography.scaledControlWidth(248, scale: fontScale, maxCap: 320))
     }
 
     private func accentMenu(for languageId: String) -> some View {
@@ -386,87 +387,33 @@ public struct IntensiveCoursesNativeView: View {
         let inProgress = !done && savedProg != nil
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    FlowLayout(spacing: 6, lineSpacing: 4) {
-                        Text("Unit \(index) · \(mod.weekLabel)")
-                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.primary.opacity(0.08)))
-                        if inProgress {
-                            Text("In Progress · \(stepsDone)/5")
-                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
-                                .foregroundStyle(BrandTheme.deepGold)
-                        }
-                        if let score = savedProg?.checkpointScore {
-                            Text("Checkpoint \(score)%")
-                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
-                                .foregroundStyle(BrandTheme.emeraldMint)
-                        }
-                        ForEach(mod.focusSkills) { sk in
-                            Label(sk.shortName, systemImage: sk.systemImage)
-                                .scaledFont(size: 11, weight: .semibold)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
-                                .foregroundStyle(BrandTheme.celestialSky)
-                        }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    moduleHeadingBlock(mod, index: index, done: done, inProgress: inProgress, stepsDone: stepsDone, savedProg: savedProg)
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 6) {
+                        moduleActionButtons(mod, index: index, course: course, done: done, inProgress: inProgress)
                     }
-                    Text(mod.title)
-                        .scaledFont(.headline)
-                    Text(mod.summary)
-                        .scaledFont(.subheadline)
-                        .foregroundStyle(.secondary)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Button {
-                        NativeAudioEngine.shared.playClickSound()
-                        store.openUnitLesson(moduleId: mod.id, languageId: course.languageId, level: course.level)
-                    } label: {
-                        Label(
-                            done ? "Review Unit \(index)" : inProgress ? "Resume Unit \(index)" : "Start Unit \(index)",
-                            systemImage: "play.fill"
-                        )
-                        .scaledFont(.caption, weight: .bold)
+                VStack(alignment: .leading, spacing: 10) {
+                    moduleHeadingBlock(mod, index: index, done: done, inProgress: inProgress, stepsDone: stepsDone, savedProg: savedProg)
+                    FlowLayout(spacing: 8, lineSpacing: 6) {
+                        moduleActionButtons(mod, index: index, course: course, done: done, inProgress: inProgress)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.celestialSky)
-                    .controlSize(.small)
-
-                    Button {
-                        let nowDone = store.toggleModuleComplete(mod, languageId: course.languageId, level: course.level)
-                        if nowDone {
-                            NativeAudioEngine.shared.playSuccessChime()
-                        } else {
-                            NativeAudioEngine.shared.playClickSound()
-                        }
-                    } label: {
-                        Label(done ? "Completed" : "Complete", systemImage: done ? "checkmark.circle.fill" : "circle")
-                            .scaledFont(.caption, weight: .bold)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(done ? BrandTheme.emeraldMint : .accentColor)
-                    .controlSize(.small)
                 }
             }
 
             // Objectives
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 ForEach(mod.objectives, id: \.self) { obj in
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "checkmark.seal.fill")
                             .scaledFont(.caption2)
                             .foregroundStyle(BrandTheme.celestialSky)
                             .padding(.top, 2)
-                        Text(obj).scaledFont(.caption)
+                        Text(obj)
+                            .scaledFont(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -490,31 +437,33 @@ public struct IntensiveCoursesNativeView: View {
             // 4-Skill Drills
             ForEach(mod.drills) { drill in
                 VStack(alignment: .leading, spacing: 7) {
-                    HStack {
-                        Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
-                            .scaledFont(.caption, weight: .bold)
-                            .foregroundStyle(BrandTheme.celestialSky)
-                        Spacer()
-                        Button {
-                            store.openAICoach(
-                                languageId: course.languageId,
-                                level: course.level,
-                                skill: drill.skill,
-                                seedPrompt: "Practice drill: \(drill.title). \(drill.instruction)"
-                            )
-                        } label: {
-                            Label("AI Coach", systemImage: "sparkles")
-                                .scaledFont(.caption2, weight: .bold)
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
+                                .scaledFont(.caption, weight: .bold)
+                                .foregroundStyle(BrandTheme.celestialSky)
+                            Spacer()
+                            drillCoachButton(drill: drill, course: course)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
+                                .scaledFont(.caption, weight: .bold)
+                                .foregroundStyle(BrandTheme.celestialSky)
+                            drillCoachButton(drill: drill, course: course)
+                        }
                     }
-                    Text(drill.title).scaledFont(.subheadline, weight: .semibold)
-                    Text(drill.instruction).scaledFont(.caption).foregroundStyle(.secondary)
+                    Text(drill.title)
+                        .scaledFont(.subheadline, weight: .semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(drill.instruction)
+                        .scaledFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if let passage = drill.samplePassage {
                         Text(passage)
                             .scaledFont(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
@@ -535,6 +484,7 @@ public struct IntensiveCoursesNativeView: View {
                         DisclosureGroup("Reveal Audio Transcript") {
                             Text(script)
                                 .scaledFont(.caption)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 4)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -547,6 +497,7 @@ public struct IntensiveCoursesNativeView: View {
 
             Text("🎯 Checkpoint: \(mod.checkpointPrompt)")
                 .scaledFont(.caption, weight: .medium)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.12)))
@@ -560,5 +511,103 @@ public struct IntensiveCoursesNativeView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(done ? BrandTheme.emeraldMint.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private func moduleHeadingBlock(
+        _ mod: CourseModule,
+        index: Int,
+        done: Bool,
+        inProgress: Bool,
+        stepsDone: Int,
+        savedProg: UnitStudyProgress?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            FlowLayout(spacing: 6, lineSpacing: 4) {
+                Text("Unit \(index) · \(mod.weekLabel)")
+                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+                if inProgress {
+                    Text("In Progress · \(stepsDone)/5")
+                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
+                        .foregroundStyle(BrandTheme.deepGold)
+                }
+                if let score = savedProg?.checkpointScore {
+                    Text("Checkpoint \(score)%")
+                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                }
+                ForEach(mod.focusSkills) { sk in
+                    Label(sk.shortName, systemImage: sk.systemImage)
+                        .scaledFont(size: 11, weight: .semibold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
+                        .foregroundStyle(BrandTheme.celestialSky)
+                }
+            }
+            Text(mod.title)
+                .scaledFont(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(mod.summary)
+                .scaledFont(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func moduleActionButtons(_ mod: CourseModule, index: Int, course: IntensiveCourse, done: Bool, inProgress: Bool) -> some View {
+        Button {
+            NativeAudioEngine.shared.playClickSound()
+            store.openUnitLesson(moduleId: mod.id, languageId: course.languageId, level: course.level)
+        } label: {
+            Label(
+                done ? "Review Unit \(index)" : inProgress ? "Resume Unit \(index)" : "Start Unit \(index)",
+                systemImage: "play.fill"
+            )
+            .scaledFont(.caption, weight: .bold)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(BrandTheme.celestialSky)
+        .controlSize(.small)
+
+        Button {
+            let nowDone = store.toggleModuleComplete(mod, languageId: course.languageId, level: course.level)
+            if nowDone {
+                NativeAudioEngine.shared.playSuccessChime()
+            } else {
+                NativeAudioEngine.shared.playClickSound()
+            }
+        } label: {
+            Label(done ? "Completed" : "Complete", systemImage: done ? "checkmark.circle.fill" : "circle")
+                .scaledFont(.caption, weight: .bold)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(done ? BrandTheme.emeraldMint : .accentColor)
+        .controlSize(.small)
+    }
+
+    private func drillCoachButton(drill: CourseDrill, course: IntensiveCourse) -> some View {
+        Button {
+            store.openAICoach(
+                languageId: course.languageId,
+                level: course.level,
+                skill: drill.skill,
+                seedPrompt: "Practice drill: \(drill.title). \(drill.instruction)"
+            )
+        } label: {
+            Label("AI Coach", systemImage: "sparkles")
+                .scaledFont(.caption2, weight: .bold)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 }

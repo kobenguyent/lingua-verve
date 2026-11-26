@@ -5,6 +5,7 @@ import LinguaVerveCore
 public struct ExamSimulatorNativeView: View {
     @Bindable var store: CurriculumStore
     @Binding var showAISettingsSheet: Bool
+    @Environment(\.appFontScale) private var fontScale
 
     @State private var mode: String = "strict" // "strict" | "practice"
     @State private var timingMode: String = "official" // "official" | "sprint"
@@ -172,7 +173,7 @@ public struct ExamSimulatorNativeView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(maxWidth: 220)
+                    .frame(maxWidth: AppTypography.scaledControlWidth(235, scale: fontScale, maxCap: 310))
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Simulate Official Certification Pressure")
@@ -242,7 +243,7 @@ public struct ExamSimulatorNativeView: View {
                 }
 
                 // Multi-Part Blueprint Grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(200, scale: fontScale)), spacing: 10)], spacing: 10) {
                     blueprintCard(
                         title: "1. Reading",
                         badge: "\(readingParts.count) Parts · \(totalReadQs) Qs",
@@ -455,7 +456,7 @@ public struct ExamSimulatorNativeView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 260)
+                .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
                 .disabled(isGeneratingExam)
 
                 TextField(placeholder, text: $customTopic)
@@ -512,7 +513,7 @@ public struct ExamSimulatorNativeView: View {
 
     @ViewBuilder
     private func aiExamProgressGrid() -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(160, scale: fontScale)), spacing: 8)], spacing: 8) {
             ForEach(SkillType.allCases) { sk in
                 let st = genProgress[sk] ?? .pending
                 let statusText: String = {
@@ -546,7 +547,7 @@ public struct ExamSimulatorNativeView: View {
                 Spacer()
                 Text(badge).scaledFont(size: 10, weight: .semibold, design: .monospaced).foregroundStyle(.secondary)
             }
-            Text(detail).scaledFont(.caption2).foregroundStyle(.secondary).lineLimit(2)
+            Text(detail).scaledFont(.caption2).foregroundStyle(.secondary).lineLimit(3)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -574,24 +575,47 @@ public struct ExamSimulatorNativeView: View {
         let totalSpokenWords = speakingParts.reduce(0) { $0 + wordCount(speakingByPart[$1.id] ?? "") }
 
         // Countdown Bar
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
-                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
-                    .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
-                Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(1)
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
+                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
+                    Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(2)
+                }
+                Spacer()
+                Label(formatClock(remainingSeconds), systemImage: "timer")
+                    .scaledFont(size: 16, weight: .bold, design: .monospaced)
+                    .monospacedDigit()
+                    .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
+                Button("Submit All") {
+                    Task { await submitExam(exam) }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(BrandTheme.emeraldMint)
+                .controlSize(.small)
             }
-            Spacer()
-            Label(formatClock(remainingSeconds), systemImage: "timer")
-                .scaledFont(size: 16, weight: .bold, design: .monospaced)
-                .monospacedDigit()
-                .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
-            Button("Submit All") {
-                Task { await submitExam(exam) }
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
+                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
+                    Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(2)
+                }
+                HStack {
+                    Label(formatClock(remainingSeconds), systemImage: "timer")
+                        .scaledFont(size: 16, weight: .bold, design: .monospaced)
+                        .monospacedDigit()
+                        .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
+                    Spacer()
+                    Button("Submit All") {
+                        Task { await submitExam(exam) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.emeraldMint)
+                    .controlSize(.small)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(BrandTheme.emeraldMint)
-            .controlSize(.small)
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.06)))
@@ -1069,7 +1093,7 @@ public struct ExamSimulatorNativeView: View {
             }
 
             // 4-Skill Score Cards + 4-Criterion CEFR Rubric Bars
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(210, scale: fontScale)), spacing: 10)], spacing: 10) {
                 ForEach(SkillType.allCases) { sk in
                     if let s = report.skills[sk.rawValue] {
                         VStack(alignment: .leading, spacing: 6) {

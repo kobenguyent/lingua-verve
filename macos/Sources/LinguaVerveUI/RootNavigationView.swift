@@ -3,14 +3,16 @@ import LinguaVerveCore
 
 /// Adaptive Universal Apple Root View:
 /// - iPhone (compact): Native iOS TabView with NavigationStacks
-/// - iPad & MacBook (regular / macOS): Native NavigationSplitView with sidebar & inspector actions
+/// - iPad & MacBook (regular / macOS): Native NavigationSplitView with seamless unified toolbar & inspector actions
 public struct RootNavigationView: View {
     @Bindable var store: CurriculumStore
     @Binding var showDiagnosticSheet: Bool
     @Binding var showFalseFriendsSheet: Bool
     @Binding var showAISettingsSheet: Bool
+    @Environment(\.appFontScale) private var fontScale
     @State private var showVoiceStudioSheet: Bool = false
     @State private var showDisplaySettingsSheet: Bool = false
+    @State private var hoveredWorkspace: WorkspaceSection? = nil
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -26,6 +28,28 @@ public struct RootNavigationView: View {
         self._showDiagnosticSheet = showDiagnosticSheet
         self._showFalseFriendsSheet = showFalseFriendsSheet
         self._showAISettingsSheet = showAISettingsSheet
+    }
+
+    public static func workspaceSubtitle(
+        for store: CurriculumStore,
+        section: WorkspaceSection? = nil
+    ) -> String {
+        let target = section ?? store.activeWorkspace
+        let languageName = store.courseLanguageId == "german" ? "German" : "English"
+        switch target {
+        case .courses:
+            return "\(languageName) · \(store.courseLevel.rawValue) Mastery"
+        case .pretest:
+            return "\(languageName) · CEFR Placement"
+        case .simulator:
+            return "\(languageName) · \(store.examTargetLevel.rawValue) 4-Skill Arena"
+        case .aiCoach:
+            return "\(languageName) · \(store.aiCoachLevel.rawValue) \(store.aiCoachSkill.displayName)"
+        case .progress:
+            return "\(store.learnerState.completedModuleIds.count) units · \(store.learnerState.examHistory.count) exams"
+        case .manual:
+            return "Field Tactics & Grammar Reference"
+        }
     }
 
     public var body: some View {
@@ -69,7 +93,7 @@ public struct RootNavigationView: View {
             List {
                 Section {
                     HStack(spacing: 10) {
-                        BrandCrestView(size: 34)
+                        BrandCrestView(size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("LinguaVerve")
                                 .scaledFont(size: 16, weight: .bold, design: .serif)
@@ -78,12 +102,14 @@ public struct RootNavigationView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 6)
                 }
 
                 Section("Academy Workspaces") {
+                    let iconColumnWidth = max(18, 18 * min(fontScale, 1.35))
                     ForEach(WorkspaceSection.allCases) { section in
                         let selected = store.activeWorkspace == section
+                        let hovered = hoveredWorkspace == section
                         Button {
                             NativeAudioEngine.shared.playClickSound()
                             store.activeWorkspace = section
@@ -91,30 +117,42 @@ public struct RootNavigationView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: section.systemImage)
                                     .foregroundStyle(selected ? BrandTheme.celestialSky : .secondary)
-                                    .frame(width: 18)
+                                    .frame(width: iconColumnWidth)
                                 Text(section.title)
                                     .scaledFont(size: 13.5, weight: selected ? .semibold : .regular)
                                     .foregroundStyle(.primary)
+                                    .lineLimit(1)
                                 Spacer()
                                 if section == .progress {
                                     let count = store.learnerState.completedModuleIds.count + store.learnerState.examHistory.count
                                     if count > 0 {
                                         Text("\(count)")
-                                            .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                                            .scaledFont(.caption2, weight: .bold, design: .monospaced, monospacedDigit: true)
                                             .foregroundStyle(BrandTheme.emeraldMint)
                                     }
                                 }
                             }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 6)
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 8)
                             .background(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .fill(selected ? BrandTheme.celestialSky.opacity(0.14) : .clear)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(
+                                        selected
+                                            ? BrandTheme.celestialSky.opacity(0.15)
+                                            : (hovered ? Color.primary.opacity(0.05) : .clear)
+                                    )
                             )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        #if os(macOS)
+                        .onHover { isInside in
+                            hoveredWorkspace = isInside ? section : (hoveredWorkspace == section ? nil : hoveredWorkspace)
+                        }
+                        #endif
                     }
+                    .animation(.snappy(duration: 0.18), value: store.activeWorkspace)
+                    .animation(.easeOut(duration: 0.12), value: hoveredWorkspace)
                 }
 
                 Section("Tools & AI") {
@@ -124,6 +162,7 @@ public struct RootNavigationView: View {
                         HStack {
                             Label(store.aiConfig.isReady ? "AI: \(store.aiConfig.model)" : "Connect Local/Cloud AI", systemImage: "cpu")
                                 .scaledFont(size: 13)
+                                .lineLimit(1)
                             Spacer()
                             Circle()
                                 .fill(store.aiConfig.isReady ? BrandTheme.emeraldMint : .orange)
@@ -139,6 +178,7 @@ public struct RootNavigationView: View {
                         HStack {
                             Label("Voice & Accents", systemImage: "waveform")
                                 .scaledFont(size: 13)
+                                .lineLimit(1)
                             Spacer()
                             Text("\(accent?.flag ?? "🎙️") \(NativeAudioEngine.shared.voiceSettings.provider.shortLabel)")
                                 .scaledFont(.caption2, design: .monospaced)
@@ -153,9 +193,10 @@ public struct RootNavigationView: View {
                         HStack {
                             Label("Text Size", systemImage: "textformat.size")
                                 .scaledFont(size: 13)
+                                .lineLimit(1)
                             Spacer()
                             Text("\(store.fontScalePercent)%")
-                                .scaledFont(.caption2, design: .monospaced)
+                                .scaledFont(.caption2, design: .monospaced, monospacedDigit: true)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -166,6 +207,7 @@ public struct RootNavigationView: View {
                     } label: {
                         Label("False Friends Traps", systemImage: "exclamationmark.shield")
                             .scaledFont(size: 13)
+                            .lineLimit(1)
                     }
                     .buttonStyle(.plain)
 
@@ -174,11 +216,16 @@ public struct RootNavigationView: View {
                     } label: {
                         Label("Quick CEFR Check", systemImage: "scope")
                             .scaledFont(size: 13)
+                            .lineLimit(1)
                     }
                     .buttonStyle(.plain)
 
                     Button {
-                        Task { await store.checkForUpdates(manual: true) }
+                        if store.isUpdateAvailable {
+                            store.isUpdateSheetPresented = true
+                        } else {
+                            Task { await store.checkForUpdates(manual: true) }
+                        }
                     } label: {
                         HStack {
                             Label(
@@ -188,6 +235,7 @@ public struct RootNavigationView: View {
                                 systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
                             )
                             .scaledFont(size: 13)
+                            .lineLimit(1)
                             Spacer()
                             if store.isUpdateAvailable {
                                 Circle()
@@ -204,16 +252,35 @@ public struct RootNavigationView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 210, ideal: 245, max: 280)
+            .navigationSplitViewColumnWidth(
+                min: 225,
+                ideal: AppTypography.scaledSidebarIdealWidth(scale: fontScale),
+                max: 360
+            )
         } detail: {
             NavigationStack {
-                activeWorkspaceView
+                withDetailUpdateBanner(activeWorkspaceView)
                     .navigationTitle(store.activeWorkspace.title)
+                    #if os(macOS)
+                    .navigationSubtitle(Self.workspaceSubtitle(for: store))
+                    #endif
                     .toolbar {
                         sharedToolbarItems
                     }
             }
         }
+    }
+
+    @ViewBuilder
+    private func withDetailUpdateBanner<Content: View>(_ content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if store.shouldShowUpdateBanner, let update = store.availableUpdate {
+                    UpdateNotificationBanner(store: store, update: update)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy(duration: 0.28), value: store.shouldShowUpdateBanner)
     }
 
     // MARK: - iPhone Native TabView
@@ -222,7 +289,7 @@ public struct RootNavigationView: View {
     private var compactIPhoneLayout: some View {
         TabView(selection: $store.activeWorkspace) {
             NavigationStack {
-                IntensiveCoursesNativeView(store: store)
+                withDetailUpdateBanner(IntensiveCoursesNativeView(store: store))
                     .navigationTitle("Courses")
                     .toolbar { sharedToolbarItems }
             }
@@ -232,7 +299,7 @@ public struct RootNavigationView: View {
             .tag(WorkspaceSection.courses)
 
             NavigationStack {
-                PreTestNativeView(store: store)
+                withDetailUpdateBanner(PreTestNativeView(store: store))
                     .navigationTitle("Pre-Test")
                     .toolbar { sharedToolbarItems }
             }
@@ -242,7 +309,7 @@ public struct RootNavigationView: View {
             .tag(WorkspaceSection.pretest)
 
             NavigationStack {
-                ExamSimulatorNativeView(store: store, showAISettingsSheet: $showAISettingsSheet)
+                withDetailUpdateBanner(ExamSimulatorNativeView(store: store, showAISettingsSheet: $showAISettingsSheet))
                     .navigationTitle("Exam Sim")
                     .toolbar { sharedToolbarItems }
             }
@@ -252,7 +319,7 @@ public struct RootNavigationView: View {
             .tag(WorkspaceSection.simulator)
 
             NavigationStack {
-                AICoachNativeView(store: store, showAISettingsSheet: $showAISettingsSheet)
+                withDetailUpdateBanner(AICoachNativeView(store: store, showAISettingsSheet: $showAISettingsSheet))
                     .navigationTitle("AI Coach")
                     .toolbar { sharedToolbarItems }
             }
@@ -262,7 +329,7 @@ public struct RootNavigationView: View {
             .tag(WorkspaceSection.aiCoach)
 
             NavigationStack {
-                ProgressDashboardNativeView(store: store)
+                withDetailUpdateBanner(ProgressDashboardNativeView(store: store))
                     .navigationTitle("Progress")
                     .toolbar { sharedToolbarItems }
             }
@@ -272,7 +339,7 @@ public struct RootNavigationView: View {
             .tag(WorkspaceSection.progress)
 
             NavigationStack {
-                FieldManualView(store: store)
+                withDetailUpdateBanner(FieldManualView(store: store))
                     .navigationTitle("Manual")
                     .toolbar { sharedToolbarItems }
             }
@@ -304,7 +371,8 @@ public struct RootNavigationView: View {
 
     @ToolbarContentBuilder
     private var sharedToolbarItems: some ToolbarContent {
-        ToolbarItemGroup(placement: .primaryAction) {
+        // 1. Text Size Menu (prominent + active percentage badge when != 100%)
+        ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button {
                     store.increaseFontScale()
@@ -350,44 +418,94 @@ public struct RootNavigationView: View {
                     Label("Display & Text Size Settings…", systemImage: "slider.horizontal.3")
                 }
             } label: {
-                Label("Text \(store.fontScalePercent)%", systemImage: "textformat.size")
+                if store.fontScalePercent != 100 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "textformat.size")
+                        Text("\(store.fontScalePercent)%")
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                    }
+                } else {
+                    Label("Text Size", systemImage: "textformat.size")
+                }
             }
+            .help("Text Size (\(store.fontScalePercent)%) — ⌘+ / ⌘-")
+        }
 
+        // 2. Daily Audio, Voice & AI Studio Controls
+        ToolbarItemGroup(placement: .primaryAction) {
             Button {
-                showFalseFriendsSheet = true
+                _ = NativeAudioEngine.shared.toggleMute()
             } label: {
-                Label("False Friends", systemImage: "exclamationmark.shield")
+                Image(systemName: NativeAudioEngine.shared.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .foregroundStyle(NativeAudioEngine.shared.isMuted ? .orange : .primary)
+                    .contentTransition(.symbolEffect(.replace))
             }
+            .accessibilityLabel(NativeAudioEngine.shared.isMuted ? "Unmute Audio" : "Mute Audio")
+            .help(NativeAudioEngine.shared.isMuted ? "Audio Muted (Click to Unmute)" : "Mute Audio")
 
             Button {
                 showVoiceStudioSheet = true
             } label: {
                 Label("Voice & Accents", systemImage: "waveform")
             }
+            .help("Voice & Accent Studio")
 
             Button {
                 showAISettingsSheet = true
             } label: {
-                Label("AI Setup", systemImage: "cpu")
+                Image(systemName: "cpu")
+                    .foregroundStyle(store.aiConfig.isReady ? BrandTheme.emeraldMint : .primary)
             }
+            .accessibilityLabel("AI Setup")
+            .help(store.aiConfig.isReady ? "AI Ready: \(store.aiConfig.model)" : "Configure Local or Cloud AI")
+        }
 
-            Button {
-                Task { await store.checkForUpdates(manual: true) }
-            } label: {
-                Label(
-                    store.isUpdateAvailable ? "Update Available" : "Updates",
-                    systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
-                )
+        // 3. Conditional Software Update Indicator
+        if store.isUpdateAvailable {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    store.isUpdateSheetPresented = true
+                } label: {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                }
+                .accessibilityLabel("Update Available")
+                .help("LinguaVerve v\(store.availableUpdate?.latestVersion ?? "") Available")
             }
+        }
 
-            Button {
-                _ = NativeAudioEngine.shared.toggleMute()
+        // 4. Secondary Study Utilities Menu
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button {
+                    showFalseFriendsSheet = true
+                } label: {
+                    Label("False Friends Traps", systemImage: "exclamationmark.shield")
+                }
+
+                Button {
+                    showDiagnosticSheet = true
+                } label: {
+                    Label("Quick CEFR Check", systemImage: "scope")
+                }
+
+                Divider()
+
+                Button {
+                    showDisplaySettingsSheet = true
+                } label: {
+                    Label("Display & Text Size Settings…", systemImage: "slider.horizontal.3")
+                }
+
+                Button {
+                    Task { await store.checkForUpdates(manual: true) }
+                } label: {
+                    Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                }
             } label: {
-                Label(
-                    NativeAudioEngine.shared.isMuted ? "Muted" : "Audio",
-                    systemImage: NativeAudioEngine.shared.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill"
-                )
+                Label("More Tools", systemImage: "ellipsis.circle")
             }
+            .help("More Study Tools & Updates")
         }
     }
 }

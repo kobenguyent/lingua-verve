@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A wrapping horizontal flow layout for badges, tags, filter pills, and tool chips.
-/// Guarantees individual chips never get crushed mid-word on narrow panes.
+/// Clamps individual child widths to `maxWidth` so enlarged text (up to 160%) wraps instead of overflowing horizontally.
 public struct FlowLayout: Layout {
     public var spacing: CGFloat
     public var lineSpacing: CGFloat
@@ -13,13 +13,17 @@ public struct FlowLayout: Layout {
 
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
+        let childProposal = ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
         var currentX: CGFloat = 0
         var currentY: CGFloat = 0
         var lineHeight: CGFloat = 0
         var totalWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let rawSize = subview.sizeThatFits(childProposal)
+            let itemWidth = maxWidth.isFinite ? min(rawSize.width, maxWidth) : rawSize.width
+            let size = CGSize(width: itemWidth, height: rawSize.height)
+
             if currentX > 0 && currentX + size.width > maxWidth {
                 currentX = 0
                 currentY += lineHeight + lineSpacing
@@ -37,12 +41,17 @@ public struct FlowLayout: Layout {
     }
 
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let maxWidth = bounds.width
+        let childProposal = ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
         var currentX = bounds.minX
         var currentY = bounds.minY
         var lineHeight: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let rawSize = subview.sizeThatFits(childProposal)
+            let itemWidth = maxWidth.isFinite ? min(rawSize.width, maxWidth) : rawSize.width
+            let size = CGSize(width: itemWidth, height: rawSize.height)
+
             if currentX > bounds.minX && currentX + size.width > bounds.maxX + 0.5 {
                 currentX = bounds.minX
                 currentY += lineHeight + lineSpacing
@@ -50,7 +59,7 @@ public struct FlowLayout: Layout {
             }
             subview.place(
                 at: CGPoint(x: currentX, y: currentY),
-                proposal: ProposedViewSize(size)
+                proposal: ProposedViewSize(width: size.width, height: size.height)
             )
             currentX += size.width + spacing
             lineHeight = max(lineHeight, size.height)

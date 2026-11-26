@@ -3,6 +3,7 @@ import LinguaVerveCore
 
 public struct PreTestNativeView: View {
     @Bindable var store: CurriculumStore
+    @Environment(\.appFontScale) private var fontScale
     @State private var started = false
     @State private var currentIndex = 0
     @State private var answers: [String: Int] = [:]
@@ -99,9 +100,10 @@ public struct PreTestNativeView: View {
                                     }
                                 } label: {
                                     HStack(alignment: .top, spacing: 10) {
+                                        let badgeSize = max(26, 26 * min(fontScale, 1.4))
                                         Text(["A", "B", "C", "D"][min(idx, 3)])
                                             .scaledFont(size: 12, weight: .bold, design: .monospaced)
-                                            .frame(width: 24, height: 24)
+                                            .frame(width: badgeSize, height: badgeSize)
                                             .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
                                         Text(opt)
                                             .scaledFont(.subheadline)
@@ -138,7 +140,7 @@ public struct PreTestNativeView: View {
                         }
 
                         // 4-Skill Score Grid
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(160, scale: fontScale)), spacing: 10)], spacing: 10) {
                             ForEach(SkillType.allCases) { sk in
                                 let score = res.skillScores[sk.rawValue] ?? 0
                                 VStack(alignment: .leading, spacing: 5) {
@@ -251,7 +253,7 @@ public struct PreTestNativeView: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(maxWidth: 220)
+        .frame(maxWidth: AppTypography.scaledControlWidth(235, scale: fontScale, maxCap: 310))
         .onChange(of: store.courseLanguageId) { _, _ in
             started = false
             answers = [:]

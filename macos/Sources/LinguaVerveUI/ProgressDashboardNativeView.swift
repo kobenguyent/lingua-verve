@@ -3,6 +3,7 @@ import LinguaVerveCore
 
 public struct ProgressDashboardNativeView: View {
     @Bindable var store: CurriculumStore
+    @Environment(\.appFontScale) private var fontScale
     @State private var copiedBackup = false
     @State private var showResetConfirm = false
     @State private var filterLang: String = "all"
@@ -39,7 +40,7 @@ public struct ProgressDashboardNativeView: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
 
                 // KPI Grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 10)], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(155, scale: fontScale)), spacing: 10)], spacing: 10) {
                     kpiCard(title: "Study Streak", value: "\(streak)d", icon: "flame.fill", tint: .orange)
                     kpiCard(title: "Course Units", value: "\(store.learnerState.completedModuleIds.count)/\(totalModules)", icon: "graduationcap.fill", tint: BrandTheme.celestialSky)
                     kpiCard(title: "Exams Passed", value: "\(passedExams)/\(store.learnerState.examHistory.count)", icon: "rosette", tint: BrandTheme.emeraldMint)
@@ -65,7 +66,7 @@ public struct ProgressDashboardNativeView: View {
                         }
                     }
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(190, scale: fontScale)), spacing: 10)], spacing: 10) {
                         ForEach(SkillType.allCases) { sk in
                             let stat = skillAvgs[sk] ?? (0, 0)
                             VStack(alignment: .leading, spacing: 6) {
@@ -91,7 +92,7 @@ public struct ProgressDashboardNativeView: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
 
                 // Zero-to-Hero Maps (English & German)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 14)], spacing: 14) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(310, scale: fontScale)), spacing: 14)], spacing: 14) {
                     zeroToHeroCard(languageId: "english", title: "🇬🇧 English Zero-to-Hero (A1–C2)")
                     zeroToHeroCard(languageId: "german", title: "🇩🇪 German Zero-to-Hero (A1–C2)")
                 }
@@ -175,7 +176,7 @@ public struct ProgressDashboardNativeView: View {
             Text("🇩🇪 German").tag("german")
         }
         .pickerStyle(.segmented)
-        .frame(maxWidth: 270)
+        .frame(maxWidth: AppTypography.scaledControlWidth(285, scale: fontScale, maxCap: 370))
     }
 
     private func examHistoryRowButton(attempt: ExamAttemptRecord) -> some View {

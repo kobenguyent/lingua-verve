@@ -4,6 +4,7 @@ import LinguaVerveCore
 public struct FalseFriendsView: View {
     @Bindable var store: CurriculumStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appFontScale) private var fontScale
     @State private var query: String = ""
     @State private var languageFilter: String = "all"
 
@@ -27,7 +28,7 @@ public struct FalseFriendsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(maxWidth: 190)
+                    .frame(maxWidth: AppTypography.scaledControlWidth(210, scale: fontScale, maxCap: 280))
                 }
 
                 if items.isEmpty {

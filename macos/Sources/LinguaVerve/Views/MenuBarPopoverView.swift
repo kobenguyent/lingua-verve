@@ -26,7 +26,7 @@ public struct MenuBarPopoverView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 175)
+                .frame(minWidth: 165, maxWidth: AppTypography.scaledControlWidth(195, scale: CGFloat(store.fontScale), maxCap: 245))
             }
 
             Divider()
@@ -183,6 +183,6 @@ public struct MenuBarPopoverView: View {
             }
         }
         .padding(16)
-        .frame(width: 390)
+        .frame(width: AppTypography.scaledControlWidth(410, scale: CGFloat(store.fontScale), maxCap: 500))
     }
 }

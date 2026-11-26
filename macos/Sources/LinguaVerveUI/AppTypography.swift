@@ -18,17 +18,17 @@ public enum AppTextStyle: Sendable {
 
     public var baseSize: CGFloat {
         switch self {
-        case .largeTitle: return 26
-        case .title: return 22
-        case .title2: return 18
-        case .title3: return 15.5
-        case .headline: return 14
-        case .body: return 13.5
-        case .callout: return 13
-        case .subheadline: return 12.5
-        case .footnote: return 11.5
-        case .caption: return 11.5
-        case .caption2: return 10.5
+        case .largeTitle: return 30
+        case .title: return 26
+        case .title2: return 21
+        case .title3: return 18
+        case .headline: return 16.5
+        case .body: return 15.5
+        case .callout: return 15
+        case .subheadline: return 14.5
+        case .footnote: return 13.5
+        case .caption: return 13
+        case .caption2: return 12
         }
     }
 
@@ -38,6 +38,49 @@ public enum AppTextStyle: Sendable {
         case .headline: return .semibold
         default: return .regular
         }
+    }
+}
+
+/// Shared optical legibility and responsive sizing helpers for break-free text scaling (85%–160%).
+public enum AppTypography {
+    public static let minimumReadablePointSize: CGFloat = 10.5
+
+    /// Applies an optical legibility uplift to explicit point sizes (`scaledFont(size:)`) while preserving hero display sizes.
+    public static func comfortableBaseSize(for rawSize: CGFloat) -> CGFloat {
+        if rawSize <= 14 {
+            return rawSize + 2.0
+        }
+        if rawSize < 24 {
+            return rawSize + (2.0 - ((rawSize - 14.0) / 10.0))
+        }
+        if rawSize < 32 {
+            return rawSize + 1.0
+        }
+        return rawSize
+    }
+
+    public static func resolvedPointSize(
+        baseSize: CGFloat,
+        scale: CGFloat,
+        applyOpticalLift: Bool
+    ) -> CGFloat {
+        let effectiveBase = applyOpticalLift ? comfortableBaseSize(for: baseSize) : baseSize
+        return max(minimumReadablePointSize, effectiveBase * scale)
+    }
+
+    /// Gently expands adaptive `LazyVGrid` minimum column widths so cards don't crush enlarged text.
+    public static func scaledGridMinimum(_ base: CGFloat, scale: CGFloat) -> CGFloat {
+        base * min(max(scale, 1.0), 1.35)
+    }
+
+    /// Expands ideal sidebar width harmoniously within safe bounds as global font scale increases.
+    public static func scaledSidebarIdealWidth(scale: CGFloat) -> CGFloat {
+        min(330, max(252, (252 * min(max(scale, 1.0), 1.32)).rounded()))
+    }
+
+    /// Scales bounded control widths (segmented pickers, popovers) up to an explicit maximum cap.
+    public static func scaledControlWidth(_ base: CGFloat, scale: CGFloat, maxCap: CGFloat) -> CGFloat {
+        min(maxCap, base * min(max(scale, 1.0), 1.32))
     }
 }
 
@@ -74,9 +117,15 @@ private struct ScaledPointFontModifier: ViewModifier {
     let design: Font.Design?
     let italic: Bool
     let monospacedDigit: Bool
+    let applyOpticalLift: Bool
 
     func body(content: Content) -> some View {
-        let computed = Font.system(size: max(9, baseSize * scale), weight: weight, design: design)
+        let pointSize = AppTypography.resolvedPointSize(
+            baseSize: baseSize,
+            scale: scale,
+            applyOpticalLift: applyOpticalLift
+        )
+        let computed = Font.system(size: pointSize, weight: weight, design: design)
         let styled = italic ? computed.italic() : computed
         let finalFont = monospacedDigit ? styled.monospacedDigit() : styled
         content.font(finalFont)
@@ -84,7 +133,7 @@ private struct ScaledPointFontModifier: ViewModifier {
 }
 
 public extension View {
-    /// Applies true vector-scaled typography across macOS, iPadOS, and iOS using the app's global fontScale.
+    /// Applies true vector-scaled typography with optical readability uplift across macOS, iPadOS, and iOS.
     func scaledFont(
         size: CGFloat,
         weight: Font.Weight? = nil,
@@ -98,7 +147,8 @@ public extension View {
                 weight: weight,
                 design: design,
                 italic: italic,
-                monospacedDigit: monospacedDigit
+                monospacedDigit: monospacedDigit,
+                applyOpticalLift: true
             )
         )
     }
@@ -117,7 +167,8 @@ public extension View {
                 weight: weight ?? style.defaultWeight,
                 design: design,
                 italic: italic,
-                monospacedDigit: monospacedDigit
+                monospacedDigit: monospacedDigit,
+                applyOpticalLift: false
             )
         )
     }
@@ -126,7 +177,7 @@ public extension View {
     func applyAppFontScale(_ store: CurriculumStore) -> some View {
         self
             .environment(\.appFontScale, CGFloat(store.fontScale))
-            .environment(\.font, .system(size: 13.5 * CGFloat(store.fontScale)))
+            .environment(\.font, .system(size: AppTextStyle.body.baseSize * CGFloat(store.fontScale)))
             .dynamicTypeSize(store.preferredDynamicTypeSize)
     }
 }
@@ -151,7 +202,7 @@ public struct DisplaySettingsSheetView: View {
                                 .scaledFont(.headline)
                             Spacer()
                             Text("\(store.fontScalePercent)%")
-                                .scaledFont(.headline, weight: .bold, design: .monospaced)
+                                .scaledFont(.headline, weight: .bold, design: .monospaced, monospacedDigit: true)
                                 .foregroundStyle(BrandTheme.celestialSky)
                         }
 
@@ -220,12 +271,15 @@ public struct DisplaySettingsSheetView: View {
                             .foregroundStyle(BrandTheme.celestialSky)
                         Text("Konjunktiv II & Höfliche Formulierungen")
                             .scaledFont(.title3, weight: .bold, design: .serif)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Könnten Sie mir bitte mitteilen, ob die Sprachprüfung am kommenden Freitag um neun Uhr im Hauptgebäude stattfindet?")
                             .scaledFont(.body)
                             .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text("Tip: Every workspace, guided lesson, exam passage, flashcard, and sidebar scales immediately.")
                             .scaledFont(.caption)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.vertical, 6)
                 }
@@ -252,7 +306,7 @@ public struct DisplaySettingsSheetView: View {
         }
         .applyAppFontScale(store)
         #if os(macOS)
-        .frame(minWidth: 480, idealWidth: 540, minHeight: 460, idealHeight: 540)
+        .frame(minWidth: 500, idealWidth: 560, minHeight: 480, idealHeight: 560)
         #endif
     }
 }

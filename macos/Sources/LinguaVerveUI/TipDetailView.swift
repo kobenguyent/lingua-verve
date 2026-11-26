@@ -21,6 +21,7 @@ public enum PlatformClipboard {
 public struct TipDetailView: View {
     @Bindable var store: CurriculumStore
     let tip: TipItem
+    @Environment(\.appFontScale) private var fontScale
     @State private var copied: Bool = false
 
     public init(store: CurriculumStore, tip: TipItem) {
@@ -119,9 +120,10 @@ public struct TipDetailView: View {
 
                     ForEach(Array(tip.tactics.enumerated()), id: \.offset) { idx, tactic in
                         HStack(alignment: .top, spacing: 10) {
+                            let badgeSize = max(26, 26 * min(fontScale, 1.4))
                             Text("\(idx + 1)")
                                 .scaledFont(size: 12, weight: .bold, design: .monospaced)
-                                .frame(width: 24, height: 24)
+                                .frame(width: badgeSize, height: badgeSize)
                                 .background(Circle().fill(BrandTheme.celestialSky.opacity(0.14)))
                                 .foregroundStyle(BrandTheme.celestialSky)
                             Text(tactic)
