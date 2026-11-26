@@ -44,11 +44,11 @@ public struct PreTestNativeView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Text("Item \(currentIndex + 1) of \(questions.count)")
-                                .font(.system(size: 12, design: .monospaced))
+                                .scaledFont(size: 12, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text("\(q.level.rawValue) · \(q.skill.displayName)")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.16)))
@@ -59,7 +59,7 @@ public struct PreTestNativeView: View {
 
                         if let passage = q.passage {
                             Text(passage)
-                                .font(.subheadline)
+                                .scaledFont(.subheadline)
                                 .padding(12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05)))
@@ -82,7 +82,7 @@ public struct PreTestNativeView: View {
                         }
 
                         Text(q.prompt)
-                            .font(.headline)
+                            .scaledFont(.headline)
 
                         VStack(spacing: 8) {
                             ForEach(Array(q.options.enumerated()), id: \.offset) { idx, opt in
@@ -100,11 +100,11 @@ public struct PreTestNativeView: View {
                                 } label: {
                                     HStack(alignment: .top, spacing: 10) {
                                         Text(["A", "B", "C", "D"][min(idx, 3)])
-                                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                            .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                             .frame(width: 24, height: 24)
                                             .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
                                         Text(opt)
-                                            .font(.subheadline)
+                                            .scaledFont(.subheadline)
                                             .foregroundStyle(.primary)
                                             .multilineTextAlignment(.leading)
                                         Spacer()
@@ -124,12 +124,12 @@ public struct PreTestNativeView: View {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("VERIFIED CEFR PLACEMENT")
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                     .foregroundStyle(BrandTheme.emeraldMint)
                                 Text("Verified Level: \(res.verifiedLevel.rawValue)")
-                                    .font(.system(size: 26, weight: .bold, design: .serif))
+                                    .scaledFont(size: 26, weight: .bold, design: .serif)
                                 Text("Score: \(res.correctCount)/\(res.totalCount) (\(res.overallScore)%) · Target: \(res.suggestedCertificate)")
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -144,10 +144,10 @@ public struct PreTestNativeView: View {
                                 VStack(alignment: .leading, spacing: 5) {
                                     HStack {
                                         Label(sk.shortName, systemImage: sk.systemImage)
-                                            .font(.caption.weight(.bold))
+                                            .scaledFont(.caption, weight: .bold)
                                         Spacer()
                                         Text("\(score)%")
-                                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                            .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                     }
                                     ProgressView(value: Double(score), total: 100.0)
                                         .tint(score < 60 ? .orange : BrandTheme.emeraldMint)
@@ -160,24 +160,24 @@ public struct PreTestNativeView: View {
                         Divider()
 
                         Text("RECOMMENDED COLLECTIVE COURSE BUNDLE")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                             .foregroundStyle(BrandTheme.celestialSky)
 
                         ForEach(Array(res.recommendedCourses.enumerated()), id: \.element.id) { idx, step in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Text("STEP \(idx + 1) · \(step.role.uppercased())")
-                                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                                         .padding(.horizontal, 7)
                                         .padding(.vertical, 3)
                                         .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.16)))
                                         .foregroundStyle(BrandTheme.celestialSky)
                                     Spacer()
                                     Text("CEFR \(step.level.rawValue)")
-                                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                        .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                 }
-                                Text(step.title).font(.headline)
-                                Text(step.reason).font(.caption).foregroundStyle(.secondary)
+                                Text(step.title).scaledFont(.headline)
+                                Text(step.reason).scaledFont(.caption).foregroundStyle(.secondary)
                                 Button {
                                     NativeAudioEngine.shared.playClickSound()
                                     store.openCourse(languageId: res.languageId, level: step.level)
@@ -206,12 +206,12 @@ public struct PreTestNativeView: View {
                 } else {
                     VStack(spacing: 14) {
                         Image(systemName: "checklist.checked")
-                            .font(.system(size: 40))
+                            .scaledFont(size: 40)
                             .foregroundStyle(BrandTheme.celestialSky)
                         Text("12-Item Scored 4-Skill Placement Pre-Test")
-                            .font(.title3.weight(.bold))
+                            .scaledFont(.title3, weight: .bold)
                         Text("Tests Reading, Spoken Listening/Hearing, Writing Grammar, and Speaking Pragmatics from A1 to C2, then automatically recommends your collective course path.")
-                            .font(.subheadline)
+                            .scaledFont(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                         Button {
@@ -237,10 +237,10 @@ public struct PreTestNativeView: View {
     private var headerText: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("SCORED CEFR PLACEMENT ENGINE")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundStyle(.indigo)
             Text("Verify Level & Recommend Collective Courses")
-                .font(.system(size: 21, weight: .bold, design: .serif))
+                .scaledFont(size: 21, weight: .bold, design: .serif)
         }
     }
 

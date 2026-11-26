@@ -15369,7 +15369,7 @@
         "durationMinutes": 14,
         "maxPlaysStrict": 2,
         "contextNote": "Sie hören eine Durchsage im Supermarkt und eine Nachricht auf dem Anrufbeantworter.",
-        "audioScript": "Liebe Kundinnen und Kunden, heute gibt es frische Erdbeeren im Angebot: fünfhundert Gramm kosten nur zwei Euro fünfzig statt vier Euro. Unsere Bäckerei im Erdgeschoss schließt heute ausnahmsweise schon um neunzehn Uhr. Vielen Dank für Ihren Einkauf!",
+        "audioScript": "Lena: Entschuldigung! Sind die Erdbeeren da drüben wirklich heute im Angebot?\nVerkäufer: Hallo! Ja, genau — fünfhundert Gramm kosten heute nur zwei Euro fünfzig statt vier Euro.\nLena: Oh, super, dann nehme ich gleich eine Schale! Ach, und wo finde ich denn Ihre Bäckerei?\nVerkäufer: Unsere Bäckerei ist direkt unten im Erdgeschoss, gleich neben dem Ausgang.\nLena: Alles klar, danke! Hat die bis zwanzig Uhr auf?\nVerkäufer: Normalerweise schon, aber heute schließt sie ausnahmsweise schon um neunzehn Uhr. Beeilen Sie sich lieber ein bisschen!",
         "hearingFocusTrap": "Watch German numbers: 2,50 € (Angebot) vs. 4,00 € (normal price), and 19:00 Uhr.",
         "questions": [
           {
@@ -15417,7 +15417,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Liebe Kundinnen und Kunden, heute gibt es frische Erdbeeren im Angebot: fünfhundert Gramm kosten nur zwei Euro fünfzig statt vier Euro. Unsere Bäckerei im Erdgeschoss schließt heute ausnahmsweise schon um neunzehn Uhr. Vielen Dank für Ihren Einkauf!",
+            "audioScript": "Lena: Entschuldigung! Sind die Erdbeeren da drüben wirklich heute im Angebot?\nVerkäufer: Hallo! Ja, genau — fünfhundert Gramm kosten heute nur zwei Euro fünfzig statt vier Euro.\nLena: Oh, super, dann nehme ich gleich eine Schale! Ach, und wo finde ich denn Ihre Bäckerei?\nVerkäufer: Unsere Bäckerei ist direkt unten im Erdgeschoss, gleich neben dem Ausgang.\nLena: Alles klar, danke! Hat die bis zwanzig Uhr auf?\nVerkäufer: Normalerweise schon, aber heute schließt sie ausnahmsweise schon um neunzehn Uhr. Beeilen Sie sich lieber ein bisschen!",
             "hearingFocusTrap": "Watch German numbers: 2,50 € (Angebot) vs. 4,00 € (normal price), and 19:00 Uhr.",
             "questions": [
               {
@@ -15465,7 +15465,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Grüß Gott, hier ist das Hotel Donau in Wien. Sie haben ein Einzelzimmer für Freitag gebucht. Das Frühstück gibt es von sieben bis zehn Uhr im ersten Stock. Bitte sagen Sie uns kurz Bescheid, wann Sie am Freitag ankommen. Unsere Rezeption ist bis zweiundzwanzig Uhr besetzt.",
+            "audioScript": "Herr Gruber: Hotel Donau in Wien, Grüß Gott! Wie kann ich Ihnen helfen?\nClara: Guten Tag! Hier ist Clara Weber. Ich habe ein Einzelzimmer für Freitag gebucht und wollte kurz nach dem Frühstück fragen.\nHerr Gruber: Sehr gern, Frau Weber! Das Frühstück gibt es jeden Morgen von sieben bis zehn Uhr oben im ersten Stock.\nClara: Perfekt, im ersten Stock! Und bis wann kann ich am Freitagabend einchecken?\nHerr Gruber: Unsere Rezeption ist bis zweiundzwanzig Uhr besetzt. Bitte sagen Sie uns vorher noch kurz Bescheid, wann Sie am Freitag genau ankommen.\nClara: Mache ich sehr gern, vielen Dank und bis Freitag!",
             "hearingFocusTrap": "Achten Sie auf Frühstückszeiten (7–10 Uhr), Stockwerk (1. Stock) und Rezeptionsschluss (22 Uhr).",
             "questions": [
               {
@@ -15513,7 +15513,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Grüezi liebe Reisende! Der Intercity nach Basel um dreizehn Uhr zehn hat heute leider fünfzehn Minuten Verspätung. Er fährt außerdem nicht von Gleis sechs, sondern von Gleis neun ab. Wir danken Ihnen für Ihr Verständnis.",
+            "audioScript": "Lukas: Entschuldigung, Grüezi! Fährt der Intercity nach Basel um dreizehn Uhr zehn gleich hier von Gleis sechs?\nFrau Meier: Grüezi! Gut, dass Sie fragen — schauen Sie mal auf die Anzeige: Der Intercity nach Basel hat heute leider fünfzehn Minuten Verspätung.\nLukas: Ach herrje, fünfzehn Minuten! Bleibt es wenigstens bei Gleis sechs?\nFrau Meier: Nein, er fährt heute ausnahmsweise nicht von Gleis sechs, sondern von Gleis neun ab. Da vorne geht es direkt zur Unterführung.\nLukas: Oh, vielen Dank für den Hinweis! Dann laufe ich gleich rüber zu Gleis neun.",
             "hearingFocusTrap": "Gleiswechsel-Falle: Nicht Gleis 6, sondern Gleis 9 — und 15 Minuten Verspätung!",
             "questions": [
               {
@@ -15912,7 +15912,7 @@
         "durationMinutes": 16,
         "maxPlaysStrict": 2,
         "contextNote": "Sie hören eine Sprachnachricht von Ihrem Freund Jonas über das Wochenende.",
-        "audioScript": "Hey! Am Samstag wollten wir ja eigentlich wandern gehen, aber der Wetterbericht sagt starken Regen für den ganzen Vormittag voraus. Wie wäre es, wenn wir stattdessen um vierzehn Uhr in die neue Fotoausstellung gehen? Danach können wir in der Pizzeria neben dem Bahnhof etwas essen. Sag mir bis Freitagabend Bescheid!",
+        "audioScript": "Jonas: Hey Mia, hast du kurz Zeit? Wegen unserer Wanderung am Samstag...\nMia: Hi Jonas! Klar — sag bloß, das Wetter spielt nicht mit?\nJonas: Genau, der Wetterbericht sagt leider starken Regen für den ganzen Vormittag voraus. Da macht Wandern echt keinen Spaß.\nMia: Schade! Und was machen wir stattdessen?\nJonas: Wie wäre es, wenn wir um vierzehn Uhr in die neue Fotoausstellung gehen? Und danach können wir in der Pizzeria neben dem Bahnhof etwas essen.\nMia: Das klingt richtig gut! Ich checke kurz meinen Kalender und sage dir bis Freitagabend Bescheid.",
         "hearingFocusTrap": "Notice the shift from original plan (wandern) to alternative (Fotoausstellung um 14:00) due to Regen.",
         "questions": [
           {
@@ -15960,7 +15960,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Hey! Am Samstag wollten wir ja eigentlich wandern gehen, aber der Wetterbericht sagt starken Regen für den ganzen Vormittag voraus. Wie wäre es, wenn wir stattdessen um vierzehn Uhr in die neue Fotoausstellung gehen? Danach können wir in der Pizzeria neben dem Bahnhof etwas essen. Sag mir bis Freitagabend Bescheid!",
+            "audioScript": "Jonas: Hey Mia, hast du kurz Zeit? Wegen unserer Wanderung am Samstag...\nMia: Hi Jonas! Klar — sag bloß, das Wetter spielt nicht mit?\nJonas: Genau, der Wetterbericht sagt leider starken Regen für den ganzen Vormittag voraus. Da macht Wandern echt keinen Spaß.\nMia: Schade! Und was machen wir stattdessen?\nJonas: Wie wäre es, wenn wir um vierzehn Uhr in die neue Fotoausstellung gehen? Und danach können wir in der Pizzeria neben dem Bahnhof etwas essen.\nMia: Das klingt richtig gut! Ich checke kurz meinen Kalender und sage dir bis Freitagabend Bescheid.",
             "hearingFocusTrap": "Notice the shift from original plan (wandern) to alternative (Fotoausstellung um 14:00) due to Regen.",
             "questions": [
               {
@@ -16008,7 +16008,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Hannah: Lukas, fahren wir am Samstag mit dem Zug an den See? Lukas: Gern! Aber der Bus um neun Uhr fährt am Wochenende nicht. Wir sollten lieber den Zug um neun Uhr dreißig nehmen. Hannah: Super, ich bringe den Kuchen mit, weil ich gestern gebacken habe. Lukas: Perfekt, dann besorge ich die Getränke.",
+            "audioScript": "Hannah: Lukas, fahren wir am Samstag eigentlich zusammen an den See?\nLukas: Total gern! Aber warte mal — mit dem Bus um neun Uhr klappt es nicht, der fährt am Wochenende gar nicht.\nHannah: Echt nicht? Wie kommen wir dann am besten hin?\nLukas: Am besten nehmen wir den Zug um neun Uhr dreißig, der hält fast direkt am Ufer.\nHannah: Super Idee! Ich bringe übrigens einen frischen Kuchen mit, weil ich gestern Abend gebacken habe.\nLukas: Oh, genial! Dann besorge ich kalte Getränke für uns beide.",
             "hearingFocusTrap": "Unterscheiden Sie Bus (fährt nicht) vs. Zug (9:30 Uhr) und wer was mitbringt!",
             "questions": [
               {
@@ -16056,7 +16056,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Grüezi Frau Keller, hier ist die Buchhandlung Rheinblick. Ihr bestelltes Wörterbuch ist leider im Moment nicht lieferbar, deshalb schicken wir heute zuerst nur die beiden Romane ab. Das Wörterbuch kommt voraussichtlich am Dienstag kostenlos nach. Wenn Sie lieber stornieren möchten, rufen Sie uns bitte bis achtzehn Uhr an.",
+            "audioScript": "Herr Baumann: Grüezi Frau Keller, hier ist Martin Baumann von der Buchhandlung Rheinblick in Basel.\nFrau Keller: Grüezi Herr Baumann! Geht es um meine Bestellung von gestern?\nHerr Baumann: Ja, genau. Ihr bestelltes Wörterbuch ist leider im Moment nicht lieferbar — deshalb schicken wir heute zuerst nur die beiden Romane ab.\nFrau Keller: Ach so! Und wann kommt das Wörterbuch ungefähr?\nHerr Baumann: Es kommt voraussichtlich am Dienstag kostenlos nach. Falls Sie es aber lieber stornieren möchten, rufen Sie uns bitte einfach heute bis achtzehn Uhr an.\nFrau Keller: Alles klar, bis achtzehn Uhr — vielen Dank für den schnellen Anruf!",
             "hearingFocusTrap": "Was wird heute verschickt (2 Romane) vs. was kommt später kostenlos nach (Wörterbuch)?",
             "questions": [
               {
@@ -16452,7 +16452,7 @@
         "durationMinutes": 21,
         "maxPlaysStrict": 2,
         "contextNote": "Sie hören einen Ausschnitt aus einer Radiosendung zum Thema mobiles Arbeiten.",
-        "audioScript": "Moderator: Herr Becker, seit zwei Jahren arbeitet Ihre Firma hybrid. Was hat sich am stärksten verändert? Herr Becker: Zuerst hatten wir Angst, dass die Qualität sinkt. Das Gegenteil ist passiert: Weil die Mitarbeiter zweimal pro Woche zu Hause ungestört arbeiten können, werden komplexe Projekte schneller fertig. Schwierig bleibt jedoch die Einarbeitung neuer Kollegen — dafür brauchen wir unbedingt gemeinsame Tage im Büro.",
+        "audioScript": "Moderator: Herr Becker, Ihre Firma arbeitet jetzt seit zwei Jahren hybrid. Hand aufs Herz — was hat sich im Alltag am stärksten verändert?\nHerr Becker: Zuerst hatten wir ehrlich gesagt Angst, dass die Qualität sinkt. Aber genau das Gegenteil ist passiert!\nModerator: Inwiefern? Arbeiten die Teams produktiver?\nHerr Becker: Ja, deutlich! Weil die Mitarbeiter zweimal pro Woche zu Hause ungestört arbeiten können, werden komplexe Projekte spürbar schneller fertig.\nModerator: Gibt es denn gar keine Schattenseiten beim Homeoffice?\nHerr Becker: Doch, eine wichtige: Die Einarbeitung neuer Kollegen bleibt digital schwierig — dafür brauchen wir unbedingt gemeinsame Tage im Büro.",
         "hearingFocusTrap": "Distinguish initial fear (Qualität sinkt) from actual result (Gegenteil) and remaining challenge (Einarbeitung neuer Kollegen).",
         "questions": [
           {
@@ -16500,7 +16500,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Moderator: Herr Becker, seit zwei Jahren arbeitet Ihre Firma hybrid. Was hat sich am stärksten verändert? Herr Becker: Zuerst hatten wir Angst, dass die Qualität sinkt. Das Gegenteil ist passiert: Weil die Mitarbeiter zweimal pro Woche zu Hause ungestört arbeiten können, werden komplexe Projekte schneller fertig. Schwierig bleibt jedoch die Einarbeitung neuer Kollegen — dafür brauchen wir unbedingt gemeinsame Tage im Büro.",
+            "audioScript": "Moderator: Herr Becker, Ihre Firma arbeitet jetzt seit zwei Jahren hybrid. Hand aufs Herz — was hat sich im Alltag am stärksten verändert?\nHerr Becker: Zuerst hatten wir ehrlich gesagt Angst, dass die Qualität sinkt. Aber genau das Gegenteil ist passiert!\nModerator: Inwiefern? Arbeiten die Teams produktiver?\nHerr Becker: Ja, deutlich! Weil die Mitarbeiter zweimal pro Woche zu Hause ungestört arbeiten können, werden komplexe Projekte spürbar schneller fertig.\nModerator: Gibt es denn gar keine Schattenseiten beim Homeoffice?\nHerr Becker: Doch, eine wichtige: Die Einarbeitung neuer Kollegen bleibt digital schwierig — dafür brauchen wir unbedingt gemeinsame Tage im Büro.",
             "hearingFocusTrap": "Distinguish initial fear (Qualität sinkt) from actual result (Gegenteil) and remaining challenge (Einarbeitung neuer Kollegen).",
             "questions": [
               {
@@ -16548,7 +16548,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Moderator: Frau Berger, profitieren Geschäfte von autofreien Einkaufsstraßen? Frau Berger: Anfangs befürchteten viele Händler weniger Umsatz. Nachdem aber unsere Straße vor zwei Jahren umgebaut wurde, kamen deutlich mehr Fußgänger und Familien. Einerseits fehlen manchen Handwerkern Parkplätze vor der Tür, andererseits hat sich der Umsatz in Cafés und kleinen Läden klar erhöht.",
+            "audioScript": "Moderator: Frau Berger, hier in Wien wird wieder heftig gestritten: Profitieren kleine Geschäfte eigentlich von autofreien Einkaufsstraßen?\nFrau Berger: Anfangs befürchteten tatsächlich viele Händler weniger Umsatz, mich eingeschlossen! Aber die Realität hat uns überrascht.\nModerator: Was ist nach dem Umbau vor zwei Jahren genau passiert?\nFrau Berger: Sobald die Straße ruhiger war, kamen deutlich mehr Fußgänger und verweilten länger in Cafés und Läden — unsere Umsätze sind seitdem spürbar gestiegen.\nModerator: Klingt durchweg positiv. Wo hakt es aus Ihrer Sicht noch?\nFrau Berger: Nur bei den Lieferzeiten für schwere Ware — da wünschen wir uns noch flexiblere Morgenfenster vor neun Uhr.",
             "hearingFocusTrap": "Achten Sie auf den Gegensatz zwischen der anfänglichen Angst und dem Ergebnis nach dem Umbau!",
             "questions": [
               {
@@ -16596,7 +16596,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Herzlich willkommen! Bevor wir in die Eisenbahnhalle gehen, ein kurzer Hinweis: Fotografieren ohne Blitz ist überall gestattet, aber das Berühren der historischen Lokomotiven ist leider untersagt. Um zwölf Uhr machen wir dreißig Minuten Pause im Bistro; danach treffen wir uns pünktlich vor dem Planetarium.",
+            "audioScript": "Frau Bühler: Grüezi und herzlich willkommen hier im Verkehrshaus Luzern! Haben alle ihre Kopfhörer dabei?\nMarkus: Ja, alles bereit! Darf man drinnen in der Eisenbahnhalle eigentlich Fotos machen?\nFrau Bühler: Gute Frage! Fotografieren ohne Blitz ist überall gestattet — nur im neuen Planetarium bleiben Smartphones bitte komplett in der Tasche.\nMarkus: Alles klar, kein Handy im Planetarium. Und wie lange dauert der Rundgang ungefähr?\nFrau Bühler: Die Führung dauert rund fünfundvierzig Minuten, danach treffen wir uns um zwölf Uhr fünfzehn wieder im Innenhof beim Café.\nMarkus: Super, dann wissen wir Bescheid — legen wir los!",
             "hearingFocusTrap": "Unterscheiden Sie „gestattet“ (Fotos ohne Blitz) vs. „untersagt“ (Berühren) und den Treffpunkt nach der Pause!",
             "questions": [
               {
@@ -16996,7 +16996,7 @@
         "durationMinutes": 25,
         "maxPlaysStrict": 2,
         "contextNote": "Sie hören eine Medienpsychologin über Multitasking am Arbeitsplatz.",
-        "audioScript": "Viele Berufstätige sind stolz auf ihr Multitasking, doch neurologisch gesehen existiert echtes paralleles Denken bei anspruchsvollen Aufgaben gar nicht. Unser Gehirn springt lediglich rasend schnell zwischen Kontexten hin und her. Jeder dieser Wechsel kostet sogenannte Wechselkosten: Studien zeigen, dass man nach einer kurzen Chat-Unterbrechung im Schnitt mehrere Minuten benötigt, um wieder dieselbe gedankliche Tiefe zu erreichen. Wirksamer als reine Selbstdisziplin sind daher feste, im Team vereinbarte Fokuszeiten ohne Benachrichtigungen.",
+        "audioScript": "Moderator: Frau Dr. Brandt, viele Berufstätige sind ja richtig stolz auf ihr Multitasking. Funktioniert das neurologisch überhaupt?\nDr. Brandt: Leider überhaupt nicht! Bei anspruchsvollen Aufgaben existiert echtes paralleles Denken im Gehirn gar nicht — unser Kopf springt lediglich rasend schnell zwischen Kontexten hin und her.\nModerator: Und was kostet uns dieses ständige Hin-und-Her-Springen?\nDr. Brandt: Wir nennen das Wechselkosten. Studien zeigen, dass man schon nach einer kurzen Chat-Unterbrechung im Schnitt mehrere Minuten braucht, um wieder dieselbe gedankliche Tiefe zu erreichen.\nModerator: Hilft da am Ende nur eiserne Selbstdisziplin?\nDr. Brandt: Eben nicht! Deutlich wirksamer als reine Selbstdisziplin sind feste, gemeinsam im Team vereinbarte Fokuszeiten ganz ohne Benachrichtigungen.",
         "hearingFocusTrap": "Notice the contrast between \"reine Selbstdisziplin\" (less effective) vs. \"im Team vereinbarte Fokuszeiten\" (recommended).",
         "questions": [
           {
@@ -17044,7 +17044,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Viele Berufstätige sind stolz auf ihr Multitasking, doch neurologisch gesehen existiert echtes paralleles Denken bei anspruchsvollen Aufgaben gar nicht. Unser Gehirn springt lediglich rasend schnell zwischen Kontexten hin und her. Jeder dieser Wechsel kostet sogenannte Wechselkosten: Studien zeigen, dass man nach einer kurzen Chat-Unterbrechung im Schnitt mehrere Minuten benötigt, um wieder dieselbe gedankliche Tiefe zu erreichen. Wirksamer als reine Selbstdisziplin sind daher feste, im Team vereinbarte Fokuszeiten ohne Benachrichtigungen.",
+            "audioScript": "Moderator: Frau Dr. Brandt, viele Berufstätige sind ja richtig stolz auf ihr Multitasking. Funktioniert das neurologisch überhaupt?\nDr. Brandt: Leider überhaupt nicht! Bei anspruchsvollen Aufgaben existiert echtes paralleles Denken im Gehirn gar nicht — unser Kopf springt lediglich rasend schnell zwischen Kontexten hin und her.\nModerator: Und was kostet uns dieses ständige Hin-und-Her-Springen?\nDr. Brandt: Wir nennen das Wechselkosten. Studien zeigen, dass man schon nach einer kurzen Chat-Unterbrechung im Schnitt mehrere Minuten braucht, um wieder dieselbe gedankliche Tiefe zu erreichen.\nModerator: Hilft da am Ende nur eiserne Selbstdisziplin?\nDr. Brandt: Eben nicht! Deutlich wirksamer als reine Selbstdisziplin sind feste, gemeinsam im Team vereinbarte Fokuszeiten ganz ohne Benachrichtigungen.",
             "hearingFocusTrap": "Notice the contrast between \"reine Selbstdisziplin\" (less effective) vs. \"im Team vereinbarte Fokuszeiten\" (recommended).",
             "questions": [
               {
@@ -17092,7 +17092,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Interviewer: Frau Professorin Novak, ersetzen KI-Lernassistenten bald klassische Nachhilfe? Novak: Das lässt sich so pauschal keineswegs sagen. Zwar stehen digitale Erklärungen rund um die Uhr zur Verfügung und senken Hemmschwellen bei Rückfragen. Infolgedessen profitieren besonders selbstständige Lernende. Wer jedoch grundlegende Motivationsprobleme hat, braucht nach wie vor menschliche Begleitung, die individuell ermutigt.",
+            "audioScript": "Interviewer: Frau Professorin Novak, an der Universität Wien forschen Sie zu digitaler Bildung. Ersetzen KI-Lernassistenten bald klassische Nachhilfe?\nProf. Novak: Nein, so pauschal lässt sich das keineswegs sagen — da muss man differenzieren.\nInterviewer: Wo liegen denn die echten Stärken der digitalen Werkzeuge?\nProf. Novak: Zwar stehen digitale Erklärungen rund um die Uhr zur Verfügung und senken Hemmschwellen bei Rückfragen. Infolgedessen profitieren besonders selbstständige Lernende enorm.\nInterviewer: Und wo stoßen sie an ihre Grenzen?\nProf. Novak: Wer jedoch grundlegende Motivationsprobleme hat, braucht nach wie vor menschliche Begleitung, die individuell ermutigt und dranbleibt.",
             "hearingFocusTrap": "Unterscheiden Sie, welche Schülergruppe profitiert vs. wer weiterhin menschliche Begleitung braucht!",
             "questions": [
               {
@@ -17140,7 +17140,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Im Vergleich zum Vorjahr hat sich der Anteil des Schienengüterverkehrs zwar um neun Prozent erhöht, doch auf einzelnen Nebenstrecken stagnieren die Zahlen. Experten führen dies vor allem auf langwierige Baustellen zurück. Sofern die neuen Tunnelabschnitte planmäßig öffnen, prognostiziert das Verkehrsamt ab zweitausendachtundzwanzig deutlich kürzere Fahrzeiten.",
+            "audioScript": "Moderatorin: Herr Keller, das Schweizer Verkehrsamt hat gerade frische Zahlen zum Alpen-Transit vorgelegt. Wie entwickelt sich der Schienengüterverkehr?\nHerr Keller: Insgesamt erfreulich: Im Vergleich zum Vorjahr hat sich der Anteil des Schienengüterverkehrs immerhin um neun Prozent erhöht.\nModeratorin: Klingt stark — aber auf regionalen Nebenstrecken hört man noch Kritik.\nHerr Keller: Zu Recht, denn auf einzelnen Nebenstrecken stagnieren die Zahlen noch. Experten führen das vor allem auf langwierige Baustellen zurück.\nModeratorin: Wann dürften die Unternehmen dort eine spürbare Entlastung merken?\nHerr Keller: Sofern die neuen Tunnelabschnitte planmäßig öffnen, prognostiziert das Verkehrsamt ab zweitausendachtundzwanzig deutlich kürzere Fahrzeiten.",
             "hearingFocusTrap": "Unterscheiden Sie den Gesamtzuwachs (+9 %) vs. Stagnation auf Nebenstrecken und die Bedingung „sofern“!",
             "questions": [
               {
@@ -17539,7 +17539,7 @@
         "durationMinutes": 29,
         "maxPlaysStrict": 1,
         "contextNote": "Strenger C1-Modus: Sie hören den Ausschnitt aus einem Fachpodium zur digitalen Souveränität nur EINMAL.",
-        "audioScript": "Moderatorin: Professor Lindner, inwiefern unterscheidet sich digitale Souveränität von bloßem Protektionismus? Prof. Lindner: Ein entscheidender Unterschied! Protektionismus schottet Märkte ab und erstickt Innovation. Digitale Souveränität hingegen bedeutet Wahlfreiheit — also die Fähigkeit von Staaten und Unternehmen, kritische Infrastrukturen über offene Standards zu betreiben, ohne von einem einzelnen Anbieter abhängig zu sein. Nur durch Interoperabilität lässt sich wirtschaftliche Resilienz mit internationaler Offenheit versöhnen.",
+        "audioScript": "Moderatorin: Professor Lindner, in der politischen Debatte wird „digitale Souveränität“ oft mit Protektionismus verwechselt. Wo ziehen Sie die Grenze?\nProf. Lindner: Das ist ein entscheidender Unterschied! Protektionismus schottet Märkte ab und erstickt Innovation.\nModeratorin: Und was genau verstehen Sie stattdessen unter digitaler Souveränität?\nProf. Lindner: Sie bedeutet vor allem Wahlfreiheit — also die Fähigkeit von Staaten und Unternehmen, kritische Infrastrukturen über offene Standards zu betreiben, ohne von einem einzelnen Anbieter abhängig zu sein.\nModeratorin: Lässt sich wirtschaftliche Resilienz denn überhaupt mit globaler Offenheit verbinden?\nProf. Lindner: Ja, genau über einen Schlüsselbegriff: Nur durch echte Interoperabilität lässt sich Resilienz mit internationaler Offenheit versöhnen.",
         "hearingFocusTrap": "Single play only! Distinguish Protektionismus (Abschottung) from Digitale Souveränität (Wahlfreiheit & Interoperabilität).",
         "questions": [
           {
@@ -17587,7 +17587,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 1,
             "preReadSeconds": 15,
-            "audioScript": "Moderatorin: Professor Lindner, inwiefern unterscheidet sich digitale Souveränität von bloßem Protektionismus? Prof. Lindner: Ein entscheidender Unterschied! Protektionismus schottet Märkte ab und erstickt Innovation. Digitale Souveränität hingegen bedeutet Wahlfreiheit — also die Fähigkeit von Staaten und Unternehmen, kritische Infrastrukturen über offene Standards zu betreiben, ohne von einem einzelnen Anbieter abhängig zu sein. Nur durch Interoperabilität lässt sich wirtschaftliche Resilienz mit internationaler Offenheit versöhnen.",
+            "audioScript": "Moderatorin: Professor Lindner, in der politischen Debatte wird „digitale Souveränität“ oft mit Protektionismus verwechselt. Wo ziehen Sie die Grenze?\nProf. Lindner: Das ist ein entscheidender Unterschied! Protektionismus schottet Märkte ab und erstickt Innovation.\nModeratorin: Und was genau verstehen Sie stattdessen unter digitaler Souveränität?\nProf. Lindner: Sie bedeutet vor allem Wahlfreiheit — also die Fähigkeit von Staaten und Unternehmen, kritische Infrastrukturen über offene Standards zu betreiben, ohne von einem einzelnen Anbieter abhängig zu sein.\nModeratorin: Lässt sich wirtschaftliche Resilienz denn überhaupt mit globaler Offenheit verbinden?\nProf. Lindner: Ja, genau über einen Schlüsselbegriff: Nur durch echte Interoperabilität lässt sich Resilienz mit internationaler Offenheit versöhnen.",
             "hearingFocusTrap": "Single play only! Distinguish Protektionismus (Abschottung) from Digitale Souveränität (Wahlfreiheit & Interoperabilität).",
             "questions": [
               {
@@ -17635,7 +17635,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Dr. Steiner: Ich räume gern ein, dass traditionelle Fachverlage über Jahrzehnte ein funktionierendes Begutachtungssystem aufgebaut haben. Dem halte ich jedoch entgegen, dass öffentlich finanzierte Forschung nicht hinter teuren Bezahlschranken verschwinden darf — zumal kleine Universitäten diese Lizenzgebühren kaum noch schultern können. Ein transparenter Übergang zu frei zugänglichen Publikationen dürfte daher langfristig unabdingbar sein.",
+            "audioScript": "Moderatorin: Dr. Steiner, Sie fordern den radikalen Umbau wissenschaftlicher Publikationen. Übersehen Sie dabei nicht die Leistung klassischer Verlage?\nDr. Steiner: Keineswegs! Ich räume gern ein, dass traditionelle Fachverlage über Jahrzehnte ein funktionierendes Begutachtungssystem aufgebaut haben.\nModeratorin: Was genau stört Sie dann am gegenwärtigen Modell?\nDr. Steiner: Dem halte ich entgegen, dass öffentlich finanzierte Forschung nicht hinter teuren Bezahlschranken verschwinden darf — zumal kleine Universitäten diese Lizenzgebühren kaum noch schultern können.\nModeratorin: Halten Sie Open Access also für mehr als einen bloßen Trend?\nDr. Steiner: Absolut. Ein transparenter Übergang zu frei zugänglichen Publikationen dürfte langfristig schlicht unabdingbar sein.",
             "hearingFocusTrap": "Einmaliges Hören! Trennen Sie das Zugeständnis („räume ein“) von der Kernthese („halte entgegen ... zumal“).",
             "questions": [
               {
@@ -17683,7 +17683,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Angesichts immer häufigerer Starkregenereignisse gewinnt das Prinzip der Schwammstadt an Bedeutung. Statt Niederschläge rasch in überlastete Kanäle abzuleiten, speichern begrünte Dächer und entsiegelte Plätze das Wasser vor Ort. Einschränkend weisen Hydrologen allerdings darauf hin, dass Umbauten im dichten historischen Bestand erhebliche Mittel in Anspruch nehmen und bestehende Leitungsnetze nicht vollständig ersetzen.",
+            "audioScript": "Interviewer: Frau Dr. Graf, angesichts immer häufigerer Starkregenereignisse reden alle über die „Schwammstadt“. Was steckt konkret dahinter?\nDr. Graf: Das Grundprinzip ist eigentlich bestechend einfach: Statt Niederschläge rasch in überlastete Kanäle abzuleiten, speichern begrünte Dächer und entsiegelte Plätze das Wasser direkt vor Ort.\nInterviewer: Klingt fast wie eine Patentlösung für überflutete Innenstädte — oder gibt es Haken?\nDr. Graf: Einschränkend weisen wir Hydrologen klar darauf hin, dass Umbauten im dichten historischen Bestand erhebliche finanzielle Mittel in Anspruch nehmen.\nInterviewer: Das heißt, klassische Kanalnetze werden dadurch nicht überflüssig?\nDr. Graf: Genau — begrünte Flächen entlasten das System spürbar, ersetzen bestehende Leitungsnetze aber nicht vollständig.",
             "hearingFocusTrap": "Achten Sie auf den einschränkenden Vorbehalt am Schluss („Einschränkend weisen Hydrologen darauf hin...“)!",
             "questions": [
               {
@@ -18079,7 +18079,7 @@
         "durationMinutes": 33,
         "maxPlaysStrict": 1,
         "contextNote": "Strenger C2-Modus: Einmaliges Hören eines kulturphilosophischen Interviews.",
-        "audioScript": "Interviewer: Verliert das gedruckte Buch im Zeitalter permanenter Verfügbarkeit seinen kulturellen Rang? Autorin: Im Gegenteil — gerade seine Begrenztheit wird wieder zum Luxus. Ein Buch blinkt nicht, es schickt keine Push-Meldung und zwingt mich nicht zur sofortigen Stellungnahme. Diese widerständige Langsamkeit erlaubt erst jene produktive Fremdheit, in der man einen Gedanken nicht bloß konsumiert, sondern tatsächlich an ihm reift.",
+        "audioScript": "Interviewer: Frau Hartmann, Hand aufs Herz: Verliert das gedruckte Buch im Zeitalter permanenter digitaler Verfügbarkeit allmählich seinen kulturellen Rang?\nAutorin: Im Gegenteil — gerade seine Begrenztheit wird wieder zum eigentlichen Luxus!\nInterviewer: Begrenztheit als Luxus? Wie meinen Sie das?\nAutorin: Nun ja, ein Buch blinkt nicht, es schickt keine Push-Meldung und zwingt mich nicht zur sofortigen Stellungnahme.\nInterviewer: Und was gewinnt man durch diese Entschleunigung beim Lesen?\nAutorin: Diese widerständige Langsamkeit erlaubt erst jene produktive Fremdheit, in der man einen Gedanken nicht bloß konsumiert, sondern tatsächlich an ihm reift.",
         "hearingFocusTrap": "Catch the paradoxical phrasing: \"Begrenztheit wird zum Luxus\" and \"widerständige Langsamkeit\".",
         "questions": [
           {
@@ -18127,7 +18127,7 @@
             "accentCode": "de-DE",
             "maxPlaysStrict": 1,
             "preReadSeconds": 15,
-            "audioScript": "Interviewer: Verliert das gedruckte Buch im Zeitalter permanenter Verfügbarkeit seinen kulturellen Rang? Autorin: Im Gegenteil — gerade seine Begrenztheit wird wieder zum Luxus. Ein Buch blinkt nicht, es schickt keine Push-Meldung und zwingt mich nicht zur sofortigen Stellungnahme. Diese widerständige Langsamkeit erlaubt erst jene produktive Fremdheit, in der man einen Gedanken nicht bloß konsumiert, sondern tatsächlich an ihm reift.",
+            "audioScript": "Interviewer: Frau Hartmann, Hand aufs Herz: Verliert das gedruckte Buch im Zeitalter permanenter digitaler Verfügbarkeit allmählich seinen kulturellen Rang?\nAutorin: Im Gegenteil — gerade seine Begrenztheit wird wieder zum eigentlichen Luxus!\nInterviewer: Begrenztheit als Luxus? Wie meinen Sie das?\nAutorin: Nun ja, ein Buch blinkt nicht, es schickt keine Push-Meldung und zwingt mich nicht zur sofortigen Stellungnahme.\nInterviewer: Und was gewinnt man durch diese Entschleunigung beim Lesen?\nAutorin: Diese widerständige Langsamkeit erlaubt erst jene produktive Fremdheit, in der man einen Gedanken nicht bloß konsumiert, sondern tatsächlich an ihm reift.",
             "hearingFocusTrap": "Catch the paradoxical phrasing: \"Begrenztheit wird zum Luxus\" and \"widerständige Langsamkeit\".",
             "questions": [
               {
@@ -18175,7 +18175,7 @@
             "accentCode": "de-AT",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Kritikerin: Historisierende Rekonstruktionen ganzer Stadtviertel treffen zwar ein verständliches Bedürfnis nach Vertrautheit; gleichwohl untergraben perfekte Kulissen mitunter das Bewusstsein für historische Brüche. Architektur sollte Widersprüche nicht glattbügeln, sondern lesbar halten — darin liegt die eigentliche Gretchenfrage jeder Denkmalpflege.",
+            "audioScript": "Moderator: Frau Dr. Hofer, die Rekonstruktion ganzer historischer Altstadtzeilen begeistert ja viele Bürger. Warum bleiben Sie dennoch skeptisch?\nKritikerin: Verstehen Sie mich nicht falsch — historisierende Rekonstruktionen ganzer Stadtviertel treffen durchaus ein verständliches Bedürfnis nach Vertrautheit.\nModerator: Wo genau liegt dann aus Sicht der Denkmalpflege das Problem?\nKritikerin: Gleichwohl untergraben makellose Kulissen mitunter das Bewusstsein für historische Brüche, als habe es nie Zerstörung oder Wandel gegeben.\nModerator: Was wäre demnach die anspruchsvollere Haltung im Städtebau?\nKritikerin: Architektur sollte Widersprüche nicht glattbügeln, sondern lesbar halten — genau darin liegt die eigentliche Gretchenfrage jeder Denkmalpflege.",
             "hearingFocusTrap": "Einmaliges Hören! Verfolgen Sie die Metaphern „glattbügeln“ und „Gretchenfrage“!",
             "questions": [
               {
@@ -18223,7 +18223,7 @@
             "accentCode": "de-CH",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Direkte Abstimmungen verlangen den Stimmberechtigten zweifellos Geduld und allfällige Kompromissbereitschaft ab. Wer jedoch behauptet, Bürgerentscheide trieben die Polarisierung zwangsläufig auf die Spitze, verkennt deren befriedende Wirkung: Gerade das öffentliche Ausloten strittiger Fragen entkräftet oft jenes Gefühl der Ohnmacht, das demokratische Institutionen andernorts untergräbt.",
+            "audioScript": "Moderatorin: Herr Professor Frei, Kritiker werfen der direkten Demokratie häufig vor, Volksabstimmungen verschärften gesellschaftliche Spaltungen. Teilen Sie diese Sorge?\nProf. Frei: Sicherlich verlangen direkte Abstimmungen den Stimmberechtigten Geduld und allfällige Kompromissbereitschaft ab — einfach ist das nicht.\nModeratorin: Aber treiben knappe Abstimmungen die Polarisierung nicht dennoch auf die Spitze?\nProf. Frei: Wer behauptet, Bürgerentscheide trieben die Polarisierung zwangsläufig auf die Spitze, verkennt deren befriedende Wirkung.\nModeratorin: Inwiefern kann ein strittiges Votum gesellschaftlich befriedend wirken?\nProf. Frei: Gerade das öffentliche Ausloten strittiger Fragen entkräftet oft jenes Gefühl der Ohnmacht, das demokratische Institutionen andernorts gefährlich untergräbt.",
             "hearingFocusTrap": "Schweizer Standardlexik („Stimmberechtigte“, „allfällig“) + Umkehrung des Polarisierungsvorwurfs!",
             "questions": [
               {
@@ -18619,7 +18619,7 @@
         "durationMinutes": 13,
         "maxPlaysStrict": 2,
         "contextNote": "Listen to a short bookstore announcement in London.",
-        "audioScript": "Good afternoon shoppers! Our travel book section on the second floor has a twenty percent discount today until five thirty. Please note that the coffee bar on the ground floor closes at five o’clock. Thank you for visiting River Books!",
+        "audioScript": "Emma: Excuse me! Do you know where the travel books are? I couldn’t find them downstairs.\nDaniel: Hi there! Yes, our travel book section is up on the second floor — and you’re in luck, there’s a twenty percent discount today until five thirty.\nEmma: Oh, twenty percent off! That’s awesome. Could I grab a quick coffee downstairs first?\nDaniel: Sure, the coffee bar is right on the ground floor, just be quick — it closes at five o’clock sharp!\nEmma: Good thing you told me! I’ll head down for coffee first and then check out the second floor.",
         "hearingFocusTrap": "Distinguish 5:30 (book discount ends) vs. 5:00 (coffee bar closes) and second floor vs. ground floor.",
         "questions": [
           {
@@ -18667,7 +18667,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Good afternoon shoppers! Our travel book section on the second floor has a twenty percent discount today until five thirty. Please note that the coffee bar on the ground floor closes at five o’clock. Thank you for visiting River Books!",
+            "audioScript": "Emma: Excuse me! Do you know where the travel books are? I couldn’t find them downstairs.\nDaniel: Hi there! Yes, our travel book section is up on the second floor — and you’re in luck, there’s a twenty percent discount today until five thirty.\nEmma: Oh, twenty percent off! That’s awesome. Could I grab a quick coffee downstairs first?\nDaniel: Sure, the coffee bar is right on the ground floor, just be quick — it closes at five o’clock sharp!\nEmma: Good thing you told me! I’ll head down for coffee first and then check out the second floor.",
             "hearingFocusTrap": "Distinguish 5:30 (book discount ends) vs. 5:00 (coffee bar closes) and second floor vs. ground floor.",
             "questions": [
               {
@@ -18715,7 +18715,7 @@
             "accentCode": "en-US",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Welcome to Riverside Hotel! Your reservation is for Room 304 on the third floor. Breakfast is served from seven to ten in the morning in the sunny garden room. If you need help with your luggage, our porter is right next to the elevator. Enjoy your stay!",
+            "audioScript": "David: Welcome to Riverside Hotel! Let me pull up your reservation... Ah yes, you’re in Room 304 on the third floor.\nSophie: Wonderful, thank you! Could you tell me when and where breakfast is served tomorrow?\nDavid: Of course! Breakfast is served from seven to ten in the morning in our sunny garden room.\nSophie: Seven to ten in the garden room — got it. Oh, and my suitcase is quite heavy...\nDavid: No problem at all! Our porter is standing right next to the elevator and will happily help you with your luggage.",
             "hearingFocusTrap": "Catch the room number (304), breakfast window (7–10 am), and breakfast location (garden room).",
             "questions": [
               {
@@ -18763,7 +18763,7 @@
             "accentCode": "en-AU",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Good afternoon shoppers! Just a quick reminder that our bookstore closes in twenty minutes at six o’clock sharp. Today all travel guides have a twenty-five percent discount at the front counter. Thank you for visiting us today!",
+            "audioScript": "Chloe: Excuse me, how much longer is the bookstore open today?\nLiam: G’day! Just a quick heads-up — we’re closing in twenty minutes, at six o’clock sharp.\nChloe: Oh right, I’d better hurry then! Are any books on sale today?\nLiam: Yep, all travel guides have a twenty-five percent discount right at the front counter today.\nChloe: Twenty-five percent off travel guides? Brilliant, I’ll grab the New Zealand one right now!",
             "hearingFocusTrap": "Listen for closing time (6:00) vs. countdown (20 mins) and discount percentage (25%).",
             "questions": [
               {
@@ -19160,7 +19160,7 @@
         "durationMinutes": 16,
         "maxPlaysStrict": 2,
         "contextNote": "Listen to Sam leaving a voicemail about a weekend cooking class.",
-        "audioScript": "Hi! Just calling about our Italian cooking class on Sunday. The website originally said it started at two o’clock, but the chef emailed to move it to two thirty. Everything is included in the twenty-five pound fee—ingredients and aprons—so you only need to bring a container to take home your extra pasta!",
+        "audioScript": "Oliver: Hey Sarah! I’m just calling about our Italian cooking class on Sunday.\nSarah: Oh hi Oliver! We’re still meeting at two o’clock, right?\nOliver: Actually, that’s why I rang — the website originally said two o’clock, but the chef just emailed to move it to two thirty.\nSarah: Good catch! Do we need to bring ingredients or an apron?\nOliver: Nope, everything is included in the twenty-five pound fee — ingredients and aprons — so you only need to bring a food container to take home your extra pasta!\nSarah: Amazing, twenty-five pounds all-in and a container for leftovers. See you at two thirty!",
         "hearingFocusTrap": "Catch the time correction (2:00 -> 2:30) and what you actually need to bring (container, NOT apron).",
         "questions": [
           {
@@ -19208,7 +19208,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Hi! Just calling about our Italian cooking class on Sunday. The website originally said it started at two o’clock, but the chef emailed to move it to two thirty. Everything is included in the twenty-five pound fee—ingredients and aprons—so you only need to bring a container to take home your extra pasta!",
+            "audioScript": "Oliver: Hey Sarah! I’m just calling about our Italian cooking class on Sunday.\nSarah: Oh hi Oliver! We’re still meeting at two o’clock, right?\nOliver: Actually, that’s why I rang — the website originally said two o’clock, but the chef just emailed to move it to two thirty.\nSarah: Good catch! Do we need to bring ingredients or an apron?\nOliver: Nope, everything is included in the twenty-five pound fee — ingredients and aprons — so you only need to bring a food container to take home your extra pasta!\nSarah: Amazing, twenty-five pounds all-in and a container for leftovers. See you at two thirty!",
             "hearingFocusTrap": "Catch the time correction (2:00 -> 2:30) and what you actually need to bring (container, NOT apron).",
             "questions": [
               {
@@ -19256,7 +19256,7 @@
             "accentCode": "en-AU",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Emma: Liam, are we still going kayaking on Saturday morning? Liam: I wanted to, but the forecast says strong wind, so the rental shop cancelled morning boats. Emma: Oh no! Shall we visit the science museum instead? Liam: Great idea! Let’s catch the ten-fifteen tram — my brother is coming too and he has already booked three student tickets online.",
+            "audioScript": "Emma: Liam, are we still going kayaking on Saturday morning?\nLiam: I really wanted to, but the forecast says strong wind, so the rental shop cancelled all morning boats.\nEmma: Oh no, what a shame! Shall we visit the science museum instead?\nLiam: Great idea! Let’s catch the ten-fifteen tram into town.\nEmma: Sounds good — should I buy our tickets online now?\nLiam: No need! My brother is coming too and he has already booked three student tickets online.",
             "hearingFocusTrap": "Watch the cancelled plan (kayaking) → replacement plan (science museum) + who booked tickets!",
             "questions": [
               {
@@ -19304,7 +19304,7 @@
             "accentCode": "en-IE",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Good morning everyone! Today’s walking tour takes two hours, and we’ll finish opposite Trinity College at noon. Please stay with the group while we cross busy streets. If you feel hungry after the tour, I strongly recommend the small bakery on Grafton Street — their brown bread is delicious and much cheaper than tourist restaurants!",
+            "audioScript": "Claire: Good morning! Ready for the Dublin walking tour? Just stay with the group when we cross the busy streets.\nBen: Morning! How long does the walk take, and where do we finish up?\nClaire: It takes two hours in total, so we’ll finish right opposite Trinity College at noon.\nBen: Brilliant — any lunch tips nearby once we’re done?\nClaire: If you’re hungry afterward, definitely try the small bakery on Grafton Street. Their brown bread is delicious and much cheaper than the tourist restaurants!",
             "hearingFocusTrap": "Catch tour length (2 hours), finish location (opposite Trinity College), and why the bakery is recommended.",
             "questions": [
               {
@@ -19700,7 +19700,7 @@
         "durationMinutes": 21,
         "maxPlaysStrict": 2,
         "contextNote": "Listen to a short podcast clip about urban cycling infrastructure.",
-        "audioScript": "Host: So when Copenhagen started expanding its protected bike lanes, did drivers push back at first? Guest: Oh, absolutely—local merchants worried customers wouldn’t turn up if street parking disappeared. Yet within two years, foot and cycle traffic rose so sharply that neighborhood bakery and café revenues actually went up. People stop far more spontaneously when they’re on a bike than when they’re hunting for a parking spot.",
+        "audioScript": "Host: So when Copenhagen started expanding its protected bike lanes, did local drivers and businesses push back at first?\nClara: Oh, absolutely! Local merchants were really worried customers wouldn’t turn up once street parking disappeared.\nHost: And did sales actually drop like they feared?\nClara: Quite the opposite — within two years, foot and cycle traffic rose so sharply that neighborhood bakery and café revenues actually went up.\nHost: Why do you think cyclists spend more at neighborhood shops?\nClara: It’s simple: people stop far more spontaneously when they’re on a bike than when they’re frustrated hunting for a parking spot.",
         "hearingFocusTrap": "Hear phrasal verbs (\"push back\", \"turn up\", \"went up\") and contrast initial merchant fear vs. 2-year reality.",
         "questions": [
           {
@@ -19748,7 +19748,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Host: So when Copenhagen started expanding its protected bike lanes, did drivers push back at first? Guest: Oh, absolutely—local merchants worried customers wouldn’t turn up if street parking disappeared. Yet within two years, foot and cycle traffic rose so sharply that neighborhood bakery and café revenues actually went up. People stop far more spontaneously when they’re on a bike than when they’re hunting for a parking spot.",
+            "audioScript": "Host: So when Copenhagen started expanding its protected bike lanes, did local drivers and businesses push back at first?\nClara: Oh, absolutely! Local merchants were really worried customers wouldn’t turn up once street parking disappeared.\nHost: And did sales actually drop like they feared?\nClara: Quite the opposite — within two years, foot and cycle traffic rose so sharply that neighborhood bakery and café revenues actually went up.\nHost: Why do you think cyclists spend more at neighborhood shops?\nClara: It’s simple: people stop far more spontaneously when they’re on a bike than when they’re frustrated hunting for a parking spot.",
             "hearingFocusTrap": "Hear phrasal verbs (\"push back\", \"turn up\", \"went up\") and contrast initial merchant fear vs. 2-year reality.",
             "questions": [
               {
@@ -19796,7 +19796,7 @@
             "accentCode": "en-US",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Host: Hannah, how did your neighborhood book-swap box begin? Hannah: Honestly, I had run out of shelf space at home! I almost put off building the wooden box until spring, yet once I placed twenty novels outside, neighbors filled it twice over in a week. The only drawback is rain, so last month a local carpenter helped us add a stronger roof.",
+            "audioScript": "Host: Hannah, your neighborhood book-swap box has become a local hit! How did the idea start?\nHannah: Honestly? I had completely run out of shelf space at home! I almost put off building the wooden box until spring.\nHost: How did neighbors react once you put it outside?\nHannah: It blew me away — once I placed twenty novels inside, neighbors filled it twice over in a single week!\nHost: Any unexpected challenges running a mini outdoor library?\nHannah: The only real drawback was heavy rain damaging paperbacks, so last month a local carpenter helped us add a much stronger roof.",
             "hearingFocusTrap": "Distinguish what inspired the idea (no shelf space) vs. the drawback (rain) vs. who fixed it (local carpenter).",
             "questions": [
               {
@@ -19844,7 +19844,7 @@
             "accentCode": "en-IN",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Welcome to our orientation! Please make sure you pick up your campus transit card before Wednesday, as fares double without it. Our weekend heritage walk is free, though we have only a few seats left on the coach, so sign up at reception this afternoon if you’d like to take part.",
+            "audioScript": "Priya: Welcome to Bengaluru orientation! Have you picked up your campus transit card yet?\nTom: Not yet — can I just get it next week once classes start?\nPriya: I wouldn’t wait! Make sure you pick it up before Wednesday, because bus and train fares double without it.\nTom: Whoa, double the fare — I’ll grab it tomorrow! What about the weekend heritage walk? Does it cost extra?\nPriya: The heritage walk is completely free! Just sign up at reception this afternoon though, because we only have a few seats left on the coach.",
             "hearingFocusTrap": "Catch deadline (before Wednesday), why it matters (fares double), and why to sign up today (only a few seats left).",
             "questions": [
               {
@@ -20238,7 +20238,7 @@
         "durationMinutes": 25,
         "maxPlaysStrict": 2,
         "contextNote": "Listen to two university students comparing study strategies before finals.",
-        "audioScript": "Maya: I used to spend hours highlighting textbook chapters in neon yellow, thinking I was absorbing everything. Leo: Same here—until I bombed a mock exam and realized passive rereading creates an illusion of competence. Switching to active recall flashcards and explaining concepts aloud to an empty room cut my revision time almost in half. Maya: That’s exactly what I’m trying this semester, though spacing reviews over weeks instead of cramming is the hardest habit to stick to.",
+        "audioScript": "Maya: I used to spend hours highlighting textbook chapters in neon yellow, convinced I was absorbing everything.\nLeo: Same here — until I bombed a mock exam and realized passive rereading just creates an illusion of competence.\nMaya: Wait, what did you switch to instead?\nLeo: Active recall flashcards and explaining tricky concepts aloud to an empty room. Honestly, it cut my revision time almost in half.\nMaya: That’s exactly what I’m trying this semester! Though spacing reviews over weeks instead of cramming at the last minute is still the hardest habit to stick to.",
         "hearingFocusTrap": "Track the distinction between \"illusion of competence\" (highlighting) and Maya’s toughest obstacle (spacing over weeks).",
         "questions": [
           {
@@ -20286,7 +20286,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 2,
             "preReadSeconds": 15,
-            "audioScript": "Maya: I used to spend hours highlighting textbook chapters in neon yellow, thinking I was absorbing everything. Leo: Same here—until I bombed a mock exam and realized passive rereading creates an illusion of competence. Switching to active recall flashcards and explaining concepts aloud to an empty room cut my revision time almost in half. Maya: That’s exactly what I’m trying this semester, though spacing reviews over weeks instead of cramming is the hardest habit to stick to.",
+            "audioScript": "Maya: I used to spend hours highlighting textbook chapters in neon yellow, convinced I was absorbing everything.\nLeo: Same here — until I bombed a mock exam and realized passive rereading just creates an illusion of competence.\nMaya: Wait, what did you switch to instead?\nLeo: Active recall flashcards and explaining tricky concepts aloud to an empty room. Honestly, it cut my revision time almost in half.\nMaya: That’s exactly what I’m trying this semester! Though spacing reviews over weeks instead of cramming at the last minute is still the hardest habit to stick to.",
             "hearingFocusTrap": "Track the distinction between \"illusion of competence\" (highlighting) and Maya’s toughest obstacle (spacing over weeks).",
             "questions": [
               {
@@ -20334,7 +20334,7 @@
             "accentCode": "en-AU",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Student: Our survey shows seventy-eight percent of office staff feel more productive working from home twice a week. Tutor: To a large extent that aligns with European studies. On the flip side, bear in mind that junior employees who joined remotely reported slower mentoring — so we should take onboarding experience into account before claiming remote work suits everyone equally.",
+            "audioScript": "Student: Our survey results are in — seventy-eight percent of office staff say they feel more productive working from home twice a week.\nTutor: To a large extent that aligns closely with recent European workplace studies.\nStudent: So can we conclude that hybrid work benefits everyone across the board?\nTutor: Hold on — on the flip side, bear in mind that junior employees who joined remotely reported noticeably slower mentoring.\nStudent: Ah, good point. So we shouldn’t generalize without career-stage context.\nTutor: Exactly. Make sure you factor onboarding and mentoring experience into your final report before claiming remote work suits everyone equally.",
             "hearingFocusTrap": "Notice the hedge (\"To a large extent\") followed by the critical caveat about junior onboarding!",
             "questions": [
               {
@@ -20382,7 +20382,7 @@
             "accentCode": "en-ZA",
             "maxPlaysStrict": 2,
             "preReadSeconds": 20,
-            "audioScript": "Following severe drought warnings, municipal water usage fell by nearly half within eighteen months. Smart pressure meters accounted for a substantial share of those savings by detecting hidden pipe leaks overnight. Nevertheless, engineers warn against complacency: as population density climbs, diversifying supply through rainwater harvesting and recycled gray water remains the only viable long-term path.",
+            "audioScript": "Host: Following severe drought warnings in Cape Town, how much did municipal water usage actually drop?\nDr. Naidoo: It was remarkable — citywide consumption fell by nearly half within eighteen months.\nHost: Was that purely citizens taking shorter showers, or did technology play a role?\nDr. Naidoo: Smart pressure meters accounted for a huge share of those savings by detecting hidden pipe leaks overnight before water went to waste.\nHost: Does that mean the water crisis is permanently solved?\nDr. Naidoo: Engineers strongly warn against complacency. As population density climbs, diversifying supply through rainwater harvesting and recycled gray water remains the only viable long-term path.",
             "hearingFocusTrap": "Track how much water usage dropped (nearly half), what smart meters caught (hidden leaks), and the long-term recommendation.",
             "questions": [
               {
@@ -20776,7 +20776,7 @@
         "durationMinutes": 29,
         "maxPlaysStrict": 1,
         "contextNote": "Strict C1 Mode: You hear this behavioral economics lecture excerpt ONLY ONCE.",
-        "audioScript": "One of the most counterintuitive findings in behavioral economics is the paradox of choice. Classical rational-actor models assumed that expanding options could only improve welfare—after all, you can simply ignore alternatives you dislike. Yet field experiments repeatedly reveal that when shoppers face twenty-four varieties of jam instead of six, conversion rates actually plummet. Evaluating excessive options imposes cognitive overload and amplifies anticipated regret: even after choosing, consumers nag themselves wondering whether one of the rejected options might have been marginally superior.",
+        "audioScript": "Interviewer: Behavioral economists love talking about the \"paradox of choice.\" Why did it rattle classical economic theory so much?\nDr. Hayes: Classical rational-actor models assumed expanding options could only improve welfare — after all, you can just ignore alternatives you dislike.\nInterviewer: Yet shoppers don’t actually behave that way in the supermarket?\nDr. Hayes: Not at all! Field experiments repeatedly show that when shoppers face twenty-four varieties of jam instead of six, conversion rates actually plummet.\nInterviewer: What’s happening psychologically when there are too many options?\nDr. Hayes: Two things: cognitive overload during evaluation, and amplified anticipated regret — even after buying, people nag themselves wondering whether a rejected option might have been marginally better.",
         "hearingFocusTrap": "Single play only! Connect \"classical assumption\" vs. \"jam field experiment\" -> \"cognitive overload + anticipated regret\".",
         "questions": [
           {
@@ -20824,7 +20824,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 1,
             "preReadSeconds": 15,
-            "audioScript": "One of the most counterintuitive findings in behavioral economics is the paradox of choice. Classical rational-actor models assumed that expanding options could only improve welfare—after all, you can simply ignore alternatives you dislike. Yet field experiments repeatedly reveal that when shoppers face twenty-four varieties of jam instead of six, conversion rates actually plummet. Evaluating excessive options imposes cognitive overload and amplifies anticipated regret: even after choosing, consumers nag themselves wondering whether one of the rejected options might have been marginally superior.",
+            "audioScript": "Interviewer: Behavioral economists love talking about the \"paradox of choice.\" Why did it rattle classical economic theory so much?\nDr. Hayes: Classical rational-actor models assumed expanding options could only improve welfare — after all, you can just ignore alternatives you dislike.\nInterviewer: Yet shoppers don’t actually behave that way in the supermarket?\nDr. Hayes: Not at all! Field experiments repeatedly show that when shoppers face twenty-four varieties of jam instead of six, conversion rates actually plummet.\nInterviewer: What’s happening psychologically when there are too many options?\nDr. Hayes: Two things: cognitive overload during evaluation, and amplified anticipated regret — even after buying, people nag themselves wondering whether a rejected option might have been marginally better.",
             "hearingFocusTrap": "Single play only! Connect \"classical assumption\" vs. \"jam field experiment\" -> \"cognitive overload + anticipated regret\".",
             "questions": [
               {
@@ -20872,7 +20872,7 @@
             "accentCode": "en-IE",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Speaker A: Expanding mid-rise timber housing looks compelling on paper and might well have cut construction emissions in Scandinavia. Having said that, we can’t overlook an unintended spillover: without parallel investment in schools and transit, denser districts quickly spark local opposition. I’d back zoning reform only with a binding infrastructure caveat.",
+            "audioScript": "Host: Let’s turn to urban housing density in Dublin. Are mid-rise timber developments the breakthrough planners have been waiting for?\nDr. Kelly: Expanding mid-rise timber housing certainly looks compelling on paper, and it might well have cut construction emissions in Scandinavia.\nHost: I hear a \"but\" coming — what’s the catch?\nDr. Kelly: Having said that, we can’t overlook an unintended spillover: without parallel investment in schools and public transit, denser districts quickly spark fierce local opposition.\nHost: So would you oppose zoning reform altogether?\nDr. Kelly: No, I’d back zoning reform — but only with a binding infrastructure caveat attached from day one.",
             "hearingFocusTrap": "Single-play C1 audio! Catch the conditional endorsement (\"only with a binding infrastructure caveat\").",
             "questions": [
               {
@@ -20920,7 +20920,7 @@
             "accentCode": "en-US",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Early neuroimaging papers claimed bilingualism universally delays cognitive aging, yet subsequent replication studies painted a more nuanced picture. Not until researchers controlled for socioeconomic status and lifelong reading habits did the true mechanism emerge: constant language switching appears to bolster attentional filtering specifically, rather than boosting general IQ across the board.",
+            "audioScript": "Host: For years headlines claimed speaking two languages universally shields the brain against aging. Does newer neuroscience still back that up?\nDr. Park: Early neuroimaging papers did claim bilingualism universally delays cognitive aging, yet subsequent replication studies painted a far more nuanced picture.\nHost: What changed when researchers ran larger replications?\nDr. Park: Not until teams rigorously controlled for socioeconomic status and lifelong reading habits did the true mechanism emerge.\nHost: So what specific cognitive edge does bilingualism actually sharpen?\nDr. Park: Constant language switching appears to bolster attentional filtering specifically, rather than boosting general IQ across the board.",
             "hearingFocusTrap": "Single play! Contrast the sweeping early claim vs. the narrower replicated mechanism (attentional filtering).",
             "questions": [
               {
@@ -21314,7 +21314,7 @@
         "durationMinutes": 33,
         "maxPlaysStrict": 1,
         "contextNote": "Strict C2 Mode: Single play. Listen carefully for British understatement and unspoken critique.",
-        "audioScript": "Host: Professor Vance, you served on the national curriculum review panel. Were you satisfied with the final compromise? Vance: Let us just say the document is a monument to committee prose—scrupulously polite, wonderfully symmetrical, and almost entirely unburdened by actionable specificity. If one’s goal was to offend nobody at the conference table, it was a roaring success; if one hoped to help an overworked teacher on a rainy Tuesday morning, well, one might wait a little longer.",
+        "audioScript": "Host: Professor Vance, you served on the national curriculum review panel. Were you genuinely satisfied with the final compromise?\nVance: Let us just say the document is a monument to committee prose — scrupulously polite, wonderfully symmetrical, and almost entirely unburdened by actionable specificity.\nHost: That sounds suspiciously like faint praise! Surely the committee achieved consensus?\nVance: Oh, if one’s goal was to offend nobody at the conference table, it was a roaring success.\nHost: And what if one is an actual teacher trying to use it in class?\nVance: If one hoped to help an overworked teacher on a rainy Tuesday morning, well, one might wait a little longer.",
         "hearingFocusTrap": "Decode ironic praise (\"monument to committee prose\", \"unburdened by actionable specificity\", \"roaring success\").",
         "questions": [
           {
@@ -21362,7 +21362,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 1,
             "preReadSeconds": 15,
-            "audioScript": "Host: Professor Vance, you served on the national curriculum review panel. Were you satisfied with the final compromise? Vance: Let us just say the document is a monument to committee prose—scrupulously polite, wonderfully symmetrical, and almost entirely unburdened by actionable specificity. If one’s goal was to offend nobody at the conference table, it was a roaring success; if one hoped to help an overworked teacher on a rainy Tuesday morning, well, one might wait a little longer.",
+            "audioScript": "Host: Professor Vance, you served on the national curriculum review panel. Were you genuinely satisfied with the final compromise?\nVance: Let us just say the document is a monument to committee prose — scrupulously polite, wonderfully symmetrical, and almost entirely unburdened by actionable specificity.\nHost: That sounds suspiciously like faint praise! Surely the committee achieved consensus?\nVance: Oh, if one’s goal was to offend nobody at the conference table, it was a roaring success.\nHost: And what if one is an actual teacher trying to use it in class?\nVance: If one hoped to help an overworked teacher on a rainy Tuesday morning, well, one might wait a little longer.",
             "hearingFocusTrap": "Decode ironic praise (\"monument to committee prose\", \"unburdened by actionable specificity\", \"roaring success\").",
             "questions": [
               {
@@ -21410,7 +21410,7 @@
             "accentCode": "en-GB",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "With the greatest respect to preservationists who treat every Victorian facade as sacrosanct, freezing a living metropolis in amber begs the question of whom cities actually belong to. Winning an aesthetic victory that prices out younger residents is surely a pyrrhic triumph. That said, reckless glass-tower speculation is equally untenable — what cities cry out for is a far more perspicacious synthesis of heritage and bold contemporary craft.",
+            "audioScript": "Host: Your essay provoked quite a stir among London heritage groups. Are you arguing we should tear down Victorian neighborhoods?\nEleanor: With the greatest respect to preservationists who treat every Victorian facade as sacrosanct, freezing a living metropolis in amber begs the question of whom cities actually belong to.\nHost: You’re linking rigid preservation directly to housing affordability?\nEleanor: Precisely. Winning an aesthetic victory that prices out younger residents is surely a pyrrhic triumph.\nHost: So should planners simply green-light modern glass skyscrapers everywhere instead?\nEleanor: Heavens, no — reckless glass-tower speculation is equally untenable. What cities cry out for is a far more perspicacious synthesis of heritage and bold contemporary craft.",
             "hearingFocusTrap": "Single play! Track British diplomatic pushback (\"With the greatest respect\") and \"pyrrhic triumph\"!",
             "questions": [
               {
@@ -21458,7 +21458,7 @@
             "accentCode": "en-AU",
             "maxPlaysStrict": 1,
             "preReadSeconds": 25,
-            "audioScript": "Scientists often conflate transparent uncertainty with weakness, yet paradoxically audiences trust candid caveats far more than false bravado. When researchers acknowledge what remains equivocal while explaining the salient evidence lucidly, public equanimity grows — even during crises. Treating citizens as incapable of nuance is the surest way to erode credibility.",
+            "audioScript": "Host: In an era of rapid public-health and climate debates, why do scientific spokespeople so often struggle to hold public trust?\nDr. Reid: Scientists frequently conflate transparent uncertainty with weakness, yet paradoxically audiences trust candid caveats far more than false bravado.\nHost: Doesn’t admitting what isn’t settled yet just trigger public panic?\nDr. Reid: Quite the opposite! When researchers acknowledge what remains equivocal while explaining the salient evidence lucidly, public equanimity actually grows — even during crises.\nHost: So what erodes institutional credibility fastest in your view?\nDr. Reid: Treating citizens as incapable of nuance is the surest way to erode credibility.",
             "hearingFocusTrap": "Single play! Catch the core paradox between candid caveats and higher public trust.",
             "questions": [
               {

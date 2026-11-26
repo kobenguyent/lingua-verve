@@ -11,6 +11,15 @@ public struct ExamSimulatorNativeView: View {
     @State private var phase: ExamPhase = .lobby
     @State private var activeSection: SkillType = .reading
 
+    // AI Fresh Exam Generator & Bank state
+    @State private var selectedExamId: String? = nil
+    @State private var selectedTheme: String = ""
+    @State private var customTopic: String = ""
+    @State private var isGeneratingExam: Bool = false
+    @State private var genProgress: [SkillType: SkillGenerationStatus] = [:]
+    @State private var genNotice: String?
+    @State private var genError: String?
+
     // Multi-part navigation indices
     @State private var activeReadingIdx: Int = 0
     @State private var activeListeningIdx: Int = 0
@@ -54,23 +63,25 @@ public struct ExamSimulatorNativeView: View {
 
     public var body: some View {
         let lang = store.courseLanguageId == "german" ? "german" : "english"
-        let exam = store.mockExam(for: lang, level: store.examTargetLevel)
+        let baseExam = store.mockExam(for: lang, level: store.examTargetLevel)
+        let savedAIExams = store.generatedExams(for: lang, level: store.examTargetLevel)
+        let exam = savedAIExams.first(where: { $0.id == selectedExamId }) ?? baseExam
 
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if let exam {
+                if let exam, let baseExam {
                     switch phase {
                     case .lobby:
-                        lobbyView(exam: exam)
+                        lobbyView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
                     case .running:
                         runningView(exam: exam)
                     case .grading:
                         VStack(spacing: 12) {
                             ProgressView().controlSize(.large)
                             Text("Grading Multi-Part 4-Skill Certification Exam...")
-                                .font(.headline)
+                                .scaledFont(.headline)
                             Text("Scoring 9 Reading items, 9 Multi-Accent Listening items, 2 Weighted Writing tasks, and 3 Speaking parts against CEFR \(exam.level.rawValue).")
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
@@ -78,7 +89,7 @@ public struct ExamSimulatorNativeView: View {
                         .frame(maxWidth: .infinity)
                     case .report:
                         if let report {
-                            reportView(exam: exam, report: report)
+                            reportView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams, report: report)
                         }
                     }
                 } else {
@@ -117,8 +128,8 @@ public struct ExamSimulatorNativeView: View {
                 }
             }
             if mode == "strict" && remainingSeconds == 0 && elapsedSeconds > 2,
-               let exam = store.mockExam(for: lang, level: store.examTargetLevel) {
-                Task { await submitExam(exam) }
+               let active = exam {
+                Task { await submitExam(active) }
             }
         }
         .onChange(of: speechRecognizer.transcript) { _, newVal in
@@ -135,7 +146,7 @@ public struct ExamSimulatorNativeView: View {
     // MARK: - Lobby View
 
     @ViewBuilder
-    private func lobbyView(exam: MockExam) -> some View {
+    private func lobbyView(exam: MockExam, baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
         let readingParts = exam.reading.resolvedParts
         let listeningTracks = exam.listening.resolvedTracks
         let writingTasks = exam.writing.resolvedTasks
@@ -149,10 +160,10 @@ public struct ExamSimulatorNativeView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("REAL-WORLD MULTI-PART 4-SKILL EXAM ARENA")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                             .foregroundStyle(.red)
                         Text("Simulate Official Certification Pressure")
-                            .font(.system(size: 22, weight: .bold, design: .serif))
+                            .scaledFont(size: 22, weight: .bold, design: .serif)
                     }
                     Spacer()
                     Picker("Language", selection: $store.courseLanguageId) {
@@ -165,7 +176,7 @@ public struct ExamSimulatorNativeView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Simulate Official Certification Pressure")
-                        .font(.system(size: 21, weight: .bold, design: .serif))
+                        .scaledFont(size: 21, weight: .bold, design: .serif)
                     Picker("Language", selection: $store.courseLanguageId) {
                         Text("🇬🇧 English").tag("english")
                         Text("🇩🇪 German").tag("german")
@@ -182,23 +193,47 @@ public struct ExamSimulatorNativeView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .onChange(of: store.examTargetLevel) { _, _ in
+                selectedExamId = nil
+                genNotice = nil
+                genError = nil
+            }
+            .onChange(of: store.courseLanguageId) { _, _ in
+                selectedExamId = nil
+                selectedTheme = ""
+                genNotice = nil
+                genError = nil
+            }
+
+            // AI Unlimited Exam Generator & Exam Bank
+            aiExamGeneratorCard(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
 
             VStack(alignment: .leading, spacing: 12) {
-                Text(exam.alignedCertificate)
-                    .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(BrandTheme.celestialSky)
+                FlowLayout(spacing: 8, lineSpacing: 6) {
+                    Text(exam.alignedCertificate)
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                        .foregroundStyle(BrandTheme.celestialSky)
+                    if exam.aiGenerated == true {
+                        Text("✨ AI-Generated · \(exam.generatedByModel ?? store.aiConfig.model)")
+                            .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                            .foregroundStyle(.purple)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.purple.opacity(0.14)))
+                    }
+                }
                 Text(exam.title)
-                    .font(.title3.weight(.bold))
+                    .scaledFont(.title3, weight: .bold)
 
                 FlowLayout(spacing: 8, lineSpacing: 6) {
                     Text("⏱ \(configuredMins) mins · Pass ≥ \(exam.passingScorePercent)%")
-                        .font(.caption.monospaced().bold())
+                        .scaledFont(.caption, weight: .bold, design: .monospaced)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(Color.primary.opacity(0.08)))
                     if exam.requireAllSkillsPass == true {
                         Text("Modular Gate: All 4 Skills Must Pass")
-                            .font(.caption.monospaced().bold())
+                            .scaledFont(.caption, weight: .bold, design: .monospaced)
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -271,13 +306,13 @@ public struct ExamSimulatorNativeView: View {
                         .foregroundStyle(store.aiConfig.isReady ? BrandTheme.emeraldMint : .secondary)
                     if store.aiConfig.isReady {
                         Text("AI Examiner Active: \(store.aiConfig.provider.label) (\(store.aiConfig.model))")
-                            .font(.caption)
+                            .scaledFont(.caption)
                     } else {
                         Text("Built-in 4-Criterion CEFR Rubric active.")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                         Button("Connect Local/Cloud AI") { showAISettingsSheet = true }
-                            .font(.caption.weight(.bold))
+                            .scaledFont(.caption, weight: .bold)
                     }
                 }
 
@@ -298,14 +333,220 @@ public struct ExamSimulatorNativeView: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
     }
 
+    @ViewBuilder
+    private func aiExamGeneratorCard(exam: MockExam, baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("AI UNLIMITED EXAM GENERATOR", systemImage: "wand.and.stars")
+                        .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                        .foregroundStyle(.purple)
+                    Text("Generate brand-new unseen 4-skill \(baseExam.level.rawValue) exams (9 Reading Qs, 3 Multi-Accent Listening Tracks, 2 Writing Tasks & 3 Speaking Parts) using your connected AI provider.")
+                        .scaledFont(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if !store.aiConfig.isReady {
+                    Button {
+                        showAISettingsSheet = true
+                    } label: {
+                        Label("Connect AI", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .controlSize(.small)
+                }
+            }
+
+            aiExamBankStrip(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
+            aiExamControlsRow(baseExam: baseExam, savedAIExams: savedAIExams)
+
+            if isGeneratingExam {
+                aiExamProgressGrid()
+            }
+
+            if let genNotice {
+                Text("✨ \(genNotice)")
+                    .scaledFont(.caption)
+                    .foregroundStyle(BrandTheme.emeraldMint)
+            }
+            if let genError {
+                Text("⚠️ \(genError)")
+                    .scaledFont(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.purple.opacity(0.07)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.purple.opacity(0.22), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func aiExamBankStrip(exam: MockExam, baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
+        let builtInActive = exam.aiGenerated != true
+        FlowLayout(spacing: 8, lineSpacing: 8) {
+            Button {
+                NativeAudioEngine.shared.playClickSound()
+                selectedExamId = nil
+            } label: {
+                Text("📚 Official Built-in (\(baseExam.level.rawValue))")
+                    .scaledFont(.caption, weight: .bold)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(builtInActive ? BrandTheme.celestialSky : Color.primary.opacity(0.06))
+                    )
+                    .foregroundStyle(builtInActive ? Color.white : Color.primary)
+            }
+            .buttonStyle(.plain)
+
+            ForEach(Array(savedAIExams.enumerated()), id: \.element.id) { idx, gExam in
+                let isSelected = exam.id == gExam.id
+                let shortTopic = String((gExam.generatedTheme ?? "Custom").prefix(26))
+                HStack(spacing: 4) {
+                    Button {
+                        NativeAudioEngine.shared.playClickSound()
+                        selectedExamId = gExam.id
+                    } label: {
+                        Text("✨ AI #\(savedAIExams.count - idx): \(shortTopic)")
+                            .scaledFont(.caption, weight: .bold)
+                            .padding(.leading, 10)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        NativeAudioEngine.shared.playClickSound()
+                        store.deleteGeneratedExam(id: gExam.id)
+                        if selectedExamId == gExam.id {
+                            selectedExamId = nil
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .scaledFont(.caption)
+                            .padding(.trailing, 8)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color.purple : Color.primary.opacity(0.06))
+                )
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func aiExamControlsRow(baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
+        let themes = AIExamGeneratorService.themes(for: baseExam.languageId)
+        let placeholder = baseExam.languageId == "german"
+            ? "Optional: eigenes Thema (z. B. Arzttermin, KI)…"
+            : "Optional: custom topic (e.g. Job Interview, Climate)…"
+
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                Picker("Theme", selection: $selectedTheme) {
+                    Text("🎲 Surprise Me (Random Theme)").tag("")
+                    ForEach(themes, id: \.self) { t in
+                        Text(t).tag(t)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 260)
+                .disabled(isGeneratingExam)
+
+                TextField(placeholder, text: $customTopic)
+                    .textFieldStyle(.roundedBorder)
+                    .scaledFont(.caption)
+                    .disabled(isGeneratingExam)
+
+                Button {
+                    Task { await generateFreshExam(baseExam: baseExam, savedAIExams: savedAIExams) }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isGeneratingExam {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(isGeneratingExam ? "Crafting…" : "Generate Fresh \(baseExam.level.rawValue) AI Exam")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .disabled(isGeneratingExam)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Theme", selection: $selectedTheme) {
+                    Text("🎲 Surprise Me (Random Theme)").tag("")
+                    ForEach(themes, id: \.self) { t in
+                        Text(t).tag(t)
+                    }
+                }
+                .disabled(isGeneratingExam)
+
+                TextField(placeholder, text: $customTopic)
+                    .textFieldStyle(.roundedBorder)
+                    .scaledFont(.caption)
+                    .disabled(isGeneratingExam)
+
+                Button {
+                    Task { await generateFreshExam(baseExam: baseExam, savedAIExams: savedAIExams) }
+                } label: {
+                    Label(
+                        isGeneratingExam ? "Crafting Exam…" : "Generate Fresh \(baseExam.level.rawValue) AI Exam",
+                        systemImage: "sparkles"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .disabled(isGeneratingExam)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func aiExamProgressGrid() -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+            ForEach(SkillType.allCases) { sk in
+                let st = genProgress[sk] ?? .pending
+                let statusText: String = {
+                    switch st {
+                    case .done: return "✓ Ready"
+                    case .loading: return "⏳ Writing…"
+                    case .fallback: return "Base"
+                    case .pending: return "Queued"
+                    }
+                }()
+                let bgColor: Color = st == .done
+                    ? BrandTheme.emeraldMint.opacity(0.16)
+                    : (st == .loading ? Color.purple.opacity(0.16) : Color.primary.opacity(0.05))
+
+                HStack {
+                    Text(sk.shortName).scaledFont(.caption2, weight: .bold, design: .monospaced)
+                    Spacer()
+                    Text(statusText).scaledFont(.caption2, design: .monospaced)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7).fill(bgColor))
+            }
+        }
+    }
+
     private func blueprintCard(title: String, badge: String, detail: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(title).font(.caption.weight(.bold)).foregroundStyle(tint)
+                Text(title).scaledFont(.caption, weight: .bold).foregroundStyle(tint)
                 Spacer()
-                Text(badge).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
+                Text(badge).scaledFont(size: 10, weight: .semibold, design: .monospaced).foregroundStyle(.secondary)
             }
-            Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+            Text(detail).scaledFont(.caption2).foregroundStyle(.secondary).lineLimit(2)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,13 +577,13 @@ public struct ExamSimulatorNativeView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
                     .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
-                Text(exam.title).font(.subheadline.weight(.bold)).lineLimit(1)
+                Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(1)
             }
             Spacer()
             Label(formatClock(remainingSeconds), systemImage: "timer")
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .scaledFont(size: 16, weight: .bold, design: .monospaced)
                 .monospacedDigit()
                 .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
             Button("Submit All") {
@@ -397,20 +638,20 @@ public struct ExamSimulatorNativeView: View {
             .pickerStyle(.segmented)
 
             HStack {
-                Text(part.partLabel).font(.caption.monospaced().bold()).foregroundStyle(BrandTheme.celestialSky)
+                Text(part.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(BrandTheme.celestialSky)
                 Spacer()
                 Text(readingFormatLabel(part.format))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
             }
 
-            Text(part.passageTitle).font(.headline)
-            Text(part.instruction).font(.caption).foregroundStyle(.secondary)
+            Text(part.passageTitle).scaledFont(.headline)
+            Text(part.instruction).scaledFont(.caption).foregroundStyle(.secondary)
 
             Text(part.passage)
-                .font(.subheadline)
+                .scaledFont(.subheadline)
                 .lineSpacing(4)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -467,17 +708,33 @@ public struct ExamSimulatorNativeView: View {
             }
             .pickerStyle(.segmented)
 
-            HStack {
-                Text(track.partLabel).font(.caption.monospaced().bold()).foregroundStyle(.purple)
-                Spacer()
+            let dialogueTurns = NativeAudioEngine.parseDialogueTurns(track.audioScript)
+            FlowLayout(spacing: 8, lineSpacing: 6) {
+                Text(track.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(.purple)
+                if !dialogueTurns.isEmpty {
+                    Text("💬 2-Speaker Conversation")
+                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.14)))
+                }
+                if let speaker = NativeAudioEngine.shared.activeSpeakerName, !speaker.isEmpty {
+                    Text("🎙️ Speaking: \(speaker)")
+                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.purple))
+                }
                 Text(accentBadge(track.accentCode, languageId: exam.languageId))
-                    .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                    .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(Color.purple.opacity(0.15)))
             }
 
-            Text(track.contextNote).font(.subheadline).foregroundStyle(.secondary)
+            Text(track.contextNote).scaledFont(.subheadline).foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
                 FlowLayout(spacing: 8, lineSpacing: 8) {
@@ -511,23 +768,24 @@ public struct ExamSimulatorNativeView: View {
                     .buttonStyle(.bordered)
 
                     Text("Track \(safeIdx + 1) Plays: \(playsUsed)/\(mode == "strict" ? "\(track.maxPlaysStrict)" : "∞")")
-                        .font(.caption.monospaced().bold())
+                        .scaledFont(.caption, weight: .bold, design: .monospaced)
                         .padding(.vertical, 6)
                 }
 
                 Text("⚠️ Hearing Focus: \(track.hearingFocusTrap)")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.orange)
 
                 if mode == "strict" {
                     Label("Transcript locked in Strict Mode — unlocked in Score Report.", systemImage: "lock.fill")
-                        .font(.caption2.monospaced())
+                        .scaledFont(.caption2, design: .monospaced)
                         .foregroundStyle(.secondary)
                 } else {
                     DisclosureGroup("Practice Mode: Peek Track \(safeIdx + 1) Transcript") {
-                        Text(track.audioScript).font(.caption).padding(.top, 4)
+                        transcriptTurnsView(script: track.audioScript)
+                            .padding(.top, 4)
                     }
-                    .font(.caption)
+                    .scaledFont(.caption)
                 }
             }
             .padding(12)
@@ -580,13 +838,13 @@ public struct ExamSimulatorNativeView: View {
             .pickerStyle(.segmented)
 
             Text("\(task.partLabel) · Weight \(task.weightPercent)%")
-                .font(.caption.monospaced().bold())
+                .scaledFont(.caption, weight: .bold, design: .monospaced)
                 .foregroundStyle(.orange)
-            Text(task.scenario).font(.headline)
+            Text(task.scenario).scaledFont(.headline)
 
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(task.taskRequirements, id: \.self) { req in
-                    Text("• \(req)").font(.caption)
+                    Text("• \(req)").scaledFont(.caption)
                 }
             }
             .padding(10)
@@ -594,22 +852,22 @@ public struct ExamSimulatorNativeView: View {
             .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.12)))
 
             HStack {
-                Text("Task \(safeIdx + 1) Written Submission").font(.caption.weight(.bold))
+                Text("Task \(safeIdx + 1) Written Submission").scaledFont(.caption, weight: .bold)
                 Spacer()
                 Text("\(wc) words (Target: \(task.minWords)–\(task.maxWords))")
-                    .font(.caption.monospaced().bold())
+                    .scaledFont(.caption, weight: .bold, design: .monospaced)
                     .foregroundStyle(wc >= task.minWords ? BrandTheme.emeraldMint : .orange)
             }
 
             TextEditor(text: writingBinding(for: task.id))
-                .font(.body)
+                .scaledFont(.body)
                 .frame(minHeight: 190)
                 .padding(6)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.18)))
 
             HStack {
                 Text("4-Criterion CEFR Rubric: Task, Coherence, Lexis, Grammar")
-                    .font(.caption2)
+                    .scaledFont(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if safeIdx < tasks.count - 1 {
@@ -655,18 +913,18 @@ public struct ExamSimulatorNativeView: View {
             }
             .pickerStyle(.segmented)
 
-            Text(part.partLabel).font(.caption.monospaced().bold()).foregroundStyle(BrandTheme.emeraldMint)
-            Text(part.instruction).font(.headline)
+            Text(part.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(BrandTheme.emeraldMint)
+            Text(part.instruction).scaledFont(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(part.prompts.enumerated()), id: \.offset) { i, pt in
-                    Text("\(i + 1). \(pt)").font(.caption)
+                    Text("\(i + 1). \(pt)").scaledFont(.caption)
                 }
                 if let promptAudio = part.examinerPromptAudio, !promptAudio.isEmpty {
                     Divider()
                     HStack(alignment: .top, spacing: 8) {
                         Text("“\(promptAudio)”")
-                            .font(.caption.italic())
+                            .scaledFont(.caption, italic: true)
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
@@ -716,18 +974,18 @@ public struct ExamSimulatorNativeView: View {
             }
 
             if let msg = speechRecognizer.statusMessage {
-                Text(msg).font(.caption).foregroundStyle(.orange)
+                Text(msg).scaledFont(.caption).foregroundStyle(.orange)
             }
 
             HStack {
                 Text("Part \(safeIdx + 1) Spoken Transcript (Auto-captured via Mic or Type Manually)")
-                    .font(.caption.weight(.bold))
+                    .scaledFont(.caption, weight: .bold)
                 Spacer()
-                Text("\(wc) words").font(.caption.monospaced()).foregroundStyle(.secondary)
+                Text("\(wc) words").scaledFont(.caption, design: .monospaced).foregroundStyle(.secondary)
             }
 
             TextEditor(text: speakingBinding(for: part.id))
-                .font(.body)
+                .scaledFont(.body)
                 .frame(minHeight: 130)
                 .padding(6)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.18)))
@@ -759,7 +1017,7 @@ public struct ExamSimulatorNativeView: View {
     // MARK: - Report View
 
     @ViewBuilder
-    private func reportView(exam: MockExam, report: ExamAttemptRecord) -> some View {
+    private func reportView(exam: MockExam, baseExam: MockExam, savedAIExams: [MockExam], report: ExamAttemptRecord) -> some View {
         let readingParts = exam.reading.resolvedParts
         let listeningTracks = exam.listening.resolvedTracks
         let writingTasks = exam.writing.resolvedTasks
@@ -770,11 +1028,11 @@ public struct ExamSimulatorNativeView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     FlowLayout(spacing: 8, lineSpacing: 6) {
                         Text(report.passed ? "CERTIFICATION READY · PASSED" : "BELOW PASS MARK · REVIEW & RETRY")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                             .foregroundStyle(report.passed ? BrandTheme.emeraldMint : .orange)
                         if let label = report.officialGradeLabel {
                             Text(label)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.16)))
@@ -782,19 +1040,32 @@ public struct ExamSimulatorNativeView: View {
                         }
                     }
                     Text("\(report.examTitle) — \(report.overallScore)%")
-                        .font(.title2.weight(.bold))
+                        .scaledFont(.title2, weight: .bold)
                     Text("Mode: \(report.mode.uppercased()) · Time: \(formatClock(report.durationUsedSeconds)) · Saved to History")
-                        .font(.caption.monospaced())
+                        .scaledFont(.caption, design: .monospaced)
                         .foregroundStyle(.secondary)
                     if exam.requireAllSkillsPass == true && report.overallScore >= exam.passingScorePercent && !allModulesPassed {
                         Text("⚠️ Overall average met \(exam.passingScorePercent)%, but modular certification requires passing EVERY skill (≥ \(exam.passingScorePercent)%).")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.orange)
                     }
                 }
                 Spacer()
-                Button("New Exam") { phase = .lobby }
-                    .buttonStyle(.bordered)
+                VStack(alignment: .trailing, spacing: 6) {
+                    if store.aiConfig.isReady {
+                        Button {
+                            phase = .lobby
+                            Task { await generateFreshExam(baseExam: baseExam, savedAIExams: savedAIExams) }
+                        } label: {
+                            Label("Generate Fresh AI Exam", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.purple)
+                        .controlSize(.small)
+                    }
+                    Button("New Exam") { phase = .lobby }
+                        .buttonStyle(.bordered)
+                }
             }
 
             // 4-Skill Score Cards + 4-Criterion CEFR Rubric Bars
@@ -803,19 +1074,19 @@ public struct ExamSimulatorNativeView: View {
                     if let s = report.skills[sk.rawValue] {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text(sk.shortName.uppercased()).font(.caption.monospaced().bold())
+                                Text(sk.shortName.uppercased()).scaledFont(.caption, weight: .bold, design: .monospaced)
                                 Spacer()
                                 Text(s.passed ? "PASS" : "FAIL")
-                                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                    .scaledFont(size: 9.5, weight: .bold, design: .monospaced)
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
                                     .background(Capsule().fill((s.passed ? BrandTheme.emeraldMint : Color.red).opacity(0.16)))
                                     .foregroundStyle(s.passed ? BrandTheme.emeraldMint : .red)
                                 Text("\(s.score)%")
-                                    .font(.headline.monospaced())
+                                    .scaledFont(.headline, design: .monospaced)
                                     .foregroundStyle(s.passed ? BrandTheme.emeraldMint : .red)
                             }
-                            Text(s.feedback).font(.caption).foregroundStyle(.secondary)
+                            Text(s.feedback).scaledFont(.caption).foregroundStyle(.secondary)
                             if let rubric = s.rubric {
                                 Divider()
                                 rubricBarRow("Task Fulfillment", value: rubric.taskFulfillment)
@@ -838,7 +1109,7 @@ public struct ExamSimulatorNativeView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text("Track \(idx + 1) · \(accentBadge(track.accentCode, languageId: exam.languageId)) — \(track.partLabel)")
-                                    .font(.caption.bold())
+                                    .scaledFont(.caption, weight: .bold)
                                 Spacer()
                                 Button {
                                     NativeAudioEngine.shared.speak(
@@ -853,7 +1124,7 @@ public struct ExamSimulatorNativeView: View {
                                 .buttonStyle(.bordered)
                                 .controlSize(.mini)
                             }
-                            Text(track.audioScript).font(.caption).foregroundStyle(.secondary)
+                            transcriptTurnsView(script: track.audioScript)
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -875,27 +1146,27 @@ public struct ExamSimulatorNativeView: View {
                 }
                 .padding(.top, 8)
             }
-            .font(.subheadline.weight(.semibold))
+            .scaledFont(.subheadline, weight: .semibold)
 
             // Writing Tasks & 3-Part Speaking Model Benchmarks
             DisclosureGroup("Official Model Benchmarks (Writing Tasks & 3-Part Speaking)") {
                 VStack(alignment: .leading, spacing: 10) {
                     if !writingNotes.isEmpty {
                         Text("Writing Action Notes: \(writingNotes.joined(separator: " • "))")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.orange)
                     }
                     if !speakingNotes.isEmpty {
                         Text("Speaking Action Notes: \(speakingNotes.joined(separator: " • "))")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(BrandTheme.emeraldMint)
                     }
 
                     ForEach(Array(writingTasks.enumerated()), id: \.element.id) { idx, task in
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Model \(exam.level.rawValue) Writing · Task \(idx + 1) (\(task.weightPercent)%): \(task.partLabel)")
-                                .font(.caption.bold())
-                            Text(task.modelAnswer).font(.caption).foregroundStyle(.secondary)
+                                .scaledFont(.caption, weight: .bold)
+                            Text(task.modelAnswer).scaledFont(.caption).foregroundStyle(.secondary)
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -906,7 +1177,7 @@ public struct ExamSimulatorNativeView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text("Model \(exam.level.rawValue) Speaking · Part \(idx + 1): \(part.partLabel)")
-                                    .font(.caption.bold())
+                                    .scaledFont(.caption, weight: .bold)
                                 Spacer()
                                 Button {
                                     NativeAudioEngine.shared.speak(part.modelResponseScript, languageId: exam.languageId)
@@ -916,7 +1187,7 @@ public struct ExamSimulatorNativeView: View {
                                 .buttonStyle(.bordered)
                                 .controlSize(.mini)
                             }
-                            Text(part.modelResponseScript).font(.caption).foregroundStyle(.secondary)
+                            Text(part.modelResponseScript).scaledFont(.caption).foregroundStyle(.secondary)
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -925,18 +1196,46 @@ public struct ExamSimulatorNativeView: View {
                 }
                 .padding(.top, 8)
             }
-            .font(.subheadline.weight(.semibold))
+            .scaledFont(.subheadline, weight: .semibold)
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
     }
 
+    @ViewBuilder
+    private func transcriptTurnsView(script: String) -> some View {
+        let turns = NativeAudioEngine.parseDialogueTurns(script)
+        if turns.isEmpty {
+            Text(script).scaledFont(.caption).foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(turns.enumerated()), id: \.offset) { _, turn in
+                    let isFirst = turn.speakerIndex % 2 == 0
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(turn.speaker)
+                            .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                            .foregroundStyle(isFirst ? BrandTheme.celestialSky : .purple)
+                        Text(turn.text)
+                            .scaledFont(.caption)
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill((isFirst ? BrandTheme.celestialSky : Color.purple).opacity(0.09))
+                    )
+                }
+            }
+        }
+    }
+
     private func rubricBarRow(_ title: String, value: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(title).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                Text(title).scaledFont(size: 10, design: .monospaced).foregroundStyle(.secondary)
                 Spacer()
-                Text("\(value)%").font(.system(size: 10, weight: .bold, design: .monospaced))
+                Text("\(value)%").scaledFont(size: 10, weight: .bold, design: .monospaced)
             }
             ProgressView(value: Double(value), total: 100.0)
                 .tint(value >= 75 ? BrandTheme.emeraldMint : value >= 60 ? BrandTheme.celestialSky : .orange)
@@ -950,14 +1249,14 @@ public struct ExamSimulatorNativeView: View {
             : ""
         return VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .top) {
-                Text("[\(tag)] \(question.prompt)").font(.caption.weight(.semibold))
+                Text("[\(tag)] \(question.prompt)").scaledFont(.caption, weight: .semibold)
                 Spacer()
                 Text(ok ? "✓" : "✗")
-                    .font(.caption.bold())
+                    .scaledFont(.caption, weight: .bold)
                     .foregroundStyle(ok ? BrandTheme.emeraldMint : .red)
             }
             Text("Correct: \(correctText) — \(question.explanation)")
-                .font(.caption2)
+                .scaledFont(.caption2)
                 .foregroundStyle(.secondary)
         }
         .padding(8)
@@ -972,7 +1271,7 @@ public struct ExamSimulatorNativeView: View {
         onSelect: @escaping (Int) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Q\(index). \(question.prompt)").font(.subheadline.weight(.semibold))
+            Text("Q\(index). \(question.prompt)").scaledFont(.subheadline, weight: .semibold)
             ForEach(Array(question.options.enumerated()), id: \.offset) { idx, opt in
                 let chosen = selection == idx
                 Button {
@@ -982,7 +1281,7 @@ public struct ExamSimulatorNativeView: View {
                     HStack {
                         Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(chosen ? BrandTheme.celestialSky : .secondary)
-                        Text(opt).font(.caption).foregroundStyle(.primary).multilineTextAlignment(.leading)
+                        Text(opt).scaledFont(.caption).foregroundStyle(.primary).multilineTextAlignment(.leading)
                         Spacer()
                     }
                     .padding(9)
@@ -996,6 +1295,48 @@ public struct ExamSimulatorNativeView: View {
     }
 
     // MARK: - Actions & Multi-Part Grading
+
+    @MainActor
+    private func generateFreshExam(baseExam: MockExam, savedAIExams: [MockExam]) async {
+        guard store.aiConfig.isReady else {
+            showAISettingsSheet = true
+            return
+        }
+        NativeAudioEngine.shared.playClickSound()
+        isGeneratingExam = true
+        genError = nil
+        genNotice = nil
+        genProgress = [
+            .reading: .loading,
+            .listening: .pending,
+            .writing: .pending,
+            .speaking: .pending
+        ]
+
+        let avoid = savedAIExams.compactMap(\.generatedTheme)
+        do {
+            let service = AIExamGeneratorService()
+            let res = try await service.generateFreshExam(
+                config: store.aiConfig,
+                baseExam: baseExam,
+                theme: selectedTheme.isEmpty ? nil : selectedTheme,
+                customTopic: customTopic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customTopic,
+                avoidThemes: avoid,
+                onProgress: { skill, status in
+                    Task { @MainActor in
+                        genProgress[skill] = status
+                    }
+                }
+            )
+            store.saveGeneratedExam(res.exam)
+            selectedExamId = res.exam.id
+            genNotice = "Generated fresh \(baseExam.level.rawValue) exam (\(res.aiSkillsCount)/4 AI-crafted skills) — Theme: \"\(res.theme)\"."
+            NativeAudioEngine.shared.playSuccessChime()
+        } catch {
+            genError = error.localizedDescription
+        }
+        isGeneratingExam = false
+    }
 
     private func startExam(_ exam: MockExam) {
         NativeAudioEngine.shared.playClickSound()

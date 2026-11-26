@@ -4,6 +4,7 @@ import {
   getAccentsForLanguage,
   getDefaultVoiceSettings,
   isRoboticOrNoveltyVoice,
+  parseDialogueTurns,
   pickBestSystemVoice,
   soundEngine,
 } from '../utils/audio';
@@ -83,5 +84,28 @@ describe('SoundEngine Audio, Multi-Accent & Human Voice Selection Tests', () => 
   it('triggers success chime and click sound without error', () => {
     expect(() => soundEngine.playSuccessChime()).not.toThrow();
     expect(() => soundEngine.playClickSound()).not.toThrow();
+  });
+
+  it('parses multi-speaker human conversations (newline and inline), strips labels, and ignores non-speaker colons', () => {
+    const newlineDialogue =
+      'Clara: Grüß Gott! Ist das Frühstück inklusive?\nHerr Gruber: Ja, von sieben bis zehn Uhr im ersten Stock.\nClara: Perfekt, vielen Dank!';
+    const turns = parseDialogueTurns(newlineDialogue);
+    expect(turns.length).toBe(3);
+    expect(turns[0]).toEqual({ speaker: 'Clara', text: 'Grüß Gott! Ist das Frühstück inklusive?', speakerIndex: 0 });
+    expect(turns[1]).toEqual({ speaker: 'Herr Gruber', text: 'Ja, von sieben bis zehn Uhr im ersten Stock.', speakerIndex: 1 });
+    expect(turns[2].speakerIndex).toBe(0);
+
+    const inlineDialogue = 'Emma: Are we going on Saturday? Liam: Yes, let us take the train!';
+    const inlineTurns = parseDialogueTurns(inlineDialogue);
+    expect(inlineTurns.length).toBe(2);
+    expect(inlineTurns.map((t) => t.speaker)).toEqual(['Emma', 'Liam']);
+
+    // Monologue with a colon must NOT be misparsed as dialogue
+    const monologue = 'Hinweis: Heute gibt es Erdbeeren im Angebot: zwei Euro fünfzig!';
+    expect(parseDialogueTurns(monologue)).toEqual([]);
+
+    // Speaking a 2-turn dialogue queues 2 separate utterances (one per speaker) without speaking speaker names
+    soundEngine.speak(inlineDialogue, 'english');
+    expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(2);
   });
 });

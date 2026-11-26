@@ -568,6 +568,22 @@ public struct ReadingExamSection: Codable, Equatable, Sendable {
     public let questions: [ExamObjectiveQuestion]
     public let parts: [ReadingExamPart]?
 
+    public init(
+        title: String,
+        durationMinutes: Int,
+        passageTitle: String,
+        passage: String,
+        questions: [ExamObjectiveQuestion],
+        parts: [ReadingExamPart]? = nil
+    ) {
+        self.title = title
+        self.durationMinutes = durationMinutes
+        self.passageTitle = passageTitle
+        self.passage = passage
+        self.questions = questions
+        self.parts = parts
+    }
+
     public var resolvedParts: [ReadingExamPart] {
         if let parts, !parts.isEmpty { return parts }
         return [
@@ -627,6 +643,26 @@ public struct ListeningExamSection: Codable, Equatable, Sendable {
     public let hearingFocusTrap: String
     public let questions: [ExamObjectiveQuestion]
     public let tracks: [ListeningExamTrack]?
+
+    public init(
+        title: String,
+        durationMinutes: Int,
+        maxPlaysStrict: Int,
+        contextNote: String,
+        audioScript: String,
+        hearingFocusTrap: String,
+        questions: [ExamObjectiveQuestion],
+        tracks: [ListeningExamTrack]? = nil
+    ) {
+        self.title = title
+        self.durationMinutes = durationMinutes
+        self.maxPlaysStrict = maxPlaysStrict
+        self.contextNote = contextNote
+        self.audioScript = audioScript
+        self.hearingFocusTrap = hearingFocusTrap
+        self.questions = questions
+        self.tracks = tracks
+    }
 
     public var resolvedTracks: [ListeningExamTrack] {
         if let tracks, !tracks.isEmpty { return tracks }
@@ -690,6 +726,28 @@ public struct WritingExamSection: Codable, Equatable, Sendable {
     public let keyRubricKeywords: [String]
     public let modelAnswer: String
     public let tasks: [WritingExamTask]?
+
+    public init(
+        title: String,
+        durationMinutes: Int,
+        scenario: String,
+        taskRequirements: [String],
+        minWords: Int,
+        maxWords: Int,
+        keyRubricKeywords: [String],
+        modelAnswer: String,
+        tasks: [WritingExamTask]? = nil
+    ) {
+        self.title = title
+        self.durationMinutes = durationMinutes
+        self.scenario = scenario
+        self.taskRequirements = taskRequirements
+        self.minWords = minWords
+        self.maxWords = maxWords
+        self.keyRubricKeywords = keyRubricKeywords
+        self.modelAnswer = modelAnswer
+        self.tasks = tasks
+    }
 
     public var resolvedTasks: [WritingExamTask] {
         if let tasks, !tasks.isEmpty { return tasks }
@@ -755,6 +813,30 @@ public struct SpeakingExamSection: Codable, Equatable, Sendable {
     public let modelResponseScript: String
     public let parts: [SpeakingExamPart]?
 
+    public init(
+        title: String,
+        durationMinutes: Int,
+        prepSeconds: Int,
+        speakSeconds: Int,
+        cueCardTitle: String,
+        bulletPoints: [String],
+        followUpQuestion: String,
+        keyRubricKeywords: [String],
+        modelResponseScript: String,
+        parts: [SpeakingExamPart]? = nil
+    ) {
+        self.title = title
+        self.durationMinutes = durationMinutes
+        self.prepSeconds = prepSeconds
+        self.speakSeconds = speakSeconds
+        self.cueCardTitle = cueCardTitle
+        self.bulletPoints = bulletPoints
+        self.followUpQuestion = followUpQuestion
+        self.keyRubricKeywords = keyRubricKeywords
+        self.modelResponseScript = modelResponseScript
+        self.parts = parts
+    }
+
     public var resolvedParts: [SpeakingExamPart] {
         if let parts, !parts.isEmpty { return parts }
         return [
@@ -782,10 +864,53 @@ public struct MockExam: Codable, Identifiable, Equatable, Sendable {
     public let passingScorePercent: Int
     public let totalMinutes: Int
     public let requireAllSkillsPass: Bool?
+    public let aiGenerated: Bool?
+    public let generatedTheme: String?
+    public let generatedByModel: String?
+    public let generatedAt: String?
+    public let aiGeneratedSkills: [SkillType]?
     public let reading: ReadingExamSection
     public let listening: ListeningExamSection
     public let writing: WritingExamSection
     public let speaking: SpeakingExamSection
+
+    public init(
+        id: String,
+        languageId: String,
+        level: CEFRLevel,
+        title: String,
+        alignedCertificate: String,
+        passingScorePercent: Int,
+        totalMinutes: Int,
+        requireAllSkillsPass: Bool? = true,
+        aiGenerated: Bool? = nil,
+        generatedTheme: String? = nil,
+        generatedByModel: String? = nil,
+        generatedAt: String? = nil,
+        aiGeneratedSkills: [SkillType]? = nil,
+        reading: ReadingExamSection,
+        listening: ListeningExamSection,
+        writing: WritingExamSection,
+        speaking: SpeakingExamSection
+    ) {
+        self.id = id
+        self.languageId = languageId
+        self.level = level
+        self.title = title
+        self.alignedCertificate = alignedCertificate
+        self.passingScorePercent = passingScorePercent
+        self.totalMinutes = totalMinutes
+        self.requireAllSkillsPass = requireAllSkillsPass
+        self.aiGenerated = aiGenerated
+        self.generatedTheme = generatedTheme
+        self.generatedByModel = generatedByModel
+        self.generatedAt = generatedAt
+        self.aiGeneratedSkills = aiGeneratedSkills
+        self.reading = reading
+        self.listening = listening
+        self.writing = writing
+        self.speaking = speaking
+    }
 
     public static func officialGradeLabel(
         languageId: String,

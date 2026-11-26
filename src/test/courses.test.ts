@@ -18,6 +18,7 @@ import {
   getExamSpeakingParts,
   getExamWritingTasks,
 } from '../utils/examScoring';
+import { parseDialogueTurns } from '../utils/audio';
 
 const ALL_CEFR: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const FOUR_SKILLS: SkillType[] = ['reading', 'listening', 'writing', 'speaking'];
@@ -201,6 +202,12 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
       expect(totalListenQs).toBe(9);
       const accents = new Set(listeningTracks.map((t) => t.accentCode).filter(Boolean));
       expect(accents.size, `Expected multiple regional accents in ${exam.id}`).toBeGreaterThanOrEqual(2);
+      listeningTracks.forEach((track) => {
+        const turns = parseDialogueTurns(track.audioScript);
+        expect(turns.length, `Expected multi-turn human conversation in ${track.id}`).toBeGreaterThanOrEqual(4);
+        const speakers = new Set(turns.map((t) => t.speakerIndex));
+        expect(speakers.size, `Expected >=2 distinct speakers in ${track.id}`).toBeGreaterThanOrEqual(2);
+      });
 
       const writingTasks = getExamWritingTasks(exam);
       expect(writingTasks.length, `Expected 2 writing tasks in ${exam.id}`).toBe(2);

@@ -1,6 +1,9 @@
 import SwiftUI
 import AVFoundation
 import LinguaVerveCore
+#if os(macOS)
+import AppKit
+#endif
 
 public struct VoiceStudioSheetView: View {
     @Bindable var store: CurriculumStore
@@ -10,6 +13,7 @@ public struct VoiceStudioSheetView: View {
     @State private var accentLanguageTab: String
     @State private var previewingCode: String? = nil
     @State private var previewFeedback: (ok: Bool, message: String)? = nil
+    @State private var voiceRefreshNonce: Int = 0
 
     public init(store: CurriculumStore) {
         self.store = store
@@ -62,10 +66,10 @@ public struct VoiceStudioSheetView: View {
                                         .foregroundStyle(isSelected ? BrandTheme.celestialSky : .secondary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("\(acc.flag) \(acc.label)")
-                                            .font(.subheadline.weight(isSelected ? .bold : .medium))
+                                            .scaledFont(.subheadline, weight: isSelected ? .bold : .medium)
                                             .foregroundStyle(.primary)
                                         Text(acc.region)
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundStyle(.secondary)
                                     }
                                 }
@@ -81,7 +85,7 @@ public struct VoiceStudioSheetView: View {
                                     previewingCode == acc.code ? "..." : "Test",
                                     systemImage: "play.fill"
                                 )
-                                .font(.caption.weight(.bold))
+                                .scaledFont(.caption, weight: .bold)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -108,28 +112,81 @@ public struct VoiceStudioSheetView: View {
                     }
 
                     Text(draft.provider.setupHint)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
 
                     if draft.provider == .system {
+                        let _ = voiceRefreshNonce
+                        let diag = NativeAudioEngine.shared.activeSystemVoiceDiagnostic(for: selectedAccentCode, settings: draft)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Image(systemName: diag.isHighQualityNeural ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundStyle(diag.isHighQualityNeural ? BrandTheme.emeraldMint : .orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Active Voice: \(diag.displayName) (\(diag.locale))")
+                                        .scaledFont(.caption, weight: .bold)
+                                    Text("\(diag.qualityBadge) · \(diag.highQualityCountForLanguage) neural/enhanced voice(s) installed for \(accentLanguageTab.capitalized)")
+                                        .scaledFont(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button {
+                                    NativeAudioEngine.shared.playClickSound()
+                                    voiceRefreshNonce += 1
+                                } label: {
+                                    Label("Refresh", systemImage: "arrow.clockwise")
+                                        .scaledFont(.caption2, weight: .semibold)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+
+                            if accentLanguageTab == "german" && diag.highQualityCountForLanguage <= 1 {
+                                Text("How to install free Apple Premium German voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"German\" → download Petra (Premium), Anna (Premium), or Markus (Enhanced) → click Refresh above.")
+                                    .scaledFont(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            #if os(macOS)
+                            Button {
+                                let urls = [
+                                    "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?AX_FEATURE_SPOKENCONTENT",
+                                    "x-apple.systempreferences:com.apple.Accessibility-Settings.extension"
+                                ]
+                                for raw in urls {
+                                    if let url = URL(string: raw), NSWorkspace.shared.open(url) {
+                                        break
+                                    }
+                                }
+                            } label: {
+                                Label("Open Read & Speak Settings (System Voice → ⓘ → Manage Voices)…", systemImage: "arrow.down.circle")
+                                    .scaledFont(.caption, weight: .semibold)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            #endif
+                        }
+                        .padding(.vertical, 4)
+
                         let voiceBinding = Binding<String>(
                             get: { draft.preferredSystemVoices[selectedAccentCode] ?? "" },
                             set: { draft.preferredSystemVoices[selectedAccentCode] = $0 }
                         )
                         Picker("Installed Human Voice", selection: voiceBinding) {
-                            Text("✨ Auto-Pick Best Siri / Neural Voice").tag("")
+                            Text("✨ Auto-Pick Best Siri / Neural / Premium Voice").tag("")
                             ForEach(installedHumanVoices, id: \.identifier) { voice in
                                 Text("\(NativeAudioEngine.friendlyDisplayName(for: voice)) (\(voice.language))")
                                     .tag(voice.identifier)
                             }
                         }
 
-                        Text("Legacy robotic/Eloquence voices are automatically hidden. For extra offline accents (Austrian, Swiss, British Enhanced/Siri), download voices in System Settings → Accessibility → Spoken Content → System Voice.")
-                            .font(.caption)
+                        Text("Legacy robotic/Eloquence voices are automatically hidden. Neural & Premium voices are prioritized over 22kHz compact voices and spoken with uninterrupted prosody.")
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         TextField("TTS Endpoint URL", text: $draft.endpoint)
-                            .font(.system(size: 13, design: .monospaced))
+                            .scaledFont(size: 13, design: .monospaced)
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -137,7 +194,7 @@ public struct VoiceStudioSheetView: View {
                             #endif
 
                         TextField("Model", text: $draft.model)
-                            .font(.system(size: 13, design: .monospaced))
+                            .scaledFont(size: 13, design: .monospaced)
 
                         if draft.provider.requiresAPIKey {
                             SecureField(
@@ -148,7 +205,7 @@ public struct VoiceStudioSheetView: View {
                             )
                             if draft.provider == .openai {
                                 Toggle("Reuse OpenAI key from AI Provider settings", isOn: $draft.reuseOpenAIKey)
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                             }
                         }
 
@@ -159,7 +216,7 @@ public struct VoiceStudioSheetView: View {
                         }
 
                         TextField("Custom Voice ID", text: $draft.neuralVoice)
-                            .font(.system(size: 12.5, design: .monospaced))
+                            .scaledFont(size: 12.5, design: .monospaced)
                     }
                 }
 
@@ -175,7 +232,7 @@ public struct VoiceStudioSheetView: View {
                             Text("Speaking Pace")
                             Spacer()
                             Text(String(format: "%.2fx", draft.rateMultiplier))
-                                .font(.caption.monospaced().bold())
+                                .scaledFont(.caption, weight: .bold, design: .monospaced)
                                 .foregroundStyle(BrandTheme.celestialSky)
                         }
                         Slider(value: $draft.rateMultiplier, in: 0.75...1.25, step: 0.05)
@@ -186,7 +243,7 @@ public struct VoiceStudioSheetView: View {
                             feedback.message,
                             systemImage: feedback.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                         )
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(feedback.ok ? BrandTheme.emeraldMint : .orange)
                     }
 

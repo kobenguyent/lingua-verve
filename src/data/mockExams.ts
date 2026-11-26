@@ -1,5 +1,6 @@
 import { CEFRLevel, MockExam } from '../types';
 import { MOCK_EXAM_EXTENSIONS } from './mockExamExtensions';
+import { CONVERSATIONAL_LISTENING_SCRIPTS } from './conversationalListeningScripts';
 
 /**
  * 12 Full 4-Skill Simulated Certification Exams (English A1–C2 + German A1–C2)
@@ -1519,6 +1520,7 @@ export const MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
     listening: {
       ...exam.listening,
       durationMinutes: Math.max(exam.listening.durationMinutes, Math.round(ext.officialMinutes * 0.25)),
+      audioScript: CONVERSATIONAL_LISTENING_SCRIPTS[`${exam.id}-listen-t1`] || exam.listening.audioScript,
       tracks: [
         {
           id: `${exam.id}-listen-t1`,
@@ -1527,11 +1529,14 @@ export const MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
           accentCode: ext.primaryAccentCode,
           maxPlaysStrict: exam.listening.maxPlaysStrict,
           preReadSeconds: 15,
-          audioScript: exam.listening.audioScript,
+          audioScript: CONVERSATIONAL_LISTENING_SCRIPTS[`${exam.id}-listen-t1`] || exam.listening.audioScript,
           hearingFocusTrap: exam.listening.hearingFocusTrap,
           questions: exam.listening.questions,
         },
-        ...ext.extraListeningTracks,
+        ...ext.extraListeningTracks.map((track) => ({
+          ...track,
+          audioScript: CONVERSATIONAL_LISTENING_SCRIPTS[track.id] || track.audioScript,
+        })),
       ],
     },
     writing: {

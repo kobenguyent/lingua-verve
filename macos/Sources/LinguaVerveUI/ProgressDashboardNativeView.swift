@@ -45,7 +45,7 @@ public struct ProgressDashboardNativeView: View {
                 // 4-Skill Averages
                 VStack(alignment: .leading, spacing: 10) {
                     Text("4-SKILL COMPETENCY AVERAGES")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
@@ -54,15 +54,15 @@ public struct ProgressDashboardNativeView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
                                     Label(sk.displayName, systemImage: sk.systemImage)
-                                        .font(.caption.weight(.bold))
+                                        .scaledFont(.caption, weight: .bold)
                                     Spacer()
                                     Text(stat.samples > 0 ? "\(stat.average)%" : "—")
-                                        .font(.subheadline.monospaced().bold())
+                                        .scaledFont(.subheadline, weight: .bold, design: .monospaced)
                                 }
                                 ProgressView(value: Double(stat.average), total: 100.0)
                                     .tint(BrandTheme.celestialSky)
                                 Text(stat.samples > 0 ? "\(stat.samples) recorded test(s)" : "No tests recorded yet")
-                                    .font(.caption2)
+                                    .scaledFont(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             .padding(12)
@@ -82,22 +82,22 @@ public struct ProgressDashboardNativeView: View {
                 // Exam History
                 VStack(alignment: .leading, spacing: 10) {
                     Text("SIMULATED EXAM HISTORY (\(store.learnerState.examHistory.count))")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
 
                     if store.learnerState.examHistory.isEmpty {
                         Text("No simulated exams recorded yet. Open Exam Arena to take your first 4-skill exam.")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(store.learnerState.examHistory) { attempt in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
                                     Text("\(attempt.languageId == "german" ? "🇩🇪" : "🇬🇧") \(attempt.examTitle)")
-                                        .font(.subheadline.weight(.bold))
+                                        .scaledFont(.subheadline, weight: .bold)
                                     Spacer()
                                     Text("\(attempt.overallScore)% · \(attempt.passed ? "PASS" : "RETRY")")
-                                        .font(.caption.monospaced().bold())
+                                        .scaledFont(.caption, weight: .bold, design: .monospaced)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
                                         .background(Capsule().fill((attempt.passed ? BrandTheme.emeraldMint : .orange).opacity(0.16)))
@@ -107,7 +107,7 @@ public struct ProgressDashboardNativeView: View {
                                     ForEach(SkillType.allCases) { sk in
                                         let sc = attempt.skills[sk.rawValue]?.score ?? 0
                                         Text("\(sk.shortName): \(sc)%")
-                                            .font(.caption.monospaced())
+                                            .scaledFont(.caption, design: .monospaced)
                                             .foregroundStyle(.secondary)
                                     }
                                 }
@@ -123,22 +123,22 @@ public struct ProgressDashboardNativeView: View {
                 // Recent Study Activity
                 VStack(alignment: .leading, spacing: 8) {
                     Text("RECENT STUDY TIMELINE")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
                     if store.learnerState.activityLog.isEmpty {
                         Text("Complete course units, pre-tests, or mock exams to log your learning history.")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(store.learnerState.activityLog.prefix(15)) { entry in
                             HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundStyle(BrandTheme.emeraldMint)
                                     .padding(.top, 2)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.title).font(.caption.weight(.bold))
-                                    Text(entry.detail).font(.caption2).foregroundStyle(.secondary)
+                                    Text(entry.title).scaledFont(.caption, weight: .bold)
+                                    Text(entry.detail).scaledFont(.caption2).foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -162,10 +162,10 @@ public struct ProgressDashboardNativeView: View {
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("PROGRESS, HISTORY & TEST RESULTS")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundStyle(BrandTheme.celestialSky)
             Text("Your Zero-to-Hero Polyglot Dossier")
-                .font(.system(size: 22, weight: .bold, design: .serif))
+                .scaledFont(size: 22, weight: .bold, design: .serif)
         }
     }
 
@@ -193,10 +193,10 @@ public struct ProgressDashboardNativeView: View {
     private func kpiCard(title: String, value: String, icon: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: icon)
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(tint)
             Text(value)
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .scaledFont(size: 20, weight: .bold, design: .monospaced)
                 .monospacedDigit()
         }
         .padding(12)
@@ -207,7 +207,7 @@ public struct ProgressDashboardNativeView: View {
     private func zeroToHeroCard(languageId: String, title: String) -> some View {
         let courses = store.courses(for: languageId)
         return VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
+            Text(title).scaledFont(.headline)
             ForEach(courses) { course in
                 let pct = store.courseCompletionPercent(for: course)
                 Button {
@@ -216,11 +216,11 @@ public struct ProgressDashboardNativeView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("\(course.level.rawValue) · \(course.heroRole.components(separatedBy: "·").last?.trimmingCharacters(in: .whitespaces) ?? "")")
-                                .font(.caption.weight(.semibold))
+                                .scaledFont(.caption, weight: .semibold)
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text("\(pct)%")
-                                .font(.caption2.monospaced())
+                                .scaledFont(.caption2, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
                         ProgressView(value: Double(pct), total: 100.0)

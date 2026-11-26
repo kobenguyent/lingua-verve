@@ -22,7 +22,14 @@ import {
   recordPreTestResult,
   toggleModuleCompletionInState,
 } from '../utils/progressStore';
-import { evaluatePreTest, getPreTestQuestions } from '../data';
+import { evaluatePreTest, getPreTestQuestions, MOCK_EXAMS } from '../data';
+import {
+  deleteGeneratedExam,
+  extractJsonObject,
+  generateFreshMockExamWithAI,
+  loadGeneratedExams,
+  saveGeneratedExam,
+} from '../utils/aiExamGenerator';
 
 describe('Local & Cloud AI Provider Client', () => {
   beforeEach(() => {
@@ -326,5 +333,63 @@ describe('Learner Progress, History & Test Results Store', () => {
     expect(computeStudyStreak(['2026-11-23', '2026-11-24', '2026-11-25'], refDate)).toBe(3);
     expect(computeStudyStreak(['2026-11-20', '2026-11-24'], refDate)).toBe(1);
     expect(computeStudyStreak(['2026-11-10'], refDate)).toBe(0);
+  });
+
+  it('extracts fenced/trailing-comma JSON, falls back a malformed skill gracefully, and persists AI generated exam bank', async () => {
+    const parsed = extractJsonObject<{ ok: boolean; items: number[] }>('Here you go:\n```json\n{"ok": true, "items": [1, 2,],}\n```');
+    expect(parsed).toEqual({ ok: true, items: [1, 2] });
+
+    const baseExam = MOCK_EXAMS.find((e) => e.id === 'exam-en-b2')!;
+    const validWriting = JSON.stringify({
+      tasks: [
+        {
+          partLabel: 'Writing Task 1 · Report',
+          scenario: 'Write a report on urban cycling infrastructure for your city council.',
+          taskRequirements: ['Evaluate current lanes', 'Identify bottlenecks', 'Propose two upgrades'],
+          weightPercent: 40,
+          keyRubricKeywords: ['infrastructure', 'commuters', 'furthermore'],
+          modelAnswer: 'Urban cycling infrastructure has expanded rapidly over the past decade, yet crucial intersections still deter daily commuters from leaving cars at home.',
+        },
+        {
+          partLabel: 'Writing Task 2 · Essay',
+          scenario: 'Should major cities ban private petrol cars from historic centres by 2030?',
+          taskRequirements: ['Weigh economic impact', 'Evaluate air quality gains', 'Reach a reasoned conclusion'],
+          weightPercent: 60,
+          keyRubricKeywords: ['emissions', 'however', 'consequently'],
+          modelAnswer: 'Banning private petrol vehicles from historic centres is often portrayed as an attack on convenience; however, cities that prioritize clean air and rapid transit consistently report stronger retail footfall.',
+        },
+      ],
+    });
+
+    // Only Writing returns valid JSON; other 3 return invalid prose -> graceful 1/4 AI + 3/4 base fallback
+    const partialFetch = vi.fn().mockImplementation(async (_url, init) => {
+      const bodyStr = String(init?.body || '');
+      const content = bodyStr.includes('Writing examiner') ? validWriting : 'Sorry, I cannot comply with JSON right now.';
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content } }] }),
+      };
+    });
+
+    const cfg = { ...getDefaultAIConfig('openai'), enabled: true, apiKey: 'sk-unit' };
+    const result = await generateFreshMockExamWithAI({
+      config: cfg,
+      baseExam,
+      customTopic: 'Urban Cycling & Clean Air',
+      fetchImpl: partialFetch as unknown as typeof fetch,
+    });
+
+    expect(result.aiSkillsCount).toBe(1);
+    expect(result.exam.aiGenerated).toBe(true);
+    expect(result.exam.writing.tasks?.[0].partLabel).toBe('Writing Task 1 · Report');
+    expect(result.exam.reading.parts?.length).toBe(3);
+    expect(result.exam.listening.tracks?.length).toBe(3);
+
+    const saved = saveGeneratedExam(result.exam);
+    expect(saved.some((e) => e.id === result.exam.id)).toBe(true);
+    expect(loadGeneratedExams().some((e) => e.id === result.exam.id)).toBe(true);
+
+    const afterDelete = deleteGeneratedExam(result.exam.id);
+    expect(afterDelete.some((e) => e.id === result.exam.id)).toBe(false);
   });
 });

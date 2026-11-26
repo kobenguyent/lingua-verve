@@ -53,14 +53,14 @@ public struct TipDetailView: View {
 
                 FlowLayout(spacing: 8, lineSpacing: 6) {
                     Text("\(lang?.flag ?? "🌐") \(lang?.name ?? "Polyglot Meta")")
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .scaledFont(size: 12.5, weight: .semibold)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)
                         .background(Capsule().fill(Color.primary.opacity(0.07)))
                         .fixedSize()
 
                     Text(levelDetail != nil ? "\(tip.level) · \(levelDetail!.badge)" : "All Levels")
-                        .font(.system(size: 12.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 12.5, weight: .bold, design: .monospaced)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)
                         .foregroundStyle(tierColor)
@@ -68,7 +68,7 @@ public struct TipDetailView: View {
                         .fixedSize()
 
                     Label(tip.category.displayName, systemImage: tip.category.systemImage)
-                        .font(.system(size: 12.5, weight: .medium))
+                        .scaledFont(size: 12.5, weight: .medium)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)
                         .foregroundStyle(.secondary)
@@ -78,10 +78,10 @@ public struct TipDetailView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(tip.title)
-                        .font(.system(size: 24, weight: .bold, design: .serif))
+                        .scaledFont(size: 24, weight: .bold, design: .serif)
                         .textSelection(.enabled)
                     Text(tip.summary)
-                        .font(.system(size: 15))
+                        .scaledFont(size: 15)
                         .foregroundStyle(.secondary)
                         .lineSpacing(4)
                         .textSelection(.enabled)
@@ -92,13 +92,13 @@ public struct TipDetailView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "lightbulb.max.fill")
                             .foregroundStyle(BrandTheme.champagneGold)
-                            .font(.system(size: 18))
+                            .scaledFont(size: 18)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("GOLDEN POLYGLOT RULE")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(BrandTheme.champagneGold)
                             Text(tip.goldenRule)
-                                .font(.system(size: 14.5, weight: .semibold))
+                                .scaledFont(size: 14.5, weight: .semibold)
                                 .lineSpacing(3)
                         }
                     }
@@ -114,18 +114,18 @@ public struct TipDetailView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("ACTIONABLE TACTICS")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
 
                     ForEach(Array(tip.tactics.enumerated()), id: \.offset) { idx, tactic in
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(idx + 1)")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                 .frame(width: 24, height: 24)
                                 .background(Circle().fill(BrandTheme.celestialSky.opacity(0.14)))
                                 .foregroundStyle(BrandTheme.celestialSky)
                             Text(tactic)
-                                .font(.system(size: 14))
+                                .scaledFont(size: 14)
                                 .lineSpacing(3)
                         }
                     }
@@ -138,14 +138,14 @@ public struct TipDetailView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Text("TARGET EXAMPLES · TAP TO HEAR")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Toggle("0.75x", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                                 .toggleStyle(.switch)
                                 .labelsHidden()
                             Text("0.75x")
-                                .font(.system(size: 11, design: .monospaced))
+                                .scaledFont(size: 11, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -154,9 +154,9 @@ public struct TipDetailView: View {
                             HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(ex.source)
-                                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                        .scaledFont(size: 14, weight: .semibold, design: .monospaced)
                                     Text(ex.explanation)
-                                        .font(.system(size: 12.5))
+                                        .scaledFont(size: 12.5)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 6)
@@ -164,7 +164,7 @@ public struct TipDetailView: View {
                                     NativeAudioEngine.shared.speak(ex.speakablePhrase, languageId: tip.languageId)
                                 } label: {
                                     Label(isSpeaking ? "Playing" : "Listen", systemImage: isSpeaking ? "waveform" : "speaker.wave.2.fill")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .scaledFont(size: 12, weight: .semibold)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(isSpeaking ? BrandTheme.champagneGold : BrandTheme.celestialSky)
@@ -182,10 +182,10 @@ public struct TipDetailView: View {
                             .foregroundStyle(.red)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("COMMON PITFALL")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.red)
                             Text(tip.commonPitfall)
-                                .font(.system(size: 13.5))
+                                .scaledFont(size: 13.5)
                         }
                     }
                     .padding(14)
@@ -196,14 +196,14 @@ public struct TipDetailView: View {
                 if let tools = tip.recommendedTools, !tools.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("CURATED TOOLS")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                             .foregroundStyle(.secondary)
                         FlowLayout(spacing: 8, lineSpacing: 6) {
                             ForEach(tools, id: \.name) { tool in
                                 if let url = URL(string: tool.url) {
                                     Link(destination: url) {
                                         Label(tool.name, systemImage: "arrow.up.right.square")
-                                            .font(.system(size: 12.5, weight: .semibold))
+                                            .scaledFont(size: 12.5, weight: .semibold)
                                     }
                                     .buttonStyle(.bordered)
                                 }
@@ -220,7 +220,7 @@ public struct TipDetailView: View {
 
     private var timeCommitmentLabel: some View {
         Label(tip.timeCommitment, systemImage: "clock")
-            .font(.system(size: 12.5, design: .monospaced))
+            .scaledFont(size: 12.5, design: .monospaced)
             .foregroundStyle(.secondary)
     }
 
@@ -233,7 +233,7 @@ public struct TipDetailView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { copied = false }
         } label: {
             Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: 12, weight: .medium))
+                .scaledFont(size: 12, weight: .medium)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -243,7 +243,7 @@ public struct TipDetailView: View {
             store.toggleBookmark(tip.id)
         } label: {
             Label(isBookmarked ? "Saved" : "Save", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
-                .font(.system(size: 12, weight: .medium))
+                .scaledFont(size: 12, weight: .medium)
         }
         .buttonStyle(.bordered)
         .tint(isBookmarked ? BrandTheme.celestialSky : nil)
@@ -261,7 +261,7 @@ public struct TipDetailView: View {
                 isMastered ? "Mastered" : "Master",
                 systemImage: isMastered ? "checkmark.seal.fill" : "checkmark.seal"
             )
-            .font(.system(size: 12, weight: .semibold))
+            .scaledFont(size: 12, weight: .semibold)
         }
         .buttonStyle(.borderedProminent)
         .tint(isMastered ? BrandTheme.emeraldMint : .accentColor)

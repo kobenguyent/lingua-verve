@@ -186,6 +186,188 @@ describe('ExamSimulatorView Component', () => {
       expect(screen.getAllByText(/Task Fulfillment/i).length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it('generates a brand-new AI exam edition from the lobby when AI is connected', async () => {
+    const mockRead = JSON.stringify({
+      parts: [
+        {
+          partLabel: 'Lesen · Teil 1 (Klinik-Info)',
+          format: 'comprehension',
+          instruction: 'Lesen Sie die Information.',
+          passageTitle: 'Neue Hausarztpraxis am Markt',
+          passage: 'Die neue Hausarztpraxis am Marktplatz öffnet am Montag um acht Uhr. Patienten können online oder telefonisch Termine buchen und Rezepte abholen.',
+          questions: [
+            { prompt: 'Wann öffnet die Praxis?', options: ['Um 7 Uhr', 'Um 8 Uhr', 'Um 9 Uhr', 'Um 10 Uhr'], correctIndex: 1, explanation: 'Sie öffnet um acht Uhr.' },
+            { prompt: 'Wie bucht man Termine?', options: ['Nur per Brief', 'Online oder telefonisch', 'Nur persönlich', 'Gar nicht'], correctIndex: 1, explanation: 'Online oder telefonisch.' },
+            { prompt: 'Wo liegt die Praxis?', options: ['Am Bahnhof', 'Am Hafen', 'Am Marktplatz', 'Im Park'], correctIndex: 2, explanation: 'Am Marktplatz.' },
+          ],
+        },
+        {
+          partLabel: 'Lesen · Teil 2 (Richtig/Falsch)',
+          format: 'true-false',
+          instruction: 'Prüfen Sie die Aussagen.',
+          passageTitle: 'Apotheken-Notdienst',
+          passage: 'Am Sonntag hat die Sonnen-Apotheke bis 20 Uhr Notdienst. Bitte bringen Sie Ihre Gesundheitskarte und ein gültiges Rezept mit.',
+          questions: [
+            { prompt: 'Die Apotheke ist bis 20 Uhr offen.', options: ['Richtig', 'Falsch', 'Steht nicht im Text'], correctIndex: 0, explanation: 'Bis 20 Uhr.' },
+            { prompt: 'Man braucht keine Gesundheitskarte.', options: ['Richtig', 'Falsch', 'Steht nicht im Text'], correctIndex: 1, explanation: 'Bitte bringen Sie Ihre Karte mit.' },
+            { prompt: 'Die Apotheke verkauft Fahrräder.', options: ['Richtig', 'Falsch', 'Steht nicht im Text'], correctIndex: 2, explanation: 'Steht nicht im Text.' },
+          ],
+        },
+        {
+          partLabel: 'Lesen · Teil 3 (Sprachbausteine)',
+          format: 'cloze',
+          instruction: 'Ergänzen Sie die Lücken.',
+          passageTitle: 'Termin vereinbaren',
+          passage: 'Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren. Ich habe [3] Fieber.',
+          questions: [
+            { prompt: 'Lücke [1]', options: ['am', 'im', 'um', 'auf'], correctIndex: 0, explanation: 'am Montag' },
+            { prompt: 'Lücke [2]', options: ['bei', 'aus', 'nach', 'über'], correctIndex: 0, explanation: 'bei Dr. Weber' },
+            { prompt: 'Lücke [3]', options: ['kein', 'keinen', 'nicht', 'keine'], correctIndex: 0, explanation: 'kein Fieber' },
+          ],
+        },
+      ],
+    });
+    const mockListen = JSON.stringify({
+      tracks: [
+        {
+          partLabel: 'Hören · Teil 1 (DE)',
+          contextNote: 'Durchsage in der Praxis.',
+          accentCode: 'de-DE',
+          audioScript: 'Liebe Patientinnen und Patienten, heute findet die Impfsprechstunde im Raum zwölf statt und dauert bis sechzehn Uhr.',
+          hearingFocusTrap: 'Raum 12 und 16 Uhr.',
+          questions: [
+            { prompt: 'In welchem Raum?', options: ['Raum 10', 'Raum 12', 'Raum 14', 'Raum 16'], correctIndex: 1, explanation: 'Raum zwölf.' },
+            { prompt: 'Bis wann?', options: ['14 Uhr', '15 Uhr', '16 Uhr', '18 Uhr'], correctIndex: 2, explanation: 'Bis sechzehn Uhr.' },
+            { prompt: 'Was findet statt?', options: ['Konzert', 'Impfsprechstunde', 'Pause', 'Prüfung'], correctIndex: 1, explanation: 'Impfsprechstunde.' },
+          ],
+        },
+        {
+          partLabel: 'Hören · Teil 2 (AT)',
+          contextNote: 'Nachricht aus Wien.',
+          accentCode: 'de-AT',
+          audioScript: 'Grüß Gott, hier ist die Ordination in Wien. Ihr Befund ist fertig und kann morgen ab neun Uhr abgeholt werden.',
+          hearingFocusTrap: 'Ab 9 Uhr morgen.',
+          questions: [
+            { prompt: 'Wann abholen?', options: ['Ab 8 Uhr', 'Ab 9 Uhr', 'Ab 11 Uhr', 'Am Freitag'], correctIndex: 1, explanation: 'Ab neun Uhr.' },
+            { prompt: 'Was ist fertig?', options: ['Das Buch', 'Der Befund', 'Das Ticket', 'Die Rechnung'], correctIndex: 1, explanation: 'Ihr Befund.' },
+            { prompt: 'Wo ist die Praxis?', options: ['Berlin', 'Wien', 'Zürich', 'Köln'], correctIndex: 1, explanation: 'Wien.' },
+          ],
+        },
+        {
+          partLabel: 'Hören · Teil 3 (CH)',
+          contextNote: 'Anruf aus Zürich.',
+          accentCode: 'de-CH',
+          audioScript: 'Grüezi, Ihr Zahnarzttermin am Donnerstag wurde von zehn auf elf Uhr dreißig verschoben. Vielen Dank für Ihr Verständnis.',
+          hearingFocusTrap: 'Verschoben von 10:00 auf 11:30.',
+          questions: [
+            { prompt: 'Neue Uhrzeit?', options: ['10:00', '11:30', '12:00', '14:30'], correctIndex: 1, explanation: '11:30 Uhr.' },
+            { prompt: 'Welcher Tag?', options: ['Montag', 'Mittwoch', 'Donnerstag', 'Samstag'], correctIndex: 2, explanation: 'Donnerstag.' },
+            { prompt: 'Welcher Arzt?', options: ['Augenarzt', 'Zahnarzt', 'Kinderarzt', 'Hautarzt'], correctIndex: 1, explanation: 'Zahnarzttermin.' },
+          ],
+        },
+      ],
+    });
+    const mockWrite = JSON.stringify({
+      tasks: [
+        {
+          partLabel: 'Schreiben · Teil 1 (Arzttermin absagen)',
+          scenario: 'Sie sind krank und können am Dienstag nicht zur Praxis kommen. Schreiben Sie eine kurze E-Mail.',
+          taskRequirements: ['Absagen', 'Grund nennen', 'Neuen Termin vorschlagen'],
+          weightPercent: 40,
+          keyRubricKeywords: ['Termin', 'krank', 'Donnerstag', 'Grüße'],
+          modelAnswer: 'Sehr geehrte Damen und Herren, leider bin ich krank und kann meinen Termin am Dienstag nicht wahrnehmen. Können wir ihn auf Donnerstag verschieben? Viele Grüße, Alex.',
+        },
+        {
+          partLabel: 'Schreiben · Teil 2 (Nachricht an Kollegin)',
+          scenario: 'Schreiben Sie Ihrer Kollegin Hannah über Ihre Erkältung und wer Ihre Aufgaben übernimmt.',
+          taskRequirements: ['Situation erklären', 'Vertretung nennen', 'Rückkehrdatum angeben'],
+          weightPercent: 60,
+          keyRubricKeywords: ['Erkältung', 'Montag', 'Vertretung', 'Danke'],
+          modelAnswer: 'Liebe Hannah, ich habe eine starke Erkältung und bleibe bis Freitag zu Hause. Lukas übernimmt meine wichtigen Anrufe. Am Montag bin ich wieder im Büro. Danke für deine Hilfe! Liebe Grüße, Alex.',
+        },
+      ],
+    });
+    const mockSpeak = JSON.stringify({
+      parts: [
+        {
+          partLabel: 'Sprechen · Teil 1 (Gesundheit & Alltag)',
+          instruction: 'Sprechen Sie über Ihren gesunden Alltag.',
+          prepSeconds: 15,
+          speakSeconds: 45,
+          prompts: ['Sport', 'Ernährung', 'Schlaf'],
+          examinerPromptAudio: 'Guten Tag! Was machen Sie im Alltag, um gesund zu bleiben?',
+          keyRubricKeywords: ['Sport', 'Wasser', 'gesund'],
+          modelResponseScript: 'Ich fahre jeden Tag mit dem Fahrrad zur Arbeit, trinke viel Wasser und koche abends frisches Gemüse.',
+        },
+        {
+          partLabel: 'Sprechen · Teil 2 (Arztbesuch)',
+          instruction: 'Beschreiben Sie einen Besuch beim Arzt.',
+          prepSeconds: 30,
+          speakSeconds: 60,
+          prompts: ['Symptome', 'Wartezeit', 'Rat des Arztes'],
+          examinerPromptAudio: 'Kommen wir zu Teil zwei. Erzählen Sie von einem Arztbesuch.',
+          keyRubricKeywords: ['Arzt', 'Rezept', 'Ruhe'],
+          modelResponseScript: 'Letzten Winter hatte ich Fieber und bin zur Hausärztin gegangen. Sie hat mir Tee, Ruhe und ein Rezept gegeben.',
+        },
+        {
+          partLabel: 'Sprechen · Teil 3 (Höfliche Bitte)',
+          instruction: 'Bitten Sie in der Apotheke um Rat.',
+          prepSeconds: 15,
+          speakSeconds: 45,
+          prompts: ['Kopfschmerzen', 'Dosierung fragen', 'Danken'],
+          examinerPromptAudio: 'Guten Tag in der Apotheke! Wie kann ich Ihnen heute helfen?',
+          keyRubricKeywords: ['bitte', 'Tabletten', 'Danke'],
+          modelResponseScript: 'Guten Tag, ich habe Kopfschmerzen. Könnten Sie mir bitte ein mildes Mittel empfehlen und sagen, wie oft ich es nehmen soll?',
+        },
+      ],
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const bodyStr = String(init?.body || '');
+      const content = bodyStr.includes('Listening')
+        ? mockListen
+        : bodyStr.includes('Writing')
+        ? mockWrite
+        : bodyStr.includes('Speaking')
+        ? mockSpeak
+        : mockRead;
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content } }] }),
+      } as unknown as Response;
+    });
+
+    try {
+      const activeAI = { ...getDefaultAIConfig('openai'), enabled: true, apiKey: 'sk-test-key' };
+      render(
+        <ExamSimulatorView
+          activeLanguageId="german"
+          onSelectLanguage={vi.fn()}
+          initialLevel="A1"
+          aiConfig={activeAI}
+          onOpenAISettings={vi.fn()}
+          onCompleteExam={vi.fn()}
+        />
+      );
+
+      fireEvent.change(screen.getByLabelText(/Custom Exam Topic/i), {
+        target: { value: 'Arzttermin & Apotheke' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Generate Fresh A1 AI Exam/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Generated fresh A1 exam \(4\/4 AI-crafted skills\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/AI Edition \(Arzttermin & Apotheke\)/i)).toBeInTheDocument();
+      });
+
+      // Start the newly crafted AI exam and verify fresh passage appears!
+      fireEvent.click(screen.getByRole('button', { name: /Begin A1 Simulated Exam/i }));
+      expect(screen.getByRole('heading', { name: /Neue Hausarztpraxis am Markt/i })).toBeInTheDocument();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
 describe('AICoachView & AIProviderModal Components', () => {

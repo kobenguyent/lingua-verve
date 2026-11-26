@@ -28,10 +28,10 @@ public struct AICoachNativeView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("AI 4-SKILL MASTERY STUDIO")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                             .foregroundStyle(BrandTheme.emeraldMint)
                         Text("\(langName) \(store.aiCoachLevel.rawValue) · \(store.aiCoachSkill.displayName)")
-                            .font(.headline)
+                            .scaledFont(.headline)
                     }
                     Spacer()
                     Button {
@@ -41,7 +41,7 @@ public struct AICoachNativeView: View {
                             store.aiConfig.isReady ? store.aiConfig.model : "Setup AI",
                             systemImage: "cpu"
                         )
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(store.aiConfig.isReady ? BrandTheme.emeraldMint : BrandTheme.celestialSky)
@@ -67,7 +67,7 @@ public struct AICoachNativeView: View {
 
                     Toggle("Auto-Speak", isOn: $autoSpeak)
                         .toggleStyle(.switch)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .fixedSize()
                 }
 
@@ -90,7 +90,7 @@ public struct AICoachNativeView: View {
                             Button(prompt) {
                                 Task { await sendMessage(prompt) }
                             }
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
@@ -108,12 +108,12 @@ public struct AICoachNativeView: View {
                     if messages.isEmpty && offlineEval == nil {
                         VStack(spacing: 10) {
                             Image(systemName: "sparkles")
-                                .font(.largeTitle)
+                                .scaledFont(.largeTitle)
                                 .foregroundStyle(BrandTheme.celestialSky)
                             Text(store.aiConfig.isReady
                                  ? "Connected to \(store.aiConfig.provider.label) (\(store.aiConfig.model))"
                                  : "Connect Local (Ollama/LM Studio) or Cloud AI, or paste Writing/Speaking below for offline CEFR rubric grading.")
-                                .font(.subheadline)
+                                .scaledFont(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
@@ -126,14 +126,14 @@ public struct AICoachNativeView: View {
                             if msg.role == "user" { Spacer(minLength: 40) }
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(msg.content)
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                                     .textSelection(.enabled)
                                 if msg.role == "assistant" {
                                     Button {
                                         NativeAudioEngine.shared.speak(String(msg.content.prefix(450)), languageId: lang)
                                     } label: {
                                         Label("Listen", systemImage: "speaker.wave.2.fill")
-                                            .font(.caption2.weight(.semibold))
+                                            .scaledFont(.caption2, weight: .semibold)
                                     }
                                     .buttonStyle(.bordered)
                                     .controlSize(.mini)
@@ -152,18 +152,18 @@ public struct AICoachNativeView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("\(eval.providerLabel) · Est. \(eval.cefrEstimate.rawValue)")
-                                    .font(.caption.weight(.bold))
+                                    .scaledFont(.caption, weight: .bold)
                                 Spacer()
                                 Text("\(eval.score)/100")
-                                    .font(.headline.monospaced())
+                                    .scaledFont(.headline, design: .monospaced)
                                     .foregroundStyle(BrandTheme.celestialSky)
                             }
-                            Text(eval.examinerSummary).font(.caption)
+                            Text(eval.examinerSummary).scaledFont(.caption)
                             ForEach(eval.strengths, id: \.self) { s in
-                                Text("✓ \(s)").font(.caption).foregroundStyle(BrandTheme.emeraldMint)
+                                Text("✓ \(s)").scaledFont(.caption).foregroundStyle(BrandTheme.emeraldMint)
                             }
                             ForEach(eval.corrections, id: \.self) { c in
-                                Text("• \(c)").font(.caption).foregroundStyle(.orange)
+                                Text("• \(c)").scaledFont(.caption).foregroundStyle(.orange)
                             }
                         }
                         .padding(14)
@@ -172,12 +172,12 @@ public struct AICoachNativeView: View {
 
                     if isLoading {
                         ProgressView("AI Coach thinking...")
-                            .font(.caption)
+                            .scaledFont(.caption)
                     }
 
                     if let err = errorMessage {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.red)
                     }
                 }

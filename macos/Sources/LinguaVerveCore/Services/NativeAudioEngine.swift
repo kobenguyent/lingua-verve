@@ -208,6 +208,42 @@ public struct VoiceCandidateDescriptor: Equatable, Sendable {
 
 // MARK: - Native Audio & Multi-Accent Human Voice Engine
 
+public struct DialogueTurn: Equatable, Sendable {
+    public let speaker: String
+    public let text: String
+    public let speakerIndex: Int
+
+    public init(speaker: String, text: String, speakerIndex: Int) {
+        self.speaker = speaker
+        self.text = text
+        self.speakerIndex = speakerIndex
+    }
+}
+
+private final class SpeechTurnDelegate: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
+    var speakerByUtteranceId: [ObjectIdentifier: String] = [:]
+    var onSpeakerChange: (@Sendable (String?) -> Void)?
+    var onFinishAll: (@Sendable () -> Void)?
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        let name = speakerByUtteranceId[ObjectIdentifier(utterance)]
+        onSpeakerChange?(name)
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        speakerByUtteranceId.removeValue(forKey: ObjectIdentifier(utterance))
+        if speakerByUtteranceId.isEmpty {
+            onSpeakerChange?(nil)
+            onFinishAll?()
+        }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        speakerByUtteranceId.removeAll()
+        onSpeakerChange?(nil)
+    }
+}
+
 @Observable
 public final class NativeAudioEngine {
     public static let shared = NativeAudioEngine()
@@ -359,6 +395,9 @@ public final class NativeAudioEngine {
     ]
 
     public static let localNeuralVoices: [NeuralVoicePreset] = [
+        NeuralVoicePreset(id: "de_DE-thorsten-high", label: "Thorsten High (German M · Piper/Speaches)", note: "Ultra-natural studio German male neural voice (Piper / OpenedAI-Speech)"),
+        NeuralVoicePreset(id: "de_DE-eva_k-x_low", label: "Eva K (German F · Piper/Speaches)", note: "Warm German female neural voice (Piper / Speaches)"),
+        NeuralVoicePreset(id: "de_DE-kerstin-low", label: "Kerstin (German F · Piper/Speaches)", note: "Clear German female conversational neural voice"),
         NeuralVoicePreset(id: "bf_emma", label: "Kokoro Emma (British F)", note: "Natural British neural voice (Kokoro-FastAPI)"),
         NeuralVoicePreset(id: "bm_george", label: "Kokoro George (British M)", note: "Natural British male neural voice"),
         NeuralVoicePreset(id: "af_heart", label: "Kokoro Heart (American F)", note: "Top-rated warm US neural voice"),
@@ -383,9 +422,11 @@ public final class NativeAudioEngine {
     ]
 
     private static let settingsKey = "linguaverve_voice_settings_v1"
-    private static let sharedAIConfigKey = "linguaverve_ai_provider_v1"
+    private static let sharedAIConfigKey = "linguaverve.apple.aiConfig.v1"
+    private static let legacySharedAIConfigKey = "linguaverve_ai_provider_v1"
 
-    private let synthesizer = AVSpeechSynthesizer()
+    private var synthesizer = AVSpeechSynthesizer()
+    private let speechDelegate = SpeechTurnDelegate()
     private var audioPlayer: AVAudioPlayer?
     private var neuralTask: Task<Void, Never>?
     private var neuralCache: [String: Data] = [:]
@@ -395,6 +436,7 @@ public final class NativeAudioEngine {
     public var isMuted: Bool = false
     public var slowPace: Bool = false
     public var currentlySpeakingText: String?
+    public var activeSpeakerName: String?
     public var isLoadingNeuralAudio: Bool = false
     public var lastVoiceNotice: String?
     public var voiceSettings: VoiceSettings
@@ -406,6 +448,18 @@ public final class NativeAudioEngine {
             self.voiceSettings = decoded
         } else {
             self.voiceSettings = VoiceSettings()
+        }
+        self.synthesizer.delegate = self.speechDelegate
+        self.speechDelegate.onSpeakerChange = { [weak self] name in
+            Task { @MainActor in
+                self?.activeSpeakerName = name
+            }
+        }
+        self.speechDelegate.onFinishAll = { [weak self] in
+            Task { @MainActor in
+                self?.currentlySpeakingText = nil
+                self?.activeSpeakerName = nil
+            }
         }
     }
 
@@ -475,11 +529,15 @@ public final class NativeAudioEngine {
         let target = cfg ?? voiceSettings
         let direct = target.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if !direct.isEmpty { return direct }
-        if target.provider == .openai && target.reuseOpenAIKey,
-           let raw = defaults.data(forKey: Self.sharedAIConfigKey),
-           let aiCfg = try? JSONDecoder().decode(AIProviderConfig.self, from: raw),
-           aiCfg.provider == .openai {
-            return aiCfg.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if target.provider == .openai && target.reuseOpenAIKey {
+            for key in [Self.sharedAIConfigKey, Self.legacySharedAIConfigKey] {
+                if let raw = defaults.data(forKey: key),
+                   let aiCfg = try? JSONDecoder().decode(AIProviderConfig.self, from: raw),
+                   aiCfg.provider == .openai {
+                    let trimmed = aiCfg.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return trimmed }
+                }
+            }
         }
         return ""
     }
@@ -588,11 +646,13 @@ public final class NativeAudioEngine {
         neuralTask = nil
         audioPlayer?.stop()
         audioPlayer = nil
+        speechDelegate.speakerByUtteranceId.removeAll()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
         isLoadingNeuralAudio = false
         currentlySpeakingText = nil
+        activeSpeakerName = nil
     }
 
     // MARK: - Human Neural Voice Ranking & Robotic Filtering
@@ -610,6 +670,42 @@ public final class NativeAudioEngine {
         return false
     }
 
+    public struct ActiveVoiceDiagnostic: Equatable, Sendable {
+        public let displayName: String
+        public let identifier: String
+        public let locale: String
+        public let isHighQualityNeural: Bool
+        public let qualityBadge: String
+        public let highQualityCountForLanguage: Int
+
+        public init(
+            displayName: String,
+            identifier: String,
+            locale: String,
+            isHighQualityNeural: Bool,
+            qualityBadge: String,
+            highQualityCountForLanguage: Int
+        ) {
+            self.displayName = displayName
+            self.identifier = identifier
+            self.locale = locale
+            self.isHighQualityNeural = isHighQualityNeural
+            self.qualityBadge = qualityBadge
+            self.highQualityCountForLanguage = highQualityCountForLanguage
+        }
+    }
+
+    public static func isHighQualityVoice(_ candidate: VoiceCandidateDescriptor) -> Bool {
+        if isRoboticVoice(candidate) { return false }
+        let idLower = candidate.identifier.lowercased()
+        return idLower.contains("siri.natural")
+            || idLower.contains("gryphon-neural")
+            || idLower.contains("neural")
+            || idLower.contains("premium")
+            || idLower.contains("enhanced")
+            || candidate.qualityRaw >= 2
+    }
+
     public static func scoreVoice(_ candidate: VoiceCandidateDescriptor, targetBcp47: String) -> Int {
         if isRoboticVoice(candidate) { return -1000 }
 
@@ -619,28 +715,90 @@ public final class NativeAudioEngine {
 
         guard vLang.hasPrefix(targetBase) else { return -500 }
 
-        var score = (vLang == target) ? 300 : 80
+        // Exact locale gets a strong bonus, but neural/premium/enhanced quality ALWAYS beats robotic compact voices
+        var score = (vLang == target) ? 140 : 40
         let idLower = candidate.identifier.lowercased()
         let baseName = candidate.name.lowercased().split(separator: "(").first.map {
             String($0).trimmingCharacters(in: .whitespaces)
         } ?? candidate.name.lowercased()
 
-        if idLower.contains("siri.natural") || idLower.contains("gryphon-neural") || idLower.contains("neural") {
-            score += 155
+        if idLower.contains("gryphon-neural") || (idLower.contains("premium") && idLower.contains("neural")) {
+            score += 310
+        } else if idLower.contains("siri.natural") || idLower.contains("neural") {
+            score += 290
         } else if idLower.contains("premium") || candidate.qualityRaw >= 3 {
-            score += 135
+            score += 260
         } else if idLower.contains("enhanced") || candidate.qualityRaw == 2 {
-            score += 105
+            score += 210
+        } else if idLower.contains("super-compact") {
+            score -= 95
+        } else if idLower.contains("compact") {
+            score -= 60
         }
 
+        // Known warm human voices (e.g. Petra, Markus, Anna Premium, Daniel Enhanced, Simone)
         if knownHumanNames.contains(baseName) {
-            score += 45
+            score += 35
         }
-        if idLower.contains("super-compact") {
-            score -= 15
+        // Petra & Markus Enhanced/Premium are Apple's most natural offline German voices
+        if targetBase == "de" && (baseName == "petra" || baseName == "markus" || baseName == "viktor") && candidate.qualityRaw >= 2 {
+            score += 35
         }
 
         return score
+    }
+
+    public func activeSystemVoiceDiagnostic(for accentCode: String, settings: VoiceSettings? = nil) -> ActiveVoiceDiagnostic {
+        let cfg = settings ?? voiceSettings
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        let descriptors = voices.map {
+            VoiceCandidateDescriptor(
+                identifier: $0.identifier,
+                name: $0.name,
+                language: $0.language,
+                qualityRaw: $0.quality.rawValue
+            )
+        }
+        let targetBase = String(accentCode.prefix(2)).lowercased()
+        let hqCount = descriptors.filter {
+            $0.language.lowercased().hasPrefix(targetBase) && Self.isHighQualityVoice($0)
+        }.count
+
+        let prefId = cfg.preferredSystemVoices[accentCode]
+        if let chosenDesc = Self.pickBestCandidate(from: descriptors, targetBcp47: accentCode, preferredIdentifier: prefId),
+           let voice = voices.first(where: { $0.identifier == chosenDesc.identifier }) {
+            let isHQ = Self.isHighQualityVoice(chosenDesc)
+            let idLower = voice.identifier.lowercased()
+            let badge: String
+            if idLower.contains("gryphon-neural") {
+                badge = "Apple Neural Premium (48kHz)"
+            } else if idLower.contains("siri.natural") {
+                badge = "Apple Siri Neural (48kHz)"
+            } else if idLower.contains("premium") || voice.quality == .premium {
+                badge = "Apple Premium Offline"
+            } else if idLower.contains("enhanced") || voice.quality == .enhanced {
+                badge = "Apple Enhanced Offline"
+            } else {
+                badge = "Compact Fallback (22kHz · Robotic)"
+            }
+            return ActiveVoiceDiagnostic(
+                displayName: Self.friendlyDisplayName(for: voice),
+                identifier: voice.identifier,
+                locale: voice.language,
+                isHighQualityNeural: isHQ,
+                qualityBadge: badge,
+                highQualityCountForLanguage: hqCount
+            )
+        }
+
+        return ActiveVoiceDiagnostic(
+            displayName: "System Default",
+            identifier: "",
+            locale: accentCode,
+            isHighQualityNeural: false,
+            qualityBadge: "Compact Fallback",
+            highQualityCountForLanguage: hqCount
+        )
     }
 
     public static func pickBestCandidate(
@@ -728,6 +886,167 @@ public final class NativeAudioEngine {
         return "\(accentCue) \(styleCue) \(paceCue) Never sound flat or mechanical."
     }
 
+    // MARK: - Multi-Speaker Conversational Dialogue Parser & Casting
+
+    private static let nonSpeakerLabels: Set<String> = [
+        "angebot", "hinweis", "achtung", "preis", "uhrzeit", "öffnungszeiten", "datum",
+        "note", "warning", "tip", "example", "beispiel", "track", "part", "teil", "fazit",
+        "ergebnis", "regel", "summary", "context", "focus", "trap"
+    ]
+
+    private static let femaleNameHints: Set<String> = [
+        "frau", "anna", "hannah", "lena", "clara", "mia", "sara", "sarah", "emma", "maya",
+        "sophie", "julia", "petra", "helena", "nina", "laura", "lisa", "katharina", "elena",
+        "priya", "chloe", "rachel", "amira", "moderatorin", "kritikerin", "ärztin", "verkäuferin",
+        "rezeptionistin", "studentin", "autorin", "professorin", "novak", "berger", "keller", "meier"
+    ]
+
+    private static let maleNameHints: Set<String> = [
+        "herr", "lukas", "markus", "viktor", "martin", "yannick", "tobias", "jonas", "max",
+        "paul", "david", "tom", "ben", "liam", "leo", "daniel", "oliver", "james", "noah",
+        "stefan", "felix", "alex", "moderator", "interviewer", "schaffner", "arzt", "verkäufer",
+        "kellner", "becker", "steiner", "lindner", "gruber", "weber", "vance", "tutor", "host", "guest"
+    ]
+
+    /// Parses multi-speaker dialogue scripts (both newline-separated and inline `Name: ...` turns).
+    /// Returns an empty array if the text is a single-speaker monologue (fewer than 2 speakers).
+    public static func parseDialogueTurns(_ text: String) -> [DialogueTurn] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        // Match speaker labels at start of string, after newline, or after sentence punctuation (. ! ? —)
+        let pattern = #"(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return []
+        }
+
+        let nsText = trimmed as NSString
+        let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: nsText.length))
+        guard matches.count >= 2 else { return [] }
+
+        var rawTurns: [(speaker: String, text: String)] = []
+        for idx in 0..<matches.count {
+            let match = matches[idx]
+            let speakerRange = match.range(at: 1)
+            guard speakerRange.location != NSNotFound else { continue }
+            let speaker = nsText.substring(with: speakerRange).trimmingCharacters(in: .whitespacesAndNewlines)
+            if nonSpeakerLabels.contains(speaker.lowercased()) { continue }
+            // Avoid matching > 3 words before colon (likely a prose clause, not a speaker label)
+            if speaker.split(separator: " ").count > 3 { continue }
+
+            let textStart = match.range.location + match.range.length
+            let textEnd = (idx + 1 < matches.count) ? matches[idx + 1].range.location : nsText.length
+            guard textEnd > textStart else { continue }
+            let spoken = nsText
+                .substring(with: NSRange(location: textStart, length: textEnd - textStart))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !spoken.isEmpty else { continue }
+            rawTurns.append((speaker: speaker, text: spoken))
+        }
+
+        var speakerIndexMap: [String: Int] = [:]
+        var turns: [DialogueTurn] = []
+        for item in rawTurns {
+            let key = item.speaker.lowercased()
+            let spIdx: Int
+            if let existing = speakerIndexMap[key] {
+                spIdx = existing
+            } else {
+                spIdx = speakerIndexMap.count
+                speakerIndexMap[key] = spIdx
+            }
+            turns.append(DialogueTurn(speaker: item.speaker, text: item.text, speakerIndex: spIdx))
+        }
+
+        return speakerIndexMap.count >= 2 ? turns : []
+    }
+
+    private static func inferredGender(for speakerName: String) -> AVSpeechSynthesisVoiceGender {
+        let tokens = speakerName
+            .lowercased()
+            .replacingOccurrences(of: ".", with: "")
+            .split(whereSeparator: { $0.isWhitespace || $0 == "-" })
+            .map(String.init)
+        for token in tokens {
+            if femaleNameHints.contains(token) { return .female }
+            if maleNameHints.contains(token) { return .male }
+        }
+        return .unspecified
+    }
+
+    private static func buildNeuralConversationInstructions(
+        accentCode: String,
+        speakerName: String,
+        speakerIndex: Int,
+        slow: Bool
+    ) -> String {
+        let accentCue = accentOption(for: accentCode)?.neuralHint
+            ?? "Speak in natural, idiomatic \(accentCode)."
+        let personaTone = speakerIndex % 2 == 0
+            ? "Speak spontaneously like a real person in a live face-to-face conversation with warm inflection, natural rhythm, and authentic reactions."
+            : "Speak as the conversation partner with a distinct, relaxed, responsive tone, natural everyday cadence, and genuine human warmth."
+        let paceCue = slow
+            ? "Keep a clear, unhurried learner pace (~0.82x)."
+            : "Use natural everyday conversational speed."
+        return "\(accentCue) You are \(speakerName). \(personaTone) \(paceCue) Never sound like you are reading a scripted announcement."
+    }
+
+    private static func neuralVoiceForDialogueSpeaker(
+        cfg: VoiceSettings,
+        bcp47: String,
+        speakerName: String,
+        speakerIndex: Int
+    ) -> String {
+        let isGerman = bcp47.lowercased().hasPrefix("de")
+        let inferred = inferredGender(for: speakerName)
+        let primary = cfg.neuralVoice.isEmpty ? cfg.provider.defaultVoice : cfg.neuralVoice
+
+        switch cfg.provider {
+        case .openai:
+            let femaleVoices = ["coral", "sage", "nova", "shimmer"]
+            let maleVoices = ["ash", "echo", "onyx", "fable"]
+            if speakerIndex == 0 {
+                if inferred == .male && femaleVoices.contains(primary.lowercased()) {
+                    return "ash"
+                }
+                return primary
+            }
+            if inferred == .male {
+                return maleVoices.first(where: { $0 != primary.lowercased() }) ?? "ash"
+            }
+            if inferred == .female {
+                return femaleVoices.first(where: { $0 != primary.lowercased() }) ?? "sage"
+            }
+            return femaleVoices.contains(primary.lowercased()) ? "ash" : "coral"
+
+        case .elevenlabs:
+            let femaleId = "XB0fDUnXU5powFXDhCwa" // Charlotte
+            let maleId = "JBFqnCBsd6RMkjVDRZzb"   // George
+            if speakerIndex == 0 { return primary }
+            if inferred == .male { return primary == maleId ? "onwK4e9ZLuTAKqWW03F9" : maleId }
+            if inferred == .female { return primary == femaleId ? "EXAVITQu4vr4xnSDxMaL" : femaleId }
+            return primary == maleId ? femaleId : maleId
+
+        case .localOpenAI:
+            if isGerman {
+                let male = "de_DE-thorsten-high"
+                let female = "de_DE-eva_k-x_low"
+                if speakerIndex == 0 {
+                    return inferred == .female ? female : (inferred == .male ? male : primary)
+                }
+                return primary == male ? female : male
+            } else {
+                let female = "bf_emma"
+                let male = "bm_george"
+                if speakerIndex == 0 { return primary }
+                return primary == male ? female : male
+            }
+
+        case .system:
+            return primary
+        }
+    }
+
     public static func splitIntoNaturalPhrases(_ text: String) -> [String] {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard cleaned.count > 95 else { return [cleaned] }
@@ -762,6 +1081,15 @@ public final class NativeAudioEngine {
         try? session.setActive(true)
         #endif
 
+        // Re-instantiate AVSpeechSynthesizer cleanly if previously speaking to avoid
+        // macOS neural voice rate/prosody glitches after stopSpeaking(at: .immediate).
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+            synthesizer = AVSpeechSynthesizer()
+            synthesizer.delegate = speechDelegate
+        }
+        speechDelegate.speakerByUtteranceId.removeAll()
+
         let voices = AVSpeechSynthesisVoice.speechVoices()
         let descriptors = voices.map {
             VoiceCandidateDescriptor(
@@ -776,22 +1104,111 @@ public final class NativeAudioEngine {
         let chosenVoice = chosenDesc.flatMap { d in voices.first { $0.identifier == d.identifier } }
             ?? AVSpeechSynthesisVoice(language: bcp47)
 
-        let baseRate: Float = slow ? 0.40 : 0.50
-        let scaledRate = max(
-            AVSpeechUtteranceMinimumSpeechRate,
-            min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier))
-        )
+        let isNeuralOrHQ = chosenDesc.map { Self.isHighQualityVoice($0) } ?? false
 
-        let phrases = Self.splitIntoNaturalPhrases(text)
-        for (idx, phrase) in phrases.enumerated() {
-            let utterance = AVSpeechUtterance(string: phrase)
+        // Multi-speaker conversational dialogue playback: strip speaker names and cast distinct voices/personas!
+        let dialogueTurns = Self.parseDialogueTurns(text)
+        if !dialogueTurns.isEmpty {
+            let rankedHumanVoices = Self.humanSystemVoices(for: bcp47)
+            let highQualityPool = rankedHumanVoices.filter { v in
+                let d = VoiceCandidateDescriptor(identifier: v.identifier, name: v.name, language: v.language, qualityRaw: v.quality.rawValue)
+                return Self.isHighQualityVoice(d)
+            }
+            let castingPool = highQualityPool.count >= 2 ? highQualityPool : (chosenVoice.map { [$0] } ?? rankedHumanVoices)
+
+            var voiceBySpeakerIndex: [Int: AVSpeechSynthesisVoice] = [:]
+            var usedVoiceIds = Set<String>()
+
+            for turn in dialogueTurns {
+                if voiceBySpeakerIndex[turn.speakerIndex] == nil {
+                    let targetGender = Self.inferredGender(for: turn.speaker)
+                    let picked: AVSpeechSynthesisVoice? =
+                        castingPool.first(where: { !usedVoiceIds.contains($0.identifier) && targetGender != .unspecified && $0.gender == targetGender })
+                        ?? castingPool.first(where: { !usedVoiceIds.contains($0.identifier) })
+                        ?? chosenVoice
+                    if let picked {
+                        voiceBySpeakerIndex[turn.speakerIndex] = picked
+                        usedVoiceIds.insert(picked.identifier)
+                    }
+                }
+            }
+
+            let distinctVoicesAvailable = Set(voiceBySpeakerIndex.values.map(\.identifier)).count >= 2
+            let baseRate: Float = slow ? 0.45 : AVSpeechUtteranceDefaultSpeechRate
+
+            for (idx, turn) in dialogueTurns.enumerated() {
+                let speakerVoice = voiceBySpeakerIndex[turn.speakerIndex] ?? chosenVoice
+                let utterance = AVSpeechUtterance(string: turn.text)
+                utterance.voice = speakerVoice
+
+                if distinctVoicesAvailable {
+                    // Two distinct neural/enhanced human voices: keep pure 1.0 pitch & natural cadence!
+                    let speakerRateAdj: Float = (turn.speakerIndex % 2 == 0) ? 1.0 : 0.98
+                    utterance.rate = (!slow && abs(cfg.rateMultiplier - 1.0) < 0.01 && speakerRateAdj == 1.0)
+                        ? AVSpeechUtteranceDefaultSpeechRate
+                        : max(AVSpeechUtteranceMinimumSpeechRate, min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier) * speakerRateAdj))
+                    utterance.pitchMultiplier = 1.0
+                } else {
+                    // Single high-quality voice installed: apply subtle natural conversational vocal distinction
+                    // without dropping down to robotic 22kHz compact voices!
+                    let gender = Self.inferredGender(for: turn.speaker)
+                    let isLowerVoice = (gender == .male) || (gender == .unspecified && turn.speakerIndex % 2 == 1)
+                    let pitch: Float = isLowerVoice ? 0.92 : 1.04
+                    let paceFactor: Float = isLowerVoice ? 0.96 : 1.02
+                    utterance.rate = max(
+                        AVSpeechUtteranceMinimumSpeechRate,
+                        min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier) * paceFactor)
+                    )
+                    utterance.pitchMultiplier = pitch
+                }
+
+                utterance.prefersAssistiveTechnologySettings = false
+                utterance.preUtteranceDelay = idx == 0 ? 0.03 : 0.14
+                utterance.postUtteranceDelay = idx < dialogueTurns.count - 1 ? 0.22 : 0.04
+                speechDelegate.speakerByUtteranceId[ObjectIdentifier(utterance)] = turn.speaker
+                synthesizer.speak(utterance)
+            }
+
+            return chosenVoice
+        }
+
+        if isNeuralOrHQ {
+            // Neural/Siri/Premium voices produce far more natural human intonation when given
+            // the full text in ONE utterance with untouched pitchMultiplier (1.0) and natural rate.
+            let utterance = AVSpeechUtterance(string: text)
             utterance.voice = chosenVoice
-            utterance.rate = scaledRate
-            utterance.pitchMultiplier = cfg.speakingStyle == .broadcast ? 0.98 : 1.0
+            let baseRate: Float = slow ? 0.45 : AVSpeechUtteranceDefaultSpeechRate
+            if !slow && abs(cfg.rateMultiplier - 1.0) < 0.01 {
+                utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+            } else {
+                utterance.rate = max(
+                    AVSpeechUtteranceMinimumSpeechRate,
+                    min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier))
+                )
+            }
+            utterance.pitchMultiplier = 1.0
             utterance.prefersAssistiveTechnologySettings = false
-            utterance.preUtteranceDelay = idx == 0 ? 0.02 : 0.04
-            utterance.postUtteranceDelay = idx < phrases.count - 1 ? 0.14 : 0.04
+            speechDelegate.speakerByUtteranceId[ObjectIdentifier(utterance)] = ""
             synthesizer.speak(utterance)
+        } else {
+            // Compact fallback voices benefit from gentle phrase pacing
+            let baseRate: Float = slow ? 0.41 : 0.49
+            let scaledRate = max(
+                AVSpeechUtteranceMinimumSpeechRate,
+                min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier))
+            )
+            let phrases = Self.splitIntoNaturalPhrases(text)
+            for (idx, phrase) in phrases.enumerated() {
+                let utterance = AVSpeechUtterance(string: phrase)
+                utterance.voice = chosenVoice
+                utterance.rate = scaledRate
+                utterance.pitchMultiplier = 1.0
+                utterance.prefersAssistiveTechnologySettings = false
+                utterance.preUtteranceDelay = idx == 0 ? 0.02 : 0.04
+                utterance.postUtteranceDelay = idx < phrases.count - 1 ? 0.12 : 0.04
+                speechDelegate.speakerByUtteranceId[ObjectIdentifier(utterance)] = ""
+                synthesizer.speak(utterance)
+            }
         }
 
         return chosenVoice
@@ -804,23 +1221,180 @@ public final class NativeAudioEngine {
         slow: Bool,
         cfg: VoiceSettings
     ) async -> (ok: Bool, summary: String) {
-        let cacheKey = "\(cfg.provider.rawValue)|\(cfg.model)|\(cfg.neuralVoice)|\(bcp47)|\(cfg.speakingStyle.rawValue)|\(cfg.rateMultiplier)|\(slow)|\(text)"
-
-        if let cached = neuralCache[cacheKey] {
-            if Task.isCancelled { return (false, "Cancelled") }
-            do {
-                try await MainActor.run {
-                    try self.playAudioData(cached)
-                }
-                return (true, "\(cfg.provider.shortLabel) · \(cfg.neuralVoice) (\(bcp47) · cached)")
-            } catch {
-                // Fall through to re-fetch or system fallback
-            }
+        let dialogueTurns = Self.parseDialogueTurns(text)
+        if !dialogueTurns.isEmpty {
+            return await speakDialogueWithNeuralProvider(turns: dialogueTurns, bcp47: bcp47, slow: slow, cfg: cfg)
         }
+        return await fetchAndPlaySingleNeuralSegment(
+            text: text,
+            bcp47: bcp47,
+            slow: slow,
+            cfg: cfg,
+            voiceOverride: nil,
+            instructionsOverride: nil,
+            speakerLabel: nil,
+            fallbackFullText: text
+        )
+    }
 
+    private func speakDialogueWithNeuralProvider(
+        turns: [DialogueTurn],
+        bcp47: String,
+        slow: Bool,
+        cfg: VoiceSettings
+    ) async -> (ok: Bool, summary: String) {
         await MainActor.run {
             self.isLoadingNeuralAudio = true
             self.lastVoiceNotice = nil
+        }
+
+        defer {
+            Task { @MainActor in
+                self.isLoadingNeuralAudio = false
+                self.activeSpeakerName = nil
+                self.currentlySpeakingText = nil
+            }
+        }
+
+        do {
+            // Fetch all turns (reusing cache for repeated plays!) so playback flows with zero mid-conversation stutter
+            var turnAudios: [(turn: DialogueTurn, data: Data)] = []
+            for turn in turns {
+                if Task.isCancelled { return (false, "Cancelled") }
+                let voiceId = Self.neuralVoiceForDialogueSpeaker(
+                    cfg: cfg,
+                    bcp47: bcp47,
+                    speakerName: turn.speaker,
+                    speakerIndex: turn.speakerIndex
+                )
+                let instructions = Self.buildNeuralConversationInstructions(
+                    accentCode: bcp47,
+                    speakerName: turn.speaker,
+                    speakerIndex: turn.speakerIndex,
+                    slow: slow
+                )
+                let data = try await fetchNeuralAudioData(
+                    text: turn.text,
+                    bcp47: bcp47,
+                    slow: slow,
+                    cfg: cfg,
+                    voiceOverride: voiceId,
+                    instructionsOverride: instructions
+                )
+                turnAudios.append((turn: turn, data: data))
+            }
+
+            await MainActor.run { self.isLoadingNeuralAudio = false }
+
+            for (idx, item) in turnAudios.enumerated() {
+                if Task.isCancelled { return (false, "Cancelled") }
+                await MainActor.run { self.activeSpeakerName = item.turn.speaker }
+                let duration = try await MainActor.run { try self.playAudioData(item.data) }
+                let waitNs = UInt64(max(0.25, duration + (idx < turnAudios.count - 1 ? 0.24 : 0.05)) * 1_000_000_000)
+                try await Task.sleep(nanoseconds: waitNs)
+            }
+            return (true, "\(cfg.provider.shortLabel) · Multi-Speaker Dialogue (\(bcp47))")
+        } catch {
+            if Task.isCancelled { return (false, "Cancelled") }
+            let notice = "Neural dialogue unavailable (\(error.localizedDescription)) — fell back to on-device multi-speaker voice."
+            let fullReconstructed = turns.map { "\($0.speaker): \($0.text)" }.joined(separator: "\n")
+            await MainActor.run {
+                self.lastVoiceNotice = notice
+                _ = self.speakWithSystemVoice(text: fullReconstructed, bcp47: bcp47, slow: slow, cfg: cfg)
+            }
+            return (false, notice)
+        }
+    }
+
+    private func fetchNeuralAudioData(
+        text: String,
+        bcp47: String,
+        slow: Bool,
+        cfg: VoiceSettings,
+        voiceOverride: String?,
+        instructionsOverride: String?
+    ) async throws -> Data {
+        let effectiveVoice = voiceOverride ?? (cfg.neuralVoice.isEmpty ? cfg.provider.defaultVoice : cfg.neuralVoice)
+        let cacheKey = "\(cfg.provider.rawValue)|\(cfg.model)|\(effectiveVoice)|\(bcp47)|\(cfg.speakingStyle.rawValue)|\(cfg.rateMultiplier)|\(slow)|\(instructionsOverride ?? "")|\(text)"
+        if let cached = neuralCache[cacheKey] {
+            return cached
+        }
+
+        let apiKey = effectiveAPIKey(for: cfg)
+        let speed = max(0.65, min(1.3, (slow ? 0.80 : 0.98) * cfg.rateMultiplier))
+        var request: URLRequest
+
+        if cfg.provider == .elevenlabs {
+            let base = cfg.endpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let voiceId = effectiveVoice.isEmpty ? Self.elevenLabsNeuralVoices[0].id : effectiveVoice
+            let urlStr = base.contains("/text-to-speech/") ? base : "\(base)/\(voiceId)"
+            guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+            request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+            let body: [String: Any] = [
+                "text": text,
+                "model_id": cfg.model.isEmpty ? "eleven_multilingual_v2" : cfg.model,
+                "voice_settings": [
+                    "stability": 0.45,
+                    "similarity_boost": 0.78,
+                    "style": 0.35,
+                    "use_speaker_boost": true
+                ]
+            ]
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } else {
+            guard let url = URL(string: cfg.endpoint) else { throw URLError(.badURL) }
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if !apiKey.isEmpty {
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            }
+            let model = cfg.model.isEmpty ? cfg.provider.defaultModel : cfg.model
+            var body: [String: Any] = [
+                "model": model,
+                "input": text,
+                "voice": effectiveVoice,
+                "response_format": "mp3",
+                "speed": speed
+            ]
+            if cfg.provider == .openai && model.lowercased().contains("gpt-4o-mini-tts") {
+                body["instructions"] = instructionsOverride ?? Self.buildNeuralInstructions(
+                    accentCode: bcp47,
+                    style: cfg.speakingStyle,
+                    slow: slow
+                )
+            }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        request.timeoutInterval = 25
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), !data.isEmpty else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw NSError(domain: "LinguaVerveTTS", code: code, userInfo: [NSLocalizedDescriptionKey: "HTTP \(code)"])
+        }
+        storeInCache(key: cacheKey, data: data)
+        return data
+    }
+
+    private func fetchAndPlaySingleNeuralSegment(
+        text: String,
+        bcp47: String,
+        slow: Bool,
+        cfg: VoiceSettings,
+        voiceOverride: String?,
+        instructionsOverride: String?,
+        speakerLabel: String?,
+        fallbackFullText: String
+    ) async -> (ok: Bool, summary: String) {
+        await MainActor.run {
+            self.isLoadingNeuralAudio = true
+            self.lastVoiceNotice = nil
+            self.activeSpeakerName = speakerLabel
         }
 
         defer {
@@ -830,78 +1404,25 @@ public final class NativeAudioEngine {
         }
 
         do {
-            let apiKey = effectiveAPIKey(for: cfg)
-            let speed = max(0.65, min(1.3, (slow ? 0.80 : 0.98) * cfg.rateMultiplier))
-            var request: URLRequest
-
-            if cfg.provider == .elevenlabs {
-                let base = cfg.endpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                let voiceId = cfg.neuralVoice.isEmpty ? Self.elevenLabsNeuralVoices[0].id : cfg.neuralVoice
-                let urlStr = base.contains("/text-to-speech/") ? base : "\(base)/\(voiceId)"
-                guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
-                request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
-                request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
-                let body: [String: Any] = [
-                    "text": text,
-                    "model_id": cfg.model.isEmpty ? "eleven_multilingual_v2" : cfg.model,
-                    "voice_settings": [
-                        "stability": 0.48,
-                        "similarity_boost": 0.78,
-                        "style": cfg.speakingStyle == .conversational ? 0.35 : 0.2,
-                        "use_speaker_boost": true
-                    ]
-                ]
-                request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            } else {
-                guard let url = URL(string: cfg.endpoint) else { throw URLError(.badURL) }
-                request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                if !apiKey.isEmpty {
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                }
-                let model = cfg.model.isEmpty ? cfg.provider.defaultModel : cfg.model
-                let voice = cfg.neuralVoice.isEmpty ? cfg.provider.defaultVoice : cfg.neuralVoice
-                var body: [String: Any] = [
-                    "model": model,
-                    "input": text,
-                    "voice": voice,
-                    "response_format": "mp3",
-                    "speed": speed
-                ]
-                if cfg.provider == .openai && model.lowercased().contains("gpt-4o-mini-tts") {
-                    body["instructions"] = Self.buildNeuralInstructions(
-                        accentCode: bcp47,
-                        style: cfg.speakingStyle,
-                        slow: slow
-                    )
-                }
-                request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            }
-
-            request.timeoutInterval = 25
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let data = try await fetchNeuralAudioData(
+                text: text,
+                bcp47: bcp47,
+                slow: slow,
+                cfg: cfg,
+                voiceOverride: voiceOverride,
+                instructionsOverride: instructionsOverride
+            )
             if Task.isCancelled { return (false, "Cancelled") }
-
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), !data.isEmpty else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                throw NSError(domain: "LinguaVerveTTS", code: code, userInfo: [NSLocalizedDescriptionKey: "HTTP \(code)"])
-            }
-
-            storeInCache(key: cacheKey, data: data)
-            try await MainActor.run {
+            _ = try await MainActor.run {
                 try self.playAudioData(data)
             }
-            return (true, "\(cfg.provider.shortLabel) · \(cfg.neuralVoice) (\(bcp47))")
+            return (true, "\(cfg.provider.shortLabel) · \(voiceOverride ?? cfg.neuralVoice) (\(bcp47))")
         } catch {
             if Task.isCancelled { return (false, "Cancelled") }
             let notice = "Neural TTS unavailable (\(error.localizedDescription)) — fell back to on-device Siri/Neural voice."
             await MainActor.run {
                 self.lastVoiceNotice = notice
-                _ = self.speakWithSystemVoice(text: text, bcp47: bcp47, slow: slow, cfg: cfg)
+                _ = self.speakWithSystemVoice(text: fallbackFullText, bcp47: bcp47, slow: slow, cfg: cfg)
             }
             return (false, notice)
         }
@@ -919,7 +1440,8 @@ public final class NativeAudioEngine {
     }
 
     @MainActor
-    private func playAudioData(_ data: Data) throws {
+    @discardableResult
+    private func playAudioData(_ data: Data) throws -> TimeInterval {
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
@@ -931,5 +1453,6 @@ public final class NativeAudioEngine {
         player.prepareToPlay()
         player.play()
         audioPlayer = player
+        return player.duration
     }
 }

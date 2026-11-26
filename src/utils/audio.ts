@@ -552,6 +552,131 @@ function readSharedOpenAIKey(): string {
   }
 }
 
+export interface DialogueTurn {
+  speaker: string;
+  text: string;
+  speakerIndex: number;
+}
+
+const NON_SPEAKER_LABELS = new Set([
+  'angebot', 'hinweis', 'achtung', 'preis', 'uhrzeit', 'öffnungszeiten', 'datum',
+  'note', 'warning', 'tip', 'example', 'beispiel', 'track', 'part', 'teil', 'fazit',
+  'ergebnis', 'regel', 'summary', 'context', 'focus', 'trap',
+]);
+
+const FEMALE_SPEAKER_HINTS = new Set([
+  'frau', 'anna', 'hannah', 'lena', 'clara', 'mia', 'sara', 'sarah', 'emma', 'maya',
+  'sophie', 'julia', 'petra', 'helena', 'nina', 'laura', 'lisa', 'katharina', 'elena',
+  'priya', 'chloe', 'rachel', 'amira', 'moderatorin', 'kritikerin', 'ärztin', 'verkäuferin',
+  'rezeptionistin', 'studentin', 'autorin', 'professorin', 'novak', 'berger', 'keller', 'meier',
+]);
+
+const MALE_SPEAKER_HINTS = new Set([
+  'herr', 'lukas', 'markus', 'viktor', 'martin', 'yannick', 'tobias', 'jonas', 'max',
+  'paul', 'david', 'tom', 'ben', 'liam', 'leo', 'daniel', 'oliver', 'james', 'noah',
+  'stefan', 'felix', 'alex', 'moderator', 'interviewer', 'schaffner', 'arzt', 'verkäufer',
+  'kellner', 'becker', 'steiner', 'lindner', 'gruber', 'weber', 'vance', 'tutor', 'host', 'guest',
+]);
+
+/**
+ * Parses multi-speaker dialogue scripts (both newline-separated and inline `Name: ...` turns).
+ * Returns [] if the text is a single-speaker monologue (< 2 distinct speakers).
+ */
+export function parseDialogueTurns(text: string): DialogueTurn[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  const regex = /(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+/g;
+  const matches: Array<{ speaker: string; start: number; textStart: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(trimmed)) !== null) {
+    const speaker = m[1].trim();
+    if (!speaker || NON_SPEAKER_LABELS.has(speaker.toLowerCase())) continue;
+    if (speaker.split(/\s+/).length > 3) continue;
+    matches.push({
+      speaker,
+      start: m.index,
+      textStart: m.index + m[0].length,
+    });
+  }
+
+  if (matches.length < 2) return [];
+
+  const speakerMap = new Map<string, number>();
+  const turns: DialogueTurn[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const nextStart = i + 1 < matches.length ? matches[i + 1].start : trimmed.length;
+    const spoken = trimmed.slice(cur.textStart, nextStart).trim();
+    if (!spoken) continue;
+    const key = cur.speaker.toLowerCase();
+    let idx = speakerMap.get(key);
+    if (idx === undefined) {
+      idx = speakerMap.size;
+      speakerMap.set(key, idx);
+    }
+    turns.push({ speaker: cur.speaker, text: spoken, speakerIndex: idx });
+  }
+
+  return speakerMap.size >= 2 ? turns : [];
+}
+
+function inferSpeakerGender(speaker: string): 'female' | 'male' | 'unknown' {
+  const tokens = speaker
+    .toLowerCase()
+    .replace(/\./g, '')
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  for (const t of tokens) {
+    if (FEMALE_SPEAKER_HINTS.has(t)) return 'female';
+    if (MALE_SPEAKER_HINTS.has(t)) return 'male';
+  }
+  return 'unknown';
+}
+
+function pickNeuralVoiceForSpeaker(
+  cfg: VoiceSettings,
+  accentCode: string,
+  speaker: string,
+  speakerIndex: number
+): string {
+  const isGerman = accentCode.toLowerCase().startsWith('de');
+  const gender = inferSpeakerGender(speaker);
+  const primary = cfg.neuralVoice || (cfg.provider === 'openai' ? 'coral' : cfg.provider === 'elevenlabs' ? ELEVENLABS_NEURAL_VOICES[0].id : 'bf_emma');
+
+  if (cfg.provider === 'openai') {
+    const females = ['coral', 'sage', 'nova', 'shimmer'];
+    const males = ['ash', 'echo', 'onyx', 'fable'];
+    if (speakerIndex === 0) {
+      return gender === 'male' && females.includes(primary.toLowerCase()) ? 'ash' : primary;
+    }
+    if (gender === 'male') return males.find((v) => v !== primary.toLowerCase()) || 'ash';
+    if (gender === 'female') return females.find((v) => v !== primary.toLowerCase()) || 'sage';
+    return females.includes(primary.toLowerCase()) ? 'ash' : 'coral';
+  }
+
+  if (cfg.provider === 'elevenlabs') {
+    const femaleId = 'XB0fDUnXU5powFXDhCwa';
+    const maleId = 'JBFqnCBsd6RMkjVDRZzb';
+    if (speakerIndex === 0) return primary;
+    if (gender === 'male') return primary === maleId ? 'onwK4e9ZLuTAKqWW03F9' : maleId;
+    if (gender === 'female') return primary === femaleId ? 'EXAVITQu4vr4xnSDxMaL' : femaleId;
+    return primary === maleId ? femaleId : maleId;
+  }
+
+  if (cfg.provider === 'local-openai') {
+    if (isGerman) {
+      const male = 'de_DE-thorsten-high';
+      const female = 'de_DE-eva_k-x_low';
+      if (speakerIndex === 0) return gender === 'female' ? female : gender === 'male' ? male : primary;
+      return primary === male ? female : male;
+    }
+    return speakerIndex === 0 ? primary : primary === 'bm_george' ? 'bf_emma' : 'bm_george';
+  }
+
+  return primary;
+}
+
 class SoundEngine {
   private audioCtx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -562,6 +687,7 @@ class SoundEngine {
   private speakGeneration = 0;
   private listeners = new Set<() => void>();
   private lastVoiceNotice: string | null = null;
+  private activeSpeakerName: string | null = null;
 
   constructor() {
     this.initVoiceListListener();
@@ -603,6 +729,17 @@ class SoundEngine {
 
   public getLastVoiceNotice(): string | null {
     return this.lastVoiceNotice;
+  }
+
+  public getActiveSpeakerName(): string | null {
+    return this.activeSpeakerName;
+  }
+
+  private setActiveSpeaker(name: string | null): void {
+    if (this.activeSpeakerName !== name) {
+      this.activeSpeakerName = name;
+      this.notifyListeners();
+    }
   }
 
   public updateVoiceSettings(next: VoiceSettings): void {
@@ -826,124 +963,178 @@ class SoundEngine {
     generation: number,
     cfg: VoiceSettings
   ): Promise<{ ok: boolean; engine: string; note?: string }> {
-    const cacheKey = `${cfg.provider}|${cfg.model}|${cfg.neuralVoice}|${accentCode}|${cfg.speakingStyle}|${cfg.rateMultiplier}|${slow ? '1' : '0'}|${text}`;
+    const dialogueTurns = parseDialogueTurns(text);
+    if (dialogueTurns.length > 0) {
+      return this.speakDialogueWithNeuralProvider(dialogueTurns, text, accentCode, slow, generation, cfg);
+    }
+    return this.speakSingleNeuralSegment(text, accentCode, slow, generation, cfg);
+  }
 
-    const playAudioUrl = (url: string): Promise<void> =>
-      new Promise((resolve, reject) => {
-        if (typeof Audio === 'undefined') {
-          reject(new Error('HTML5 Audio unavailable'));
-          return;
-        }
-        const audio = new Audio(url);
-        this.activeHtmlAudio = audio;
-        audio.onended = () => {
-          if (this.activeHtmlAudio === audio) this.activeHtmlAudio = null;
-          resolve();
-        };
-        audio.onerror = () => {
-          if (this.activeHtmlAudio === audio) this.activeHtmlAudio = null;
-          reject(new Error('Audio playback failed'));
-        };
-        const playPromise = audio.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch(reject);
-        }
+  private async fetchNeuralSegmentUrl(
+    text: string,
+    accentCode: string,
+    slow: boolean,
+    cfg: VoiceSettings,
+    voiceOverride?: string,
+    instructionsOverride?: string
+  ): Promise<string> {
+    const effectiveVoice =
+      voiceOverride || cfg.neuralVoice || (cfg.provider === 'openai' ? 'coral' : cfg.provider === 'elevenlabs' ? ELEVENLABS_NEURAL_VOICES[0].id : 'bf_emma');
+    const cacheKey = `${cfg.provider}|${cfg.model}|${effectiveVoice}|${accentCode}|${cfg.speakingStyle}|${cfg.rateMultiplier}|${slow ? '1' : '0'}|${instructionsOverride || ''}|${text}`;
+    const cachedUrl = this.neuralAudioCache.get(cacheKey);
+    if (cachedUrl) return cachedUrl;
+
+    const apiKey = this.getEffectiveApiKey(cfg);
+    const speed = Math.max(0.65, Math.min(1.3, (slow ? 0.8 : 0.98) * (cfg.rateMultiplier || 1.0)));
+
+    let response: Response;
+    if (cfg.provider === 'elevenlabs') {
+      const base = cfg.endpoint.replace(/\/+$/, '');
+      const voiceId = encodeURIComponent(effectiveVoice);
+      const url = base.includes('/text-to-speech/') ? base : `${base}/${voiceId}`;
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+          'xi-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          text,
+          model_id: cfg.model || 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.45,
+            similarity_boost: 0.78,
+            style: 0.35,
+            use_speaker_boost: true,
+          },
+        }),
       });
-
-    try {
-      const cachedUrl = this.neuralAudioCache.get(cacheKey);
-      if (cachedUrl) {
-        if (generation !== this.speakGeneration) {
-          return { ok: true, engine: cfg.provider };
-        }
-        await playAudioUrl(cachedUrl);
-        return { ok: true, engine: `${cfg.provider} (${cfg.neuralVoice} · cached)` };
+    } else {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const payload: Record<string, unknown> = {
+        model: cfg.model || (cfg.provider === 'openai' ? 'gpt-4o-mini-tts' : 'kokoro'),
+        input: text,
+        voice: effectiveVoice,
+        response_format: 'mp3',
+        speed,
+      };
+      if (
+        cfg.provider === 'openai' &&
+        (payload.model as string).toLowerCase().includes('gpt-4o-mini-tts')
+      ) {
+        payload.instructions =
+          instructionsOverride || buildNeuralVoiceInstructions(accentCode, cfg.speakingStyle, slow);
       }
+      response = await fetch(cfg.endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+    }
 
-      const apiKey = this.getEffectiveApiKey(cfg);
-      const speed = Math.max(
-        0.65,
-        Math.min(1.3, (slow ? 0.8 : 0.98) * (cfg.rateMultiplier || 1.0))
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    if (this.neuralAudioCache.size >= 40) {
+      const oldestKey = this.neuralAudioCache.keys().next().value;
+      if (oldestKey) {
+        const oldUrl = this.neuralAudioCache.get(oldestKey);
+        if (oldUrl) URL.revokeObjectURL(oldUrl);
+        this.neuralAudioCache.delete(oldestKey);
+      }
+    }
+    this.neuralAudioCache.set(cacheKey, objectUrl);
+    return objectUrl;
+  }
+
+  private playAudioUrl(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (typeof Audio === 'undefined') {
+        reject(new Error('HTML5 Audio unavailable'));
+        return;
+      }
+      const audio = new Audio(url);
+      this.activeHtmlAudio = audio;
+      audio.onended = () => {
+        if (this.activeHtmlAudio === audio) this.activeHtmlAudio = null;
+        resolve();
+      };
+      audio.onerror = () => {
+        if (this.activeHtmlAudio === audio) this.activeHtmlAudio = null;
+        reject(new Error('Audio playback failed'));
+      };
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(reject);
+      }
+    });
+  }
+
+  private async speakDialogueWithNeuralProvider(
+    turns: DialogueTurn[],
+    rawText: string,
+    accentCode: string,
+    slow: boolean,
+    generation: number,
+    cfg: VoiceSettings
+  ): Promise<{ ok: boolean; engine: string; note?: string }> {
+    try {
+      const accentCue =
+        getAccentOption(accentCode)?.neuralHint ?? `Speak in natural, idiomatic ${accentCode}.`;
+      const urls = await Promise.all(
+        turns.map((turn) => {
+          const voice = pickNeuralVoiceForSpeaker(cfg, accentCode, turn.speaker, turn.speakerIndex);
+          const instructions = `${accentCue} You are ${turn.speaker} speaking spontaneously in a natural live two-person conversation. Never sound like you are reading a script.`;
+          return this.fetchNeuralSegmentUrl(turn.text, accentCode, slow, cfg, voice, instructions);
+        })
       );
 
-      let response: Response;
-      if (cfg.provider === 'elevenlabs') {
-        const base = cfg.endpoint.replace(/\/+$/, '');
-        const voiceId = encodeURIComponent(cfg.neuralVoice || ELEVENLABS_NEURAL_VOICES[0].id);
-        const url = base.includes('/text-to-speech/')
-          ? base
-          : `${base}/${voiceId}`;
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'audio/mpeg',
-            'xi-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            text,
-            model_id: cfg.model || 'eleven_multilingual_v2',
-            voice_settings: {
-              stability: 0.48,
-              similarity_boost: 0.78,
-              style: cfg.speakingStyle === 'conversational' ? 0.35 : 0.2,
-              use_speaker_boost: true,
-            },
-          }),
-        });
-      } else {
-        // OpenAI (gpt-4o-mini-tts / tts-1-hd) or Local OpenAI-compatible (Kokoro / Speaches)
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (apiKey) {
-          headers.Authorization = `Bearer ${apiKey}`;
+      for (let i = 0; i < turns.length; i++) {
+        if (generation !== this.speakGeneration) {
+          this.setActiveSpeaker(null);
+          return { ok: true, engine: cfg.provider };
         }
-        const payload: Record<string, unknown> = {
-          model: cfg.model || (cfg.provider === 'openai' ? 'gpt-4o-mini-tts' : 'kokoro'),
-          input: text,
-          voice: cfg.neuralVoice || (cfg.provider === 'openai' ? 'coral' : 'bf_emma'),
-          response_format: 'mp3',
-          speed,
-        };
-        if (
-          cfg.provider === 'openai' &&
-          (payload.model as string).toLowerCase().includes('gpt-4o-mini-tts')
-        ) {
-          payload.instructions = buildNeuralVoiceInstructions(
-            accentCode,
-            cfg.speakingStyle,
-            slow
-          );
+        this.setActiveSpeaker(turns[i].speaker);
+        await this.playAudioUrl(urls[i]);
+        if (i < turns.length - 1 && generation === this.speakGeneration) {
+          await new Promise((r) => setTimeout(r, 220));
         }
-        response = await fetch(cfg.endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-        });
       }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      this.setActiveSpeaker(null);
+      this.lastVoiceNotice = null;
+      return { ok: true, engine: `${cfg.provider} · Multi-Speaker Dialogue (${accentCode})` };
+    } catch (err) {
+      this.setActiveSpeaker(null);
+      if (generation !== this.speakGeneration) {
+        return { ok: false, engine: 'cancelled' };
       }
+      const message = err instanceof Error ? err.message : 'Network error';
+      this.lastVoiceNotice = `Neural dialogue unavailable (${message}) — played using upgraded on-device voices.`;
+      this.notifyListeners();
+      this.speakWithSystemVoice(rawText, accentCode, slow, cfg);
+      return { ok: false, engine: 'system-fallback', note: this.lastVoiceNotice };
+    }
+  }
 
-      const blob = await response.blob();
+  private async speakSingleNeuralSegment(
+    text: string,
+    accentCode: string,
+    slow: boolean,
+    generation: number,
+    cfg: VoiceSettings
+  ): Promise<{ ok: boolean; engine: string; note?: string }> {
+    try {
+      const url = await this.fetchNeuralSegmentUrl(text, accentCode, slow, cfg);
       if (generation !== this.speakGeneration) {
         return { ok: true, engine: cfg.provider };
       }
-
-      const objectUrl = URL.createObjectURL(blob);
-      if (this.neuralAudioCache.size >= 40) {
-        const oldestKey = this.neuralAudioCache.keys().next().value;
-        if (oldestKey) {
-          const oldUrl = this.neuralAudioCache.get(oldestKey);
-          if (oldUrl) URL.revokeObjectURL(oldUrl);
-          this.neuralAudioCache.delete(oldestKey);
-        }
-      }
-      this.neuralAudioCache.set(cacheKey, objectUrl);
       this.lastVoiceNotice = null;
-      await playAudioUrl(objectUrl);
+      await this.playAudioUrl(url);
       return { ok: true, engine: `${cfg.provider} · ${cfg.neuralVoice} (${accentCode})` };
     } catch (err) {
       if (generation !== this.speakGeneration) {
@@ -982,13 +1173,60 @@ class SoundEngine {
 
       const preferredURI = cfg.preferredSystemVoices[targetBcp47];
       const chosenVoice = pickBestSystemVoice(voices, targetBcp47, preferredURI);
+      const baseRate = slow ? 0.78 : 0.96;
 
-      const baseRate = slow ? 0.76 : 0.96;
+      // Multi-speaker conversational dialogue mode: strip speaker labels & assign distinct voices/tones!
+      const turns = parseDialogueTurns(text);
+      if (turns.length > 0) {
+        const targetBase = targetBcp47.replace('_', '-').toLowerCase().slice(0, 2);
+        const rankedVoices = voices
+          .filter((v) => !isRoboticOrNoveltyVoice(v) && (v.lang || '').replace('_', '-').toLowerCase().startsWith(targetBase))
+          .sort((a, b) => scoreSystemVoice(b, targetBcp47) - scoreSystemVoice(a, targetBcp47));
+        const hqPool = rankedVoices.filter((v) => classifyVoiceQuality(v) !== 'standard');
+        const castPool = hqPool.length >= 2 ? hqPool : rankedVoices.slice(0, 2);
+
+        const voiceBySpeaker = new Map<number, SpeechSynthesisVoice | undefined>();
+        turns.forEach((t) => {
+          if (!voiceBySpeaker.has(t.speakerIndex)) {
+            const candidate = castPool[t.speakerIndex % Math.max(1, castPool.length)] || chosenVoice;
+            voiceBySpeaker.set(t.speakerIndex, candidate);
+          }
+        });
+
+        const hasDistinctVoices =
+          new Set(Array.from(voiceBySpeaker.values()).map((v) => v?.voiceURI || v?.name).filter(Boolean)).size >= 2;
+        const generation = this.speakGeneration;
+
+        turns.forEach((turn, idx) => {
+          const spVoice = voiceBySpeaker.get(turn.speakerIndex) || chosenVoice;
+          const gender = inferSpeakerGender(turn.speaker);
+          const isLower = gender === 'male' || (gender === 'unknown' && turn.speakerIndex % 2 === 1);
+          const paceFactor = hasDistinctVoices ? (turn.speakerIndex % 2 === 0 ? 1.0 : 0.97) : isLower ? 0.95 : 1.02;
+          const pitch = hasDistinctVoices ? 1.0 : isLower ? 0.92 : 1.05;
+
+          const utterance = new SpeechSynthesisUtterance(turn.text);
+          utterance.rate = Math.max(0.65, Math.min(1.28, baseRate * (cfg.rateMultiplier || 1.0) * paceFactor));
+          utterance.pitch = pitch;
+          utterance.lang = spVoice?.lang || targetBcp47;
+          if (spVoice) utterance.voice = spVoice;
+          utterance.onstart = () => {
+            if (generation === this.speakGeneration) this.setActiveSpeaker(turn.speaker);
+          };
+          if (idx === turns.length - 1) {
+            utterance.onend = () => {
+              if (generation === this.speakGeneration) this.setActiveSpeaker(null);
+            };
+          }
+          window.speechSynthesis.speak(utterance);
+        });
+        return chosenVoice;
+      }
+
       const finalRate = Math.max(0.6, Math.min(1.3, baseRate * (cfg.rateMultiplier || 1.0)));
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = finalRate;
-      utterance.pitch = cfg.speakingStyle === 'broadcast' ? 0.98 : 1.0;
+      utterance.pitch = 1.0;
       utterance.lang = chosenVoice?.lang || targetBcp47;
 
       if (chosenVoice) {
@@ -1004,6 +1242,7 @@ class SoundEngine {
 
   public stopSpeech(): void {
     this.speakGeneration += 1;
+    this.setActiveSpeaker(null);
     if (this.activeHtmlAudio) {
       try {
         this.activeHtmlAudio.pause();

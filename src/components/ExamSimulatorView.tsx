@@ -18,6 +18,9 @@ import {
   Globe,
   Lock,
   Layers,
+  Wand2,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import {
   AIProviderConfig,
@@ -29,7 +32,15 @@ import {
 } from '../types';
 import { MOCK_EXAMS } from '../data';
 import { evaluateWithAIOrFallback, isAIConfigReady } from '../utils/aiClient';
-import { ACCENT_CATALOG, soundEngine } from '../utils/audio';
+import {
+  AI_EXAM_THEMES,
+  deleteGeneratedExam,
+  ExamGenerationProgress,
+  generateFreshMockExamWithAI,
+  loadGeneratedExams,
+  saveGeneratedExam,
+} from '../utils/aiExamGenerator';
+import { ACCENT_CATALOG, parseDialogueTurns, soundEngine } from '../utils/audio';
 import {
   computeOfficialGradeLabel,
   computeRubricBreakdown,
@@ -93,6 +104,38 @@ function getReadingFormatLabel(format: string): string {
   }
 }
 
+function TranscriptDisplay({ script }: { script: string }) {
+  const turns = parseDialogueTurns(script);
+  if (turns.length === 0) {
+    return <p className="leading-relaxed whitespace-pre-line">{script}</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {turns.map((turn, idx) => (
+        <div
+          key={`${turn.speaker}-${idx}`}
+          className={`p-2 rounded-lg border text-xs leading-relaxed ${
+            turn.speakerIndex % 2 === 0
+              ? 'bg-sky-500/8 border-sky-500/20'
+              : 'bg-purple-500/8 border-purple-500/20'
+          }`}
+        >
+          <span
+            className={`font-mono font-bold mr-1.5 ${
+              turn.speakerIndex % 2 === 0
+                ? 'text-sky-700 dark:text-sky-300'
+                : 'text-purple-700 dark:text-purple-300'
+            }`}
+          >
+            {turn.speaker}:
+          </span>
+          <span>{turn.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RubricBars({ rubric }: { rubric: OfficialRubricBreakdown }) {
   const rows: Array<{ label: string; value: number }> = [
     { label: 'Task Fulfillment', value: rubric.taskFulfillment },
@@ -140,6 +183,21 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   const [phase, setPhase] = useState<'lobby' | 'running' | 'grading' | 'report'>('lobby');
   const [activeSection, setActiveSection] = useState<SkillType>('reading');
 
+  // AI-Generated Fresh Exam Bank state
+  const [generatedExams, setGeneratedExams] = useState<MockExam[]>(() => loadGeneratedExams());
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<string>('');
+  const [customTopic, setCustomTopic] = useState<string>('');
+  const [isGeneratingExam, setIsGeneratingExam] = useState(false);
+  const [genProgress, setGenProgress] = useState<ExamGenerationProgress>({
+    reading: 'pending',
+    listening: 'pending',
+    writing: 'pending',
+    speaking: 'pending',
+  });
+  const [genError, setGenError] = useState<string | null>(null);
+  const [genNotice, setGenNotice] = useState<string | null>(null);
+
   // Sub-part navigation indices
   const [activeReadingIdx, setActiveReadingIdx] = useState(0);
   const [activeListeningIdx, setActiveListeningIdx] = useState(0);
@@ -165,7 +223,14 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   const [isPrepping, setIsPrepping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [micNote, setMicNote] = useState('');
+  const [activeSpeaker, setActiveSpeaker] = useState<string | null>(() => soundEngine.getActiveSpeakerName());
   const recorderRef = useRef<SpeechRecorderHandle | null>(null);
+
+  useEffect(() => {
+    return soundEngine.subscribe(() => {
+      setActiveSpeaker(soundEngine.getActiveSpeakerName());
+    });
+  }, []);
 
   const [report, setReport] = useState<ExamAttemptRecord | null>(null);
   const [gradingDetails, setGradingDetails] = useState<{
@@ -181,11 +246,83 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   useEffect(() => {
     if (initialLevel) {
       setSelectedLevel(initialLevel);
+      setSelectedExamId(null);
     }
   }, [initialLevel]);
 
-  const currentExam: MockExam =
+  useEffect(() => {
+    setSelectedExamId(null);
+    setSelectedTheme('');
+    setGenNotice(null);
+    setGenError(null);
+  }, [examLang]);
+
+  const baseExam: MockExam =
     availableExams.find((e) => e.level === selectedLevel) || availableExams[0];
+
+  const levelGeneratedExams = generatedExams.filter(
+    (e) => e.languageId === examLang && e.level === selectedLevel
+  );
+
+  const currentExam: MockExam =
+    levelGeneratedExams.find((e) => e.id === selectedExamId) || baseExam;
+
+  const themeOptions = AI_EXAM_THEMES[examLang];
+
+  const handleGenerateAIExam = async (autoStart = false) => {
+    if (!isAIConfigReady(aiConfig)) {
+      onOpenAISettings();
+      return;
+    }
+    soundEngine.playClickSound();
+    setIsGeneratingExam(true);
+    setGenError(null);
+    setGenNotice(null);
+    setGenProgress({
+      reading: 'loading',
+      listening: 'pending',
+      writing: 'pending',
+      speaking: 'pending',
+    });
+
+    try {
+      const avoidThemes = levelGeneratedExams
+        .map((e) => e.generatedTheme || '')
+        .filter(Boolean);
+      const result = await generateFreshMockExamWithAI({
+        config: aiConfig,
+        baseExam,
+        theme: selectedTheme || undefined,
+        customTopic: customTopic.trim() || undefined,
+        avoidThemes,
+        onProgress: (p) => setGenProgress(p),
+      });
+
+      const updatedBank = saveGeneratedExam(result.exam);
+      setGeneratedExams(updatedBank);
+      setSelectedExamId(result.exam.id);
+      setGenNotice(
+        `Generated fresh ${baseExam.level} exam (${result.aiSkillsCount}/4 AI-crafted skills) — Theme: "${result.theme}".`
+      );
+      soundEngine.playSuccessChime();
+      if (autoStart) {
+        startExamWith(result.exam);
+      }
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Failed to generate AI exam.');
+    } finally {
+      setIsGeneratingExam(false);
+    }
+  };
+
+  const handleDeleteGeneratedExam = (examId: string) => {
+    soundEngine.playClickSound();
+    const updated = deleteGeneratedExam(examId);
+    setGeneratedExams(updated);
+    if (selectedExamId === examId) {
+      setSelectedExamId(null);
+    }
+  };
 
   const readingParts = getExamReadingParts(currentExam);
   const listeningTracks = getExamListeningTracks(currentExam);
@@ -296,7 +433,13 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
     setActiveSection(next);
   };
 
-  const handleStartExam = () => {
+  const startExamWith = (targetExam: MockExam) => {
+    const targetTracks = getExamListeningTracks(targetExam);
+    const targetSpeakParts = getExamSpeakingParts(targetExam);
+    const targetMins =
+      timingMode === 'official'
+        ? targetExam.totalMinutes
+        : Math.max(15, Math.round(targetExam.totalMinutes * 0.5));
     soundEngine.playClickSound();
     setPhase('running');
     setActiveSection('reading');
@@ -304,22 +447,26 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
     setActiveListeningIdx(0);
     setActiveWritingIdx(0);
     setActiveSpeakingIdx(0);
-    setRemainingSeconds(configuredMinutes * 60);
+    setRemainingSeconds(targetMins * 60);
     setElapsedSeconds(0);
     setReadingAnswers({});
     setListeningAnswers({});
     setListeningPlaysByTrack({});
     setWritingResponses({});
     setSpeakingResponses({});
-    setPreReadLeft(listeningTracks[0]?.preReadSeconds || 15);
+    setPreReadLeft(targetTracks[0]?.preReadSeconds || 15);
     setIsPreReading(false);
-    setPrepLeft(speakingParts[0]?.prepSeconds || currentExam.speaking.prepSeconds);
-    setSpeakLeft(speakingParts[0]?.speakSeconds || currentExam.speaking.speakSeconds);
+    setPrepLeft(targetSpeakParts[0]?.prepSeconds || targetExam.speaking.prepSeconds);
+    setSpeakLeft(targetSpeakParts[0]?.speakSeconds || targetExam.speaking.speakSeconds);
     setIsPrepping(false);
     setIsRecording(false);
     setMicNote('');
     setReport(null);
     setGradingDetails(null);
+  };
+
+  const handleStartExam = () => {
+    startExamWith(currentExam);
   };
 
   const handlePlayListeningTrack = (track = activeListeningTrack) => {
@@ -645,6 +792,9 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                   onClick={() => {
                     soundEngine.playClickSound();
                     setSelectedLevel(lvl);
+                    setSelectedExamId(null);
+                    setGenNotice(null);
+                    setGenError(null);
                   }}
                   className={`p-3 rounded-xl border text-center font-mono font-bold text-sm transition-colors ${
                     selectedLevel === lvl
@@ -657,13 +807,189 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
               ))}
             </div>
 
+            {/* AI Fresh Exam Generator & Exam Bank */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-500/8 via-purple-500/8 to-emerald-500/8 border border-sky-500/25 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase text-sky-700 dark:text-sky-300">
+                    <Wand2 className="w-3.5 h-3.5" />
+                    <span>AI Unlimited Exam Generator</span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Tired of seeing the same test? Craft a brand-new 4-skill {selectedLevel} exam (9 Reading Qs, 3 Multi-Accent Listening Tracks, 2 Writing Tasks &amp; 3 Speaking Parts) using your connected AI provider.
+                  </p>
+                </div>
+                {!aiReady && (
+                  <button
+                    type="button"
+                    onClick={onOpenAISettings}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shrink-0 self-start"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>Connect AI Provider</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Exam Bank Switcher (Official Built-in vs Saved AI Editions) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-pressed={!currentExam.aiGenerated}
+                  onClick={() => {
+                    soundEngine.playClickSound();
+                    setSelectedExamId(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                    !currentExam.aiGenerated
+                      ? 'bg-slate-900 text-white border-slate-900 dark:bg-sky-500 dark:text-slate-950 dark:border-sky-500'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  📚 Official Built-in ({selectedLevel})
+                </button>
+
+                {levelGeneratedExams.map((gExam, idx) => {
+                  const active = currentExam.id === gExam.id;
+                  return (
+                    <div
+                      key={gExam.id}
+                      className={`inline-flex items-center rounded-lg border text-xs font-bold overflow-hidden ${
+                        active
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          soundEngine.playClickSound();
+                          setSelectedExamId(gExam.id);
+                        }}
+                        className="px-2.5 py-1.5 text-left"
+                      >
+                        ✨ AI Set #{levelGeneratedExams.length - idx}: {(gExam.generatedTheme || 'Custom').slice(0, 26)}
+                        {(gExam.generatedTheme || '').length > 26 ? '…' : ''}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete AI exam set ${gExam.generatedTheme || idx + 1}`}
+                        onClick={() => handleDeleteGeneratedExam(gExam.id)}
+                        className="px-2 py-1.5 hover:bg-black/15 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Theme Picker + Custom Focus + Generate Button */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                <select
+                  aria-label="Select AI Exam Theme"
+                  value={selectedTheme}
+                  onChange={(e) => setSelectedTheme(e.target.value)}
+                  disabled={isGeneratingExam}
+                  className="md:col-span-4 px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                >
+                  <option value="">🎲 Surprise Me (Random Real-World Theme)</option>
+                  {themeOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  aria-label="Custom Exam Topic"
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  disabled={isGeneratingExam}
+                  placeholder={
+                    examLang === 'german'
+                      ? 'Optional: eigenes Thema (z. B. Arzttermin, Vorstellungsgespräch, KI)...'
+                      : 'Optional: custom topic (e.g. Medical Visit, Tech Interview, Climate)...'
+                  }
+                  className="md:col-span-5 px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                />
+
+                <button
+                  type="button"
+                  disabled={isGeneratingExam}
+                  onClick={() => void handleGenerateAIExam(false)}
+                  className="md:col-span-3 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 disabled:bg-slate-400 text-white shadow-sm transition-colors"
+                >
+                  {isGeneratingExam ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Crafting Exam…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Generate Fresh {selectedLevel} AI Exam</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Live 4-Skill Generation Progress Bar */}
+              {isGeneratingExam && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {SECTION_ORDER.map((sk) => {
+                    const st = genProgress[sk];
+                    return (
+                      <div
+                        key={sk}
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono flex items-center justify-between border ${
+                          st === 'done'
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                            : st === 'loading'
+                            ? 'bg-purple-500/15 border-purple-500/30 text-purple-800 dark:text-purple-200'
+                            : st === 'fallback'
+                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                            : 'bg-white/70 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-500'
+                        }`}
+                      >
+                        <span className="capitalize">{sk}</span>
+                        <span>
+                          {st === 'done' ? '✓ Ready' : st === 'loading' ? '⏳ Writing…' : st === 'fallback' ? 'Base' : 'Queued'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {genNotice && (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-200 font-medium">
+                  ✨ {genNotice}
+                </div>
+              )}
+              {genError && (
+                <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-800 dark:text-rose-200 font-medium">
+                  ⚠️ {genError}
+                </div>
+              )}
+            </div>
+
             {/* Selected Exam Briefing Card */}
             <div className="p-5 rounded-2xl bg-[#FAF9F6] dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <span className="text-xs font-mono font-bold text-sky-700 dark:text-sky-400 uppercase">
-                    Aligned Certification: {currentExam.alignedCertificate}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-sky-700 dark:text-sky-400 uppercase">
+                      Aligned Certification: {currentExam.alignedCertificate}
+                    </span>
+                    {currentExam.aiGenerated && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                        ✨ AI-Generated · {currentExam.generatedByModel || aiConfig.model}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                     {currentExam.title}
                   </h2>
@@ -1094,9 +1420,21 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs font-mono font-bold uppercase text-purple-700 dark:text-purple-400">
-                  {activeListeningTrack.partLabel}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-mono font-bold uppercase text-purple-700 dark:text-purple-400">
+                    {activeListeningTrack.partLabel}
+                  </span>
+                  {parseDialogueTurns(activeListeningTrack.audioScript).length > 0 && (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                      💬 2-Speaker Conversation
+                    </span>
+                  )}
+                  {activeSpeaker && (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-600 text-white animate-pulse">
+                      🎙️ Speaking: {activeSpeaker}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-600 dark:text-slate-300">{activeListeningTrack.contextNote}</p>
               </div>
 
@@ -1156,9 +1494,9 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                     <summary className="cursor-pointer font-semibold text-purple-700 dark:text-purple-300">
                       Practice Mode: Peek Track {activeListeningIdx + 1} Transcript
                     </summary>
-                    <p className="mt-2 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                      {activeListeningTrack.audioScript}
-                    </p>
+                    <div className="mt-2 p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <TranscriptDisplay script={activeListeningTrack.audioScript} />
+                    </div>
                   </details>
                 )}
               </div>
@@ -1590,7 +1928,21 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {aiReady && (
+                  <button
+                    type="button"
+                    disabled={isGeneratingExam}
+                    onClick={() => {
+                      setPhase('lobby');
+                      void handleGenerateAIExam(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Generate Fresh Unseen Exam</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleStartExam}
@@ -1684,7 +2036,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                           <span>Replay</span>
                         </button>
                       </div>
-                      <p className="leading-relaxed">{track.audioScript}</p>
+                      <TranscriptDisplay script={track.audioScript} />
                     </div>
                   ))}
                 </div>

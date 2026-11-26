@@ -13,11 +13,11 @@ public struct UpdateNotificationBanner: View {
     public var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 14))
+                .scaledFont(size: 14)
                 .foregroundStyle(BrandTheme.emeraldMint)
 
             Text("New release: **LinguaVerve v\(update.latestVersion)** (installed: v\(store.currentAppVersion))")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .lineLimit(1)
 
             statusAccessory
@@ -78,17 +78,17 @@ public struct UpdateNotificationBanner: View {
             ProgressView(value: progress, total: 1.0)
                 .frame(width: 96)
             Text("\(Int(progress * 100))%")
-                .font(.system(size: 11, design: .monospaced))
+                .scaledFont(size: 11, design: .monospaced)
                 .foregroundStyle(.secondary)
         case .verifying:
             ProgressView().controlSize(.small)
             Text("Verifying SHA-256…")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundStyle(.secondary)
         case .installing:
             ProgressView().controlSize(.small)
             Text("Closing app to update…")
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(size: 11, weight: .semibold)
                 .foregroundStyle(BrandTheme.emeraldMint)
         default:
             EmptyView()
@@ -127,9 +127,9 @@ public struct UpdateSheetView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(hasUpdate ? "New Version Available" : "LinguaVerve Software Update")
-                        .font(.system(size: 17, weight: .bold, design: .serif))
+                        .scaledFont(size: 17, weight: .bold, design: .serif)
                     Text("Source: GitHub Releases (\(UpdateService.repoOwner)/\(UpdateService.repoName))")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -153,10 +153,10 @@ public struct UpdateSheetView: View {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("INSTALLED VERSION")
-                        .font(.caption2.weight(.semibold))
+                        .scaledFont(.caption2, weight: .semibold)
                         .foregroundStyle(.secondary)
                     Text("v\(store.currentAppVersion)")
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 15, weight: .bold, design: .monospaced)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
@@ -167,10 +167,10 @@ public struct UpdateSheetView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("LATEST GITHUB RELEASE")
-                        .font(.caption2.weight(.semibold))
+                        .scaledFont(.caption2, weight: .semibold)
                         .foregroundStyle(.secondary)
                     Text(latestVersion.map { "v\($0)" } ?? (store.isCheckingForUpdates ? "Checking…" : "v\(store.currentAppVersion)"))
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 15, weight: .bold, design: .monospaced)
                         .foregroundStyle(hasUpdate ? BrandTheme.emeraldMint : .primary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -183,32 +183,32 @@ public struct UpdateSheetView: View {
 
             if let err = store.updateCheckError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
 
             if let asset {
                 HStack(spacing: 6) {
                     Image(systemName: "shippingbox.fill")
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                     Text("Asset: \(asset.name)")
-                        .font(.system(size: 11, design: .monospaced))
+                        .scaledFont(size: 11, design: .monospaced)
                         .lineLimit(1)
                     if asset.size > 0 {
                         Text("(\(ByteCountFormatter.string(fromByteCount: asset.size, countStyle: .file)))")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                     if hasChecksums {
                         Label("SHA-256", systemImage: "checkmark.shield.fill")
-                            .font(.caption2.weight(.semibold))
+                            .scaledFont(.caption2, weight: .semibold)
                             .foregroundStyle(BrandTheme.emeraldMint)
                     }
                     Spacer()
                     if let checkedAt = store.lastUpdateCheckDate {
                         Text("Checked \(checkedAt, style: .relative) ago")
-                            .font(.caption2)
+                            .scaledFont(.caption2)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -217,7 +217,7 @@ public struct UpdateSheetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(releaseName)
-                        .font(.subheadline.weight(.semibold))
+                        .scaledFont(.subheadline, weight: .semibold)
                     Spacer()
                     Button("View on GitHub ↗") {
                         store.openReleasePage()
@@ -225,7 +225,7 @@ public struct UpdateSheetView: View {
                     #if os(macOS)
                     .buttonStyle(.link)
                     #endif
-                    .font(.caption)
+                    .scaledFont(.caption)
                 }
 
                 ScrollView {
@@ -236,7 +236,7 @@ public struct UpdateSheetView: View {
                                 ? "A new release of LinguaVerve is available on GitHub Releases."
                                 : "You are running the latest version of LinguaVerve (v\(store.currentAppVersion)).")
                     )
-                    .font(.system(size: 11.5, design: .monospaced))
+                    .scaledFont(size: 11.5, design: .monospaced)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
@@ -246,7 +246,7 @@ public struct UpdateSheetView: View {
             }
 
             Toggle("Automatically check GitHub Releases for updates on launch & every 6 hours", isOn: $store.autoCheckForUpdates)
-                .font(.caption)
+                .scaledFont(.caption)
 
             switch store.updateDownloadState {
             case .idle:
@@ -255,10 +255,10 @@ public struct UpdateSheetView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Downloading release from GitHub Releases…")
-                            .font(.caption.weight(.medium))
+                            .scaledFont(.caption, weight: .medium)
                         Spacer()
                         Text("\(Int(progress * 100))%")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .semibold, design: .monospaced)
                     }
                     ProgressView(value: progress, total: 1.0)
                 }
@@ -266,22 +266,22 @@ public struct UpdateSheetView: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Verifying SHA-256 checksum against GitHub Release…")
-                        .font(.caption.weight(.medium))
+                        .scaledFont(.caption, weight: .medium)
                 }
             case .ready(let fileURL):
                 Label("Verified \(fileURL.lastPathComponent) — closing current app to install & relaunch!", systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.semibold))
+                    .scaledFont(.caption, weight: .semibold)
                     .foregroundStyle(BrandTheme.emeraldMint)
             case .installing:
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Closing current LinguaVerve app to install update and relaunch…")
-                        .font(.caption.weight(.semibold))
+                        .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(BrandTheme.emeraldMint)
                 }
             case .failed(let msg):
                 Label(msg, systemImage: "xmark.octagon.fill")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
 

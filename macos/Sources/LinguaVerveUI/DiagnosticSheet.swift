@@ -19,7 +19,7 @@ public struct DiagnosticSheet: View {
                         ForEach(Array(store.bundle.diagnosticQuestions.enumerated()), id: \.element.id) { idx, q in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(idx + 1). \(q.question)")
-                                    .font(.system(size: 14.5, weight: .bold))
+                                    .scaledFont(size: 14.5, weight: .bold)
 
                                 ForEach(q.options, id: \.text) { opt in
                                     let selected = answers[q.id] == opt.level
@@ -34,12 +34,12 @@ public struct DiagnosticSheet: View {
                                             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                                                 .foregroundStyle(selected ? Color.accentColor : .secondary)
                                             Text(opt.text)
-                                                .font(.system(size: 13))
+                                                .scaledFont(size: 13)
                                                 .foregroundStyle(.primary)
                                                 .multilineTextAlignment(.leading)
                                             Spacer()
                                             Text(opt.level.rawValue)
-                                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                                .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                                 .foregroundStyle(.secondary)
                                         }
                                         .padding(10)
@@ -56,10 +56,10 @@ public struct DiagnosticSheet: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Recommended Starting Tier: \(result.rawValue)")
-                            .font(.headline)
+                            .scaledFont(.headline)
                         if let detail = store.levelDetail(for: result.rawValue) {
                             Text("\(detail.stageName) — \(detail.milestoneGoal)")
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         HStack {

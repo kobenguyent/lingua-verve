@@ -40,7 +40,7 @@ private struct PrepositionPyramidView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Spatial Preposition Pyramid (AT → ON → IN)", systemImage: "triangle.fill")
-                .font(.system(size: 12.5, weight: .bold))
+                .scaledFont(size: 12.5, weight: .bold)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -73,12 +73,12 @@ private struct PrepositionPyramidView: View {
     private func pyramidTier(title: String, subtitle: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Text(title)
-                .font(.system(size: 13.5, weight: .bold))
+                .scaledFont(size: 13.5, weight: .bold)
                 .foregroundStyle(color)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -101,7 +101,7 @@ private struct GermanGenderCardsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("German 80% Noun Suffix Cheat-Code", systemImage: "square.grid.3x1.below.line.grid.1x2")
-                .font(.system(size: 12.5, weight: .bold))
+                .scaledFont(size: 12.5, weight: .bold)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -138,13 +138,13 @@ private struct GermanGenderCardsView: View {
     private func genderColumn(article: String, suffixes: [String], color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(article)
-                .font(.system(size: 13, weight: .bold))
+                .scaledFont(size: 13, weight: .bold)
                 .foregroundStyle(color)
                 .fixedSize(horizontal: false, vertical: true)
             Divider()
             ForEach(suffixes, id: \.self) { item in
                 Text(item)
-                    .font(.system(size: 12.5, design: .monospaced))
+                    .scaledFont(size: 12.5, design: .monospaced)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -166,12 +166,12 @@ private struct TwoWayPrepositionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Wechselpräpositionen: Motion (Wohin?) vs. Location (Wo?)", systemImage: "arrow.left.and.right.square")
-                .font(.system(size: 12.5, weight: .bold))
+                .scaledFont(size: 12.5, weight: .bold)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("in · an · auf · neben · hinter · über · unter · vor · zwischen")
-                .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                .scaledFont(size: 12.5, weight: .semibold, design: .monospaced)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.06)))
@@ -192,14 +192,14 @@ private struct TwoWayPrepositionsView: View {
     private func twoWayCards(equalHeight: Bool) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("WOHIN? → AKKUSATIV")
-                .font(.system(size: 13, weight: .bold))
+                .scaledFont(size: 13, weight: .bold)
                 .foregroundStyle(.orange)
             Text("Boundary-crossing movement:")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Ich gehe in den Park.")
-                .font(.system(size: 13.5, weight: .bold, design: .monospaced))
+                .scaledFont(size: 13.5, weight: .bold, design: .monospaced)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
@@ -209,14 +209,14 @@ private struct TwoWayPrepositionsView: View {
 
         VStack(alignment: .leading, spacing: 5) {
             Text("WO? → DATIV")
-                .font(.system(size: 13, weight: .bold))
+                .scaledFont(size: 13, weight: .bold)
                 .foregroundStyle(.teal)
             Text("Static position inside boundary:")
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Ich bin im (in dem) Park.")
-                .font(.system(size: 13.5, weight: .bold, design: .monospaced))
+                .scaledFont(size: 13.5, weight: .bold, design: .monospaced)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
@@ -297,7 +297,7 @@ private struct MouthPhoneticsView: View {
 
         VStack(alignment: .leading, spacing: 10) {
             Label("Interactive Articulatory Phonetics Guide", systemImage: "mouth")
-                .font(.system(size: 12.5, weight: .bold))
+                .scaledFont(size: 12.5, weight: .bold)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -317,11 +317,11 @@ private struct MouthPhoneticsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 FlowLayout(spacing: 8, lineSpacing: 4) {
                     Text(active.title)
-                        .font(.system(size: 15, weight: .bold))
+                        .scaledFont(size: 15, weight: .bold)
                         .foregroundStyle(BrandTheme.celestialSky)
                         .fixedSize()
                     Text(active.articulation)
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
@@ -330,14 +330,14 @@ private struct MouthPhoneticsView: View {
                 }
 
                 Text(active.tongue)
-                    .font(.system(size: 13.5))
+                    .scaledFont(size: 13.5)
                     .lineSpacing(2.5)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 10) {
                     Text("Drill: \(active.sample)")
-                        .font(.system(size: 13.5, weight: .semibold, design: .monospaced))
+                        .scaledFont(size: 13.5, weight: .semibold, design: .monospaced)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button {
@@ -347,7 +347,7 @@ private struct MouthPhoneticsView: View {
                         )
                     } label: {
                         Label("Listen", systemImage: "speaker.wave.2.fill")
-                            .font(.system(size: 12.5, weight: .bold))
+                            .scaledFont(size: 12.5, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(BrandTheme.celestialSky)
@@ -376,7 +376,7 @@ private struct MouthPhoneticsView: View {
             }
         } label: {
             Text(item.symbol)
-                .font(.system(size: 12.5, weight: isSelected ? .bold : .medium, design: .monospaced))
+                .scaledFont(size: 12.5, weight: isSelected ? .bold : .medium, design: .monospaced)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
                 .padding(.horizontal, 10)

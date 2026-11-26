@@ -209,14 +209,14 @@ public struct UnitLessonPlayerView: View {
             VStack(alignment: .leading, spacing: 6) {
                 FlowLayout(spacing: 6, lineSpacing: 4) {
                     Text("\(course.level.rawValue) · Unit \(unitIndex) of \(totalUnits)")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(BrandTheme.celestialSky))
                         .foregroundStyle(.white)
 
                     Text(module.weekLabel)
-                        .font(.caption.monospaced())
+                        .scaledFont(.caption, design: .monospaced)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -224,7 +224,7 @@ public struct UnitLessonPlayerView: View {
 
                     if isDone {
                         Label("Unit Mastered", systemImage: "checkmark.circle.fill")
-                            .font(.caption.weight(.bold))
+                            .scaledFont(.caption, weight: .bold)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
@@ -233,20 +233,20 @@ public struct UnitLessonPlayerView: View {
                 }
 
                 Text(module.title)
-                    .font(.system(size: 21, weight: .bold, design: .serif))
+                    .scaledFont(size: 21, weight: .bold, design: .serif)
                 Text(lesson.overview)
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Guided Lesson Progress")
-                        .font(.caption.weight(.semibold))
+                        .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text("\(completedSteps.count)/\(LessonStep.allCases.count) steps (\(pct)%)")
-                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                         .monospacedDigit()
                 }
                 ProgressView(value: Double(max(8, pct)), total: 100.0)
@@ -264,7 +264,7 @@ public struct UnitLessonPlayerView: View {
                                     step.shortTitle,
                                     systemImage: (isStepDone && !isActive) ? "checkmark.circle.fill" : step.systemImage
                                 )
-                                .font(.caption.weight(.bold))
+                                .scaledFont(.caption, weight: .bold)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(
@@ -304,7 +304,7 @@ public struct UnitLessonPlayerView: View {
             store.closeUnitLesson()
         } label: {
             Label("Back to \(course.level.rawValue) Syllabus", systemImage: "chevron.left")
-                .font(.caption.weight(.bold))
+                .scaledFont(.caption, weight: .bold)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -317,7 +317,7 @@ public struct UnitLessonPlayerView: View {
 
         return HStack(spacing: 10) {
             Label("~\(lesson.estimatedMins)m", systemImage: "clock")
-                .font(.caption.monospaced())
+                .scaledFont(.caption, design: .monospaced)
                 .foregroundStyle(.secondary)
             Menu {
                 ForEach(accents) { acc in
@@ -334,13 +334,13 @@ public struct UnitLessonPlayerView: View {
                 }
             } label: {
                 Label("\(activeOpt?.flag ?? "🎙️") \(activeOpt?.label ?? activeCode)", systemImage: "waveform")
-                    .font(.caption.monospaced())
+                    .scaledFont(.caption, design: .monospaced)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             Toggle("0.75x Slow", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                 .toggleStyle(.switch)
-                .font(.caption.monospaced())
+                .scaledFont(.caption, design: .monospaced)
                 .fixedSize()
         }
     }
@@ -351,16 +351,16 @@ public struct UnitLessonPlayerView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("WHAT YOU WILL MASTER IN UNIT \(unitIndex)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundStyle(BrandTheme.celestialSky)
                 ForEach(module.objectives, id: \.self) { obj in
                     HStack(alignment: .top, spacing: 7) {
                         Image(systemName: "checkmark.seal.fill")
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .foregroundStyle(BrandTheme.celestialSky)
                             .padding(.top, 2)
                         Text(obj)
-                            .font(.subheadline)
+                            .scaledFont(.subheadline)
                     }
                 }
             }
@@ -371,24 +371,24 @@ public struct UnitLessonPlayerView: View {
             ForEach(Array(lesson.sections.enumerated()), id: \.element.id) { idx, section in
                 VStack(alignment: .leading, spacing: 12) {
                     Text("CORE CONCEPT \(idx + 1) OF \(lesson.sections.count)")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 11, weight: .bold, design: .monospaced)
                         .foregroundStyle(BrandTheme.celestialSky)
                     Text(section.heading)
-                        .font(.headline)
+                        .scaledFont(.headline)
                     Text(section.explanation)
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
 
                     if let formula = section.formula {
                         Text(formula)
-                            .font(.system(size: 12.5, weight: .semibold, design: .monospaced))
+                            .scaledFont(size: 12.5, weight: .semibold, design: .monospaced)
                             .padding(11)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)))
                     }
 
                     Text("LIVE EXAMPLES (TAP TO LISTEN)")
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
@@ -400,21 +400,21 @@ public struct UnitLessonPlayerView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(alignment: .top, spacing: 8) {
                                         Text(ex.target)
-                                            .font(.subheadline.weight(.semibold))
+                                            .scaledFont(.subheadline, weight: .semibold)
                                             .foregroundStyle(.primary)
                                             .multilineTextAlignment(.leading)
                                         Spacer(minLength: 4)
                                         Image(systemName: "speaker.wave.2.fill")
-                                            .font(.caption)
+                                            .scaledFont(.caption)
                                             .foregroundStyle(BrandTheme.celestialSky)
                                     }
                                     Text(ex.translation)
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(.secondary)
                                         .multilineTextAlignment(.leading)
                                     if let highlight = ex.highlight {
                                         Text("Pattern: \(highlight)")
-                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                            .scaledFont(size: 11, weight: .semibold, design: .monospaced)
                                             .padding(.horizontal, 7)
                                             .padding(.vertical, 3)
                                             .background(RoundedRectangle(cornerRadius: 6).fill(BrandTheme.celestialSky.opacity(0.14)))
@@ -435,7 +435,7 @@ public struct UnitLessonPlayerView: View {
                                 .foregroundStyle(BrandTheme.deepGold)
                                 .padding(.top, 2)
                             Text("Exam Pro Tip: \(tip)")
-                                .font(.caption)
+                                .scaledFont(.caption)
                         }
                         .padding(11)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -453,7 +453,7 @@ public struct UnitLessonPlayerView: View {
                     goToStep(.vocab, markCurrentDone: true)
                 } label: {
                     Label("Continue to Vocabulary Flashcards", systemImage: "arrow.right")
-                        .font(.subheadline.weight(.bold))
+                        .scaledFont(.subheadline, weight: .bold)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(BrandTheme.celestialSky)
@@ -476,14 +476,14 @@ public struct UnitLessonPlayerView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("AUDIO FLASHCARD DECK · CARD \(safeIdx + 1) OF \(cards.count)")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                 .foregroundStyle(BrandTheme.celestialSky)
                             Text("High-Yield Exam Vocabulary Studio")
-                                .font(.headline)
+                                .scaledFont(.headline)
                         }
                         Spacer()
                         Text("Mastered \(masteredVocab.count)/\(cards.count)")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
@@ -494,22 +494,22 @@ public struct UnitLessonPlayerView: View {
                     VStack(spacing: 14) {
                         HStack(spacing: 8) {
                             Text(isCardFlipped ? "MEANING & CONTEXT" : "TARGET EXPRESSION")
-                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             if isMastered {
                                 Label("Got It", systemImage: "checkmark.circle.fill")
-                                    .font(.caption2.weight(.bold))
+                                    .scaledFont(.caption2, weight: .bold)
                                     .foregroundStyle(BrandTheme.emeraldMint)
                             }
                         }
 
                         Text(card.term)
-                            .font(.system(size: 26, weight: .bold, design: .serif))
+                            .scaledFont(size: 26, weight: .bold, design: .serif)
                             .multilineTextAlignment(.center)
 
                         if let pron = card.pronunciation {
                             Text(pron)
-                                .font(.caption.monospaced())
+                                .scaledFont(.caption, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -536,10 +536,10 @@ public struct UnitLessonPlayerView: View {
                             Divider()
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(card.meaning)
-                                    .font(.headline)
+                                    .scaledFont(.headline)
                                 HStack(alignment: .top, spacing: 8) {
                                     Text("“\(card.example)”")
-                                        .font(.subheadline)
+                                        .scaledFont(.subheadline)
                                     Spacer()
                                     Button {
                                         NativeAudioEngine.shared.playClickSound()
@@ -552,7 +552,7 @@ public struct UnitLessonPlayerView: View {
                                 }
                                 if let note = card.exampleNote {
                                     Text(note)
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -595,10 +595,10 @@ public struct UnitLessonPlayerView: View {
                                 HStack(spacing: 4) {
                                     if itemMastered {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .font(.caption2)
+                                            .scaledFont(.caption2)
                                     }
                                     Text(item.term)
-                                        .font(.system(size: 11.5, design: .monospaced))
+                                        .scaledFont(size: 11.5, design: .monospaced)
                                 }
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
@@ -638,14 +638,14 @@ public struct UnitLessonPlayerView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("INTERACTIVE CHECK · INSTANT EXPLANATIONS")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                             .foregroundStyle(BrandTheme.celestialSky)
                         Text("Test Your Unit \(unitIndex) Mastery")
-                            .font(.headline)
+                            .scaledFont(.headline)
                     }
                     Spacer()
                     Text("Score \(correctCount)/\(questions.count)")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 12, weight: .bold, design: .monospaced)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
@@ -682,11 +682,11 @@ public struct UnitLessonPlayerView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Question \(idx + 1) of \(totalCount)")
-                    .font(.caption.monospaced())
+                    .scaledFont(.caption, design: .monospaced)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Label(q.skill.shortName, systemImage: q.skill.systemImage)
-                    .font(.caption2.weight(.bold))
+                    .scaledFont(.caption2, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
@@ -695,7 +695,7 @@ public struct UnitLessonPlayerView: View {
 
             if let passage = q.passage {
                 Text(passage)
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .italic()
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -708,7 +708,7 @@ public struct UnitLessonPlayerView: View {
                     NativeAudioEngine.shared.speak(audioScript, languageId: course.languageId)
                 } label: {
                     Label("Play Listening Clip", systemImage: "speaker.wave.2.fill")
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
@@ -717,16 +717,16 @@ public struct UnitLessonPlayerView: View {
                 if isAnswered {
                     DisclosureGroup("View Audio Transcript") {
                         Text(audioScript)
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .padding(.top, 4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .font(.caption)
+                    .scaledFont(.caption)
                 }
             }
 
             Text(q.prompt)
-                .font(.subheadline.weight(.semibold))
+                .scaledFont(.subheadline, weight: .semibold)
 
             VStack(spacing: 7) {
                 ForEach(Array(q.options.enumerated()), id: \.offset) { optIdx, opt in
@@ -736,7 +736,7 @@ public struct UnitLessonPlayerView: View {
 
             if isAnswered {
                 Text("\(isCorrect ? "✓ Correct: " : "Key Takeaway: ")\(q.explanation)")
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
@@ -771,7 +771,7 @@ public struct UnitLessonPlayerView: View {
         } label: {
             HStack {
                 Text(opt)
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .multilineTextAlignment(.leading)
                 Spacer()
                 if isAnswered && optionIsRight {
@@ -796,12 +796,12 @@ public struct UnitLessonPlayerView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("ACTIVE SKILL WORKBENCH · \(completedDrills.count)/\(module.drills.count) PRACTICED")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundStyle(BrandTheme.celestialSky)
 
                 if let msg = speechRecognizer.statusMessage {
                     Text(msg)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
@@ -832,17 +832,17 @@ public struct UnitLessonPlayerView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                         .foregroundStyle(BrandTheme.celestialSky)
                     Text(drill.title)
-                        .font(.subheadline.weight(.bold))
+                        .scaledFont(.subheadline, weight: .bold)
                 }
                 Spacer()
                 Button {
                     toggleDrillPracticed(idx)
                 } label: {
                     Label(practiced ? "Practiced" : "Mark Practiced", systemImage: practiced ? "checkmark.circle.fill" : "circle")
-                        .font(.caption2.weight(.bold))
+                        .scaledFont(.caption2, weight: .bold)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(practiced ? BrandTheme.emeraldMint : .accentColor)
@@ -850,12 +850,12 @@ public struct UnitLessonPlayerView: View {
             }
 
             Text(drill.instruction)
-                .font(.caption)
+                .scaledFont(.caption)
                 .foregroundStyle(.secondary)
 
             if let passage = drill.samplePassage {
                 Text(passage)
-                    .font(.caption)
+                    .scaledFont(.caption)
                     .italic()
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -870,7 +870,7 @@ public struct UnitLessonPlayerView: View {
                         drillAudioPlays[idx, default: 0] += 1
                     } label: {
                         Label("Play Listening Audio", systemImage: "speaker.wave.2.fill")
-                            .font(.caption.weight(.bold))
+                            .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.purple)
@@ -878,25 +878,25 @@ public struct UnitLessonPlayerView: View {
 
                     if let count = drillAudioPlays[idx], count > 0 {
                         Text("Played \(count)×")
-                            .font(.caption2.monospaced())
+                            .scaledFont(.caption2, design: .monospaced)
                             .foregroundStyle(.secondary)
                     }
                 }
                 DisclosureGroup("Reveal Audio Transcript") {
                     Text(script)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .padding(.top, 4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.caption)
+                .scaledFont(.caption)
             }
 
             Text(isProductive ? "Your Practice Response:" : "Your Notes & Comprehension Answers:")
-                .font(.caption2.weight(.bold))
+                .scaledFont(.caption2, weight: .bold)
                 .foregroundStyle(.secondary)
 
             TextEditor(text: noteBinding)
-                .font(.caption)
+                .scaledFont(.caption)
                 .frame(minHeight: isProductive ? 84 : 56)
                 .padding(6)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
@@ -912,7 +912,7 @@ public struct UnitLessonPlayerView: View {
                             recordingThis ? "Stop Mic" : "Dictate Live Voice",
                             systemImage: recordingThis ? "mic.slash.fill" : "mic.fill"
                         )
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(recordingThis ? .red : BrandTheme.emeraldMint)
@@ -927,7 +927,7 @@ public struct UnitLessonPlayerView: View {
                             evaluatingDrillIdx == idx ? "Evaluating..." : "Evaluate Drill",
                             systemImage: "sparkles"
                         )
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(BrandTheme.celestialSky)
@@ -944,7 +944,7 @@ public struct UnitLessonPlayerView: View {
                     )
                 } label: {
                     Label("Open in AI Coach", systemImage: "bubble.left.and.sparkles")
-                        .font(.caption.weight(.semibold))
+                        .scaledFont(.caption, weight: .semibold)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -976,21 +976,21 @@ public struct UnitLessonPlayerView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Label("UNIT \(unitIndex) MILESTONE CHECKPOINT", systemImage: "rosette")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                 .foregroundStyle(BrandTheme.deepGold)
                             Text(lesson.checkpointSkill.displayName)
-                                .font(.caption2.weight(.bold))
+                                .scaledFont(.caption2, weight: .bold)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
                                 .foregroundStyle(BrandTheme.celestialSky)
                         }
                         Text(module.checkpointPrompt)
-                            .font(.headline)
+                            .scaledFont(.headline)
                     }
                     Spacer()
                     Text("\(wordCount) / \(lesson.checkpointMinWords)+ words")
-                        .font(.caption.monospaced())
+                        .scaledFont(.caption, design: .monospaced)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(Color.primary.opacity(0.07)))
@@ -999,7 +999,7 @@ public struct UnitLessonPlayerView: View {
                 // Vocabulary hints
                 VStack(alignment: .leading, spacing: 6) {
                     Text("TRY USING THESE UNIT \(unitIndex) TERMS (TAP TO HEAR)")
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                         .foregroundStyle(.secondary)
                     FlowLayout(spacing: 6, lineSpacing: 6) {
                         ForEach(module.keyVocabulary, id: \.self) { word in
@@ -1009,7 +1009,7 @@ public struct UnitLessonPlayerView: View {
                                 NativeAudioEngine.shared.speak(word, languageId: course.languageId)
                             } label: {
                                 Label(word, systemImage: used ? "checkmark.circle.fill" : "speaker.wave.2.fill")
-                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .scaledFont(size: 11.5, design: .monospaced)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(
@@ -1025,14 +1025,14 @@ public struct UnitLessonPlayerView: View {
 
                 if let msg = speechRecognizer.statusMessage {
                     Text(msg)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
                 }
 
                 TextEditor(text: $checkpointText)
-                    .font(.subheadline)
+                    .scaledFont(.subheadline)
                     .frame(minHeight: 130)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
@@ -1079,7 +1079,7 @@ public struct UnitLessonPlayerView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("REFERENCE \(course.level.rawValue) MODEL RESPONSE")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button {
@@ -1087,14 +1087,14 @@ public struct UnitLessonPlayerView: View {
                                 NativeAudioEngine.shared.speak(lesson.checkpointModelAnswer, languageId: course.languageId)
                             } label: {
                                 Label("Listen to Model", systemImage: "speaker.wave.2.fill")
-                                    .font(.caption.weight(.bold))
+                                    .scaledFont(.caption, weight: .bold)
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(BrandTheme.celestialSky)
                             .controlSize(.small)
                         }
                         Text(lesson.checkpointModelAnswer)
-                            .font(.subheadline)
+                            .scaledFont(.subheadline)
                     }
                     .padding(13)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1104,7 +1104,7 @@ public struct UnitLessonPlayerView: View {
                 if justCompletedUnit {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Unit \(unitIndex) Completed! Progress saved.", systemImage: "graduationcap.fill")
-                            .font(.headline)
+                            .scaledFont(.headline)
                             .foregroundStyle(BrandTheme.emeraldMint)
                         FlowLayout(spacing: 8, lineSpacing: 8) {
                             Button {
@@ -1152,7 +1152,7 @@ public struct UnitLessonPlayerView: View {
                         finishUnit(advanceTo: nextMod)
                     } label: {
                         Label("Complete Unit & Continue to Unit \(unitIndex + 1)", systemImage: "checkmark.circle.fill")
-                            .font(.subheadline.weight(.bold))
+                            .scaledFont(.subheadline, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(BrandTheme.emeraldMint)
@@ -1161,7 +1161,7 @@ public struct UnitLessonPlayerView: View {
                         finishUnit(advanceTo: nil)
                     } label: {
                         Label("Complete Unit \(unitIndex) & Finish \(course.level.rawValue)", systemImage: "checkmark.circle.fill")
-                            .font(.subheadline.weight(.bold))
+                            .scaledFont(.subheadline, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(BrandTheme.emeraldMint)
@@ -1187,7 +1187,7 @@ public struct UnitLessonPlayerView: View {
                 goToStep(next, markCurrentDone: true)
             } label: {
                 Label(nextLabel, systemImage: "arrow.right")
-                    .font(.subheadline.weight(.bold))
+                    .scaledFont(.subheadline, weight: .bold)
             }
             .buttonStyle(.borderedProminent)
             .tint(BrandTheme.celestialSky)
@@ -1198,47 +1198,47 @@ public struct UnitLessonPlayerView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("\(result.score)/100")
-                    .font(.title3.bold().monospacedDigit())
+                    .scaledFont(.title3, weight: .bold, monospacedDigit: true)
                 Text("CEFR \(result.cefrEstimate.rawValue)")
-                    .font(.caption.weight(.bold))
+                    .scaledFont(.caption, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(BrandTheme.celestialSky))
                     .foregroundStyle(.white)
                 Spacer()
                 Text(result.providerLabel)
-                    .font(.caption2.monospaced())
+                    .scaledFont(.caption2, design: .monospaced)
                     .foregroundStyle(.secondary)
             }
             Text(result.examinerSummary)
-                .font(.caption)
+                .scaledFont(.caption)
 
             if !result.strengths.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Strengths")
-                        .font(.caption2.weight(.bold))
+                        .scaledFont(.caption2, weight: .bold)
                         .foregroundStyle(BrandTheme.emeraldMint)
                     ForEach(result.strengths, id: \.self) { item in
-                        Text("• \(item)").font(.caption)
+                        Text("• \(item)").scaledFont(.caption)
                     }
                 }
             }
             if !result.corrections.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Next-Level Fixes")
-                        .font(.caption2.weight(.bold))
+                        .scaledFont(.caption2, weight: .bold)
                         .foregroundStyle(BrandTheme.deepGold)
                     ForEach(result.corrections, id: \.self) { item in
-                        Text("• \(item)").font(.caption)
+                        Text("• \(item)").scaledFont(.caption)
                     }
                 }
             }
             if !result.upgradedVersion.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Upgraded \(course.level.rawValue)+ Version")
-                        .font(.caption2.weight(.bold))
+                        .scaledFont(.caption2, weight: .bold)
                         .foregroundStyle(BrandTheme.celestialSky)
-                    Text(result.upgradedVersion).font(.caption)
+                    Text(result.upgradedVersion).scaledFont(.caption)
                 }
             }
         }

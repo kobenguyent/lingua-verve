@@ -30,7 +30,9 @@ struct LinguaVerveAppleApp: App {
             #endif
             .sheet(isPresented: $store.isUpdateSheetPresented) {
                 UpdateSheetView(store: store)
+                    .applyAppFontScale(store)
             }
+            .applyAppFontScale(store)
             .task {
                 await store.startPeriodicUpdateChecks()
             }
@@ -42,6 +44,19 @@ struct LinguaVerveAppleApp: App {
                 Button("Check for Updates…") {
                     Task { await store.checkForUpdates(manual: true) }
                 }
+            }
+
+            CommandGroup(after: .toolbar) {
+                Button("Increase Text Size") { store.increaseFontScale() }
+                    .keyboardShortcut("+", modifiers: [.command])
+                    .disabled(store.fontScale >= CurriculumStore.maxFontScale - 0.001)
+                Button("Decrease Text Size") { store.decreaseFontScale() }
+                    .keyboardShortcut("-", modifiers: [.command])
+                    .disabled(store.fontScale <= CurriculumStore.minFontScale + 0.001)
+                Button("Reset Text Size (100%)") { store.resetFontScale() }
+                    .keyboardShortcut("0", modifiers: [.command])
+                    .disabled(abs(store.fontScale - 1.0) < 0.01)
+                Divider()
             }
 
             CommandMenu("Polyglot Academy") {

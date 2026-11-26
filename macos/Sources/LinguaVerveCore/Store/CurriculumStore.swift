@@ -33,7 +33,30 @@ public final class CurriculumStore {
     public private(set) var bookmarkedIds: Set<String>
     public private(set) var masteredIds: Set<String>
     public private(set) var learnerState: LearnerProgressState
+    public private(set) var generatedExams: [MockExam] = []
     public var aiConfig: AIProviderConfig
+
+    // Overall App Typography Scale (0.85x – 1.60x, persisted across launches)
+    public static let fontScalePresets: [(label: String, scale: Double)] = [
+        ("Compact", 0.90),
+        ("Default", 1.00),
+        ("Comfortable", 1.15),
+        ("Large", 1.30),
+        ("Extra Large", 1.45),
+        ("Jumbo", 1.60)
+    ]
+    public static let minFontScale: Double = 0.85
+    public static let maxFontScale: Double = 1.60
+    public var fontScale: Double = 1.0 {
+        didSet {
+            let clamped = Self.clampFontScale(fontScale)
+            if abs(clamped - fontScale) > 0.001 {
+                fontScale = clamped
+                return
+            }
+            defaults.set(clamped, forKey: fontScaleKey)
+        }
+    }
 
     // Software Update State (GitHub Releases — MacBook / iPad / iPhone)
     public let currentAppVersion: String
@@ -72,6 +95,8 @@ public final class CurriculumStore {
     private let autoInstallKey = "linguaverve.macos.autoInstallAfterDownload"
     private let learnerStateKey = "linguaverve.apple.learnerState.v1"
     private let aiConfigKey = "linguaverve.apple.aiConfig.v1"
+    private let generatedExamsKey = "linguaverve.apple.generatedExams.v1"
+    private let fontScaleKey = "linguaverve.apple.fontScale.v1"
 
     public init(
         bundle: CurriculumBundle? = nil,
@@ -111,6 +136,19 @@ public final class CurriculumStore {
             self.learnerState = decoded
         } else {
             self.learnerState = LearnerProgressState()
+        }
+
+        if defaults.object(forKey: fontScaleKey) != nil {
+            self.fontScale = Self.clampFontScale(defaults.double(forKey: fontScaleKey))
+        } else {
+            self.fontScale = 1.0
+        }
+
+        if let genData = defaults.data(forKey: generatedExamsKey),
+           let decodedGen = try? JSONDecoder().decode([MockExam].self, from: genData) {
+            self.generatedExams = decodedGen
+        } else {
+            self.generatedExams = []
         }
 
         if let aiData = defaults.data(forKey: aiConfigKey),
@@ -164,6 +202,33 @@ public final class CurriculumStore {
         if let encoded = try? JSONEncoder().encode(nextConfig) {
             defaults.set(encoded, forKey: aiConfigKey)
         }
+    }
+
+    // MARK: - Overall App Font Size Controls
+
+    public static func clampFontScale(_ value: Double) -> Double {
+        let clamped = max(minFontScale, min(maxFontScale, value))
+        return (clamped * 20.0).rounded() / 20.0 // clean 5% steps
+    }
+
+    public var fontScalePercent: Int {
+        Int((fontScale * 100.0).rounded())
+    }
+
+    public func setFontScale(_ scale: Double) {
+        fontScale = Self.clampFontScale(scale)
+    }
+
+    public func increaseFontScale() {
+        setFontScale(fontScale + 0.10)
+    }
+
+    public func decreaseFontScale() {
+        setFontScale(fontScale - 0.10)
+    }
+
+    public func resetFontScale() {
+        setFontScale(1.0)
     }
 
     private static func todayKey(from date: Date = Date()) -> String {
@@ -436,6 +501,29 @@ public final class CurriculumStore {
         let target = languageId == "german" ? "german" : "english"
         return bundle.mockExams.first { $0.languageId == target && $0.level == level }
             ?? bundle.mockExams.first { $0.languageId == target }
+    }
+
+    public func generatedExams(for languageId: String, level: CEFRLevel) -> [MockExam] {
+        let target = languageId == "german" ? "german" : "english"
+        return generatedExams.filter { $0.languageId == target && $0.level == level }
+    }
+
+    public func saveGeneratedExam(_ exam: MockExam) {
+        generatedExams.removeAll { $0.id == exam.id }
+        generatedExams.insert(exam, at: 0)
+        if generatedExams.count > 24 {
+            generatedExams = Array(generatedExams.prefix(24))
+        }
+        if let encoded = try? JSONEncoder().encode(generatedExams) {
+            defaults.set(encoded, forKey: generatedExamsKey)
+        }
+    }
+
+    public func deleteGeneratedExam(id: String) {
+        generatedExams.removeAll { $0.id == id }
+        if let encoded = try? JSONEncoder().encode(generatedExams) {
+            defaults.set(encoded, forKey: generatedExamsKey)
+        }
     }
 
     public func recordExamAttempt(_ attempt: ExamAttemptRecord) {

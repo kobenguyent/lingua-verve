@@ -384,12 +384,46 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertTrue(NativeAudioEngine.isRoboticVoice(candidates[1]))
         XCTAssertFalse(NativeAudioEngine.isRoboticVoice(candidates[3]))
 
-        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "en-GB")?.name, "Daniel")
+        // Neural/Premium voices outrank 22kHz super-compact voices even across regional variants
+        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "en-GB")?.identifier, "com.apple.siri.natural.Quinn")
         XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "en-US")?.identifier, "com.apple.siri.natural.Quinn")
         XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: candidates, targetBcp47: "de-DE")?.identifier, "com.apple.siri.natural.Helena")
 
+        // When both regional compact and regional enhanced/premium exist, exact regional enhanced wins
+        let deCandidates: [VoiceCandidateDescriptor] = [
+            VoiceCandidateDescriptor(identifier: "com.apple.voice.compact.de-DE.Anna", name: "Anna", language: "de-DE", qualityRaw: 1),
+            VoiceCandidateDescriptor(identifier: "com.apple.voice.premium.de-DE.Petra", name: "Petra", language: "de-DE", qualityRaw: 3),
+            VoiceCandidateDescriptor(identifier: "com.apple.siri.natural.Helena", name: "Voice 2", language: "de-DE", qualityRaw: 2)
+        ]
+        XCTAssertEqual(NativeAudioEngine.pickBestCandidate(from: deCandidates, targetBcp47: "de-DE")?.name, "Petra")
+
         let defaults = UserDefaults(suiteName: "LinguaVerveVoiceTests.\(UUID().uuidString)")!
         let engine = NativeAudioEngine(defaults: defaults)
+        // Verify OpenAI API key reuse reads native CurriculumStore key
+        let savedAI = AIProviderConfig(provider: .openai, apiKey: "sk-shared-native-key", enabled: true)
+        if let encodedAI = try? JSONEncoder().encode(savedAI) {
+            defaults.set(encodedAI, forKey: "linguaverve.apple.aiConfig.v1")
+        }
+        var openAISettings = VoiceSettings()
+        openAISettings.provider = .openai
+        openAISettings.reuseOpenAIKey = true
+        XCTAssertEqual(engine.effectiveAPIKey(for: openAISettings), "sk-shared-native-key")
+        XCTAssertTrue(engine.isNeuralProviderReady(for: openAISettings))
+
+        // Verify overall app font scale persistence & clamping on CurriculumStore
+        let fontDefaults = UserDefaults(suiteName: "LinguaVerveFontScaleTests.\(UUID().uuidString)")!
+        let fontStore = CurriculumStore(defaults: fontDefaults)
+        XCTAssertEqual(fontStore.fontScale, 1.0, accuracy: 0.001)
+        fontStore.increaseFontScale()
+        XCTAssertEqual(fontStore.fontScalePercent, 110)
+        fontStore.setFontScale(1.45)
+        XCTAssertEqual(fontStore.fontScalePercent, 145)
+        let reloadedFontStore = CurriculumStore(defaults: fontDefaults)
+        XCTAssertEqual(reloadedFontStore.fontScalePercent, 145)
+        reloadedFontStore.setFontScale(9.0) // clamps to max 160%
+        XCTAssertEqual(reloadedFontStore.fontScalePercent, 160)
+        reloadedFontStore.resetFontScale()
+        XCTAssertEqual(reloadedFontStore.fontScalePercent, 100)
         engine.setAccent(for: "english", accentCode: "en-AU")
         engine.setAccent(for: "german", accentCode: "de-CH")
         XCTAssertEqual(engine.activeAccentCode(for: "english"), "en-AU")
@@ -423,6 +457,12 @@ final class AcademyAndAITests: XCTestCase {
             XCTAssertEqual(tracks.reduce(0) { $0 + $1.questions.count }, 9, "Expected 9 listening items in \(exam.id)")
             let accents = Set(tracks.compactMap(\.accentCode))
             XCTAssertGreaterThanOrEqual(accents.count, 2, "Expected multiple accents in \(exam.id)")
+            for track in tracks {
+                let turns = NativeAudioEngine.parseDialogueTurns(track.audioScript)
+                XCTAssertGreaterThanOrEqual(turns.count, 4, "Expected multi-turn human conversation in \(track.id)")
+                let distinctSpeakers = Set(turns.map(\.speakerIndex))
+                XCTAssertGreaterThanOrEqual(distinctSpeakers.count, 2, "Expected >=2 speakers in \(track.id)")
+            }
 
             let tasks = exam.writing.resolvedTasks
             XCTAssertEqual(tasks.count, 2, "Expected 2 writing tasks in \(exam.id)")
@@ -454,5 +494,73 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(rubric.coherenceCohesion, 60)
         XCTAssertGreaterThanOrEqual(rubric.lexicalRange, 60)
         XCTAssertGreaterThanOrEqual(rubric.grammaticalAccuracy, 60)
+    }
+
+    func testAIExamGeneratorCreatesFreshMultiPartExamAndPersistsInStore() async throws {
+        let defaults = UserDefaults(suiteName: "LinguaVerveAIExamTests.\(UUID().uuidString)")!
+        let store = CurriculumStore(defaults: defaults)
+        guard let baseExam = store.mockExam(for: "german", level: .B1) else {
+            XCTFail("Expected German B1 base exam")
+            return
+        }
+
+        let readJSON = """
+        {"parts":[{"partLabel":"Lesen Teil 1","format":"comprehension","instruction":"Lesen Sie.","passageTitle":"Fahrradstadt Freiburg","passage":"Freiburg baut dieses Jahr zwölf neue Kilometer Radwege aus, damit Pendler sicher und klimafreundlich ins Zentrum fahren können.","questions":[{"prompt":"Was baut Freiburg?","options":["Autobahn","Radwege","Flughafen","Hafen"],"correctIndex":1,"explanation":"Zwölf Kilometer Radwege."},{"prompt":"Für wen?","options":["Piloten","Pendler","Touristen","Kapitäne"],"correctIndex":1,"explanation":"Für Pendler."},{"prompt":"Wie viele Kilometer?","options":["5","12","20","30"],"correctIndex":1,"explanation":"Zwölf Kilometer."}]},{"partLabel":"Lesen Teil 2","format":"true-false","instruction":"Richtig oder Falsch.","passageTitle":"Bürgerbus","passage":"Der neue Elektro-Bürgerbus fährt ab Mai alle zwanzig Minuten kostenlos durch die Altstadt.","questions":[{"prompt":"Der Bus kostet fünf Euro.","options":["Richtig","Falsch","Steht nicht im Text"],"correctIndex":1,"explanation":"Er fährt kostenlos."},{"prompt":"Er fährt ab Mai.","options":["Richtig","Falsch","Steht nicht im Text"],"correctIndex":0,"explanation":"Ab Mai."},{"prompt":"Der Bus hat zwanzig Sitzplätze.","options":["Richtig","Falsch","Steht nicht im Text"],"correctIndex":2,"explanation":"Steht nicht im Text."}]},{"partLabel":"Lesen Teil 3","format":"cloze","instruction":"Wählen Sie.","passageTitle":"Mobilität","passage":"Viele Menschen steigen [1] das Fahrrad um, [2] es gesund ist und [3] Staus vermeidet.","questions":[{"prompt":"Lücke 1","options":["auf","im","bei","mit"],"correctIndex":0,"explanation":"umsteigen auf"},{"prompt":"Lücke 2","options":["weil","aber","oder","denn"],"correctIndex":0,"explanation":"weil + Verb am Ende"},{"prompt":"Lücke 3","options":["viele","viel","vieles","vielen"],"correctIndex":0,"explanation":"viele Staus"}]}]}
+        """
+        let listenJSON = """
+        {"tracks":[{"partLabel":"Hören 1 (DE)","contextNote":"Verkehrsfunk","accentCode":"de-DE","audioScript":"Achtung auf der Linie vier: Wegen Bauarbeiten endet die Straßenbahn heute bereits am Nordplatz und fährt nicht bis zum Hauptbahnhof.","hearingFocusTrap":"Endet am Nordplatz.","questions":[{"prompt":"Welche Linie?","options":["2","4","6","8"],"correctIndex":1,"explanation":"Linie vier."},{"prompt":"Wo endet sie?","options":["Hauptbahnhof","Nordplatz","Südpark","Westtor"],"correctIndex":1,"explanation":"Am Nordplatz."},{"prompt":"Warum?","options":["Streik","Bauarbeiten","Schnee","Fest"],"correctIndex":1,"explanation":"Bauarbeiten."}]},{"partLabel":"Hören 2 (AT)","contextNote":"Wien Durchsage","accentCode":"de-AT","audioScript":"Grüß Gott! Der Zug nach Salzburg hat zehn Minuten Verspätung und fährt heute von Bahnsteig drei statt Bahnsteig eins ab.","hearingFocusTrap":"Bahnsteig 3 statt 1.","questions":[{"prompt":"Wohin fährt der Zug?","options":["Graz","Salzburg","Linz","Innsbruck"],"correctIndex":1,"explanation":"Salzburg."},{"prompt":"Welcher Bahnsteig?","options":["1","2","3","4"],"correctIndex":2,"explanation":"Bahnsteig drei."},{"prompt":"Verspätung?","options":["5 Min","10 Min","15 Min","20 Min"],"correctIndex":1,"explanation":"Zehn Minuten."}]},{"partLabel":"Hören 3 (CH)","contextNote":"Zürich Hinweis","accentCode":"de-CH","audioScript":"Grüezi! Das neue Nachtnetz am Wochenende startet diesen Freitag um ein Uhr morgens mit Halbstundentakt in alle Quartiere.","hearingFocusTrap":"Ab 1 Uhr, Halbstundentakt.","questions":[{"prompt":"Wann startet es?","options":["Donnerstag","Freitag","Sonntag","Montag"],"correctIndex":1,"explanation":"Diesen Freitag."},{"prompt":"Ab welcher Uhrzeit?","options":["23 Uhr","0 Uhr","1 Uhr","2 Uhr"],"correctIndex":2,"explanation":"Ein Uhr morgens."},{"prompt":"Welcher Takt?","options":["10 Min","30 Min","60 Min","90 Min"],"correctIndex":1,"explanation":"Halbstundentakt."}]}]}
+        """
+        let writeJSON = """
+        {"tasks":[{"partLabel":"Schreiben 1 (Leserbrief)","scenario":"Schreiben Sie einen Leserbrief über autofreie Innenstädte.","taskRequirements":["Vorteile nennen","Nachteile nennen","Eigene Meinung begründen"],"weightPercent":40,"keyRubricKeywords":["Innenstadt","Bus","weil","Meinung"],"modelAnswer":"Meiner Meinung nach sind autofreie Innenstädte sinnvoll, weil die Luft sauberer wird und Fußgänger sicherer unterwegs sind. Allerdings braucht man gute Busverbindungen für alle Bewohner."},{"partLabel":"Schreiben 2 (Beschwerde)","scenario":"Schreiben Sie eine Beschwerde an das Verkehrsunternehmen wegen verspäteter Züge.","taskRequirements":["Problem beschreiben","Folgen schildern","Lösung fordern"],"weightPercent":60,"keyRubricKeywords":["Verspätung","Pendler","Erstattung","deshalb"],"modelAnswer":"Sehr geehrte Damen und Herren, seit drei Wochen hat mein Morgenzug täglich zwanzig Minuten Verspätung. Deshalb komme ich oft zu spät zur Arbeit und bitte um zuverlässige Information sowie eine faire Erstattung."}]}
+        """
+        let speakJSON = """
+        {"parts":[{"partLabel":"Sprechen 1 (Mobilität)","instruction":"Wie kommen Sie täglich zur Arbeit?","prepSeconds":15,"speakSeconds":60,"prompts":["Verkehrsmittel","Dauer","Vor- und Nachteile"],"examinerPromptAudio":"Guten Tag! Wie fahren Sie normalerweise zur Arbeit oder Universität?","keyRubricKeywords":["Fahrrad","Zug","schnell"],"modelResponseScript":"Ich fahre meistens zwanzig Minuten mit dem Fahrrad, weil ich flexibel bleibe und keinen Parkplatz suchen muss."},{"partLabel":"Sprechen 2 (Präsentation)","instruction":"Sollte der Nahverkehr kostenlos sein?","prepSeconds":60,"speakSeconds":120,"prompts":["Umwelt","Finanzierung","Persönliche Erfahrung"],"examinerPromptAudio":"Kommen wir zu Ihrer Präsentation über kostenlosen Nahverkehr.","keyRubricKeywords":["Umwelt","Steuern","einerseits"],"modelResponseScript":"Einerseits würde kostenloser Nahverkehr den Autoverkehr stark reduzieren. Andererseits müssen Städte hohe Investitionen in neue Züge über Steuern finanzieren."},{"partLabel":"Sprechen 3 (Nachfrage)","instruction":"Reagieren Sie auf die Nachfrage zu ländlichen Regionen.","prepSeconds":20,"speakSeconds":90,"prompts":["Dorf vs. Stadt","Anrufbusse","Kompromiss"],"examinerPromptAudio":"Aber hilft kostenloser Nahverkehr überhaupt Menschen auf dem Land?","keyRubricKeywords":["Land","Angebot","Kompromiss"],"modelResponseScript":"Auf dem Land ist nicht nur der Preis entscheidend, sondern vor allem der Takt. Flexible Rufbusse wären dort ein sehr sinnvoller Kompromiss."}]}
+        """
+
+        let transport = MockAITransport { request in
+            let reqBody = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+            let payload: String
+            if reqBody.contains("Listening exam author") {
+                payload = listenJSON
+            } else if reqBody.contains("Writing examiner") {
+                payload = writeJSON
+            } else if reqBody.contains("Speaking examiner") {
+                payload = speakJSON
+            } else {
+                payload = readJSON
+            }
+            let escaped = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": "```json\n\(payload)\n```"]]]])
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (escaped, resp)
+        }
+
+        let service = AIExamGeneratorService(aiClient: AIClientService(transport: transport))
+        let cfg = AIProviderConfig(provider: .openai, apiKey: "sk-unit", enabled: true)
+        let result = try await service.generateFreshExam(
+            config: cfg,
+            baseExam: baseExam,
+            customTopic: "Nachhaltige Mobilität"
+        )
+
+        XCTAssertEqual(result.aiSkillsCount, 4)
+        XCTAssertEqual(result.exam.aiGenerated, true)
+        XCTAssertEqual(result.exam.generatedTheme, "Nachhaltige Mobilität")
+        XCTAssertEqual(result.exam.reading.resolvedParts.count, 3)
+        XCTAssertEqual(result.exam.reading.resolvedParts.reduce(0) { $0 + $1.questions.count }, 9)
+        XCTAssertEqual(result.exam.listening.resolvedTracks.count, 3)
+        XCTAssertEqual(result.exam.listening.resolvedTracks.compactMap(\.accentCode), ["de-DE", "de-AT", "de-CH"])
+        XCTAssertEqual(result.exam.writing.resolvedTasks.count, 2)
+        XCTAssertEqual(result.exam.writing.resolvedTasks.reduce(0) { $0 + $1.weightPercent }, 100)
+        XCTAssertEqual(result.exam.speaking.resolvedParts.count, 3)
+
+        // Verify persistence in CurriculumStore across reloads
+        store.saveGeneratedExam(result.exam)
+        XCTAssertEqual(store.generatedExams(for: "german", level: .B1).count, 1)
+
+        let reloaded = CurriculumStore(defaults: defaults)
+        XCTAssertEqual(reloaded.generatedExams(for: "german", level: .B1).first?.id, result.exam.id)
+
+        reloaded.deleteGeneratedExam(id: result.exam.id)
+        XCTAssertTrue(reloaded.generatedExams(for: "german", level: .B1).isEmpty)
     }
 }

@@ -62,11 +62,11 @@ public struct IntensiveCoursesNativeView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack {
                             Text("Zero-to-Hero Progress (A1 → C2)")
-                                .font(.caption.weight(.semibold))
+                                .scaledFont(.caption, weight: .semibold)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text("\(zeroToHero.done)/\(zeroToHero.total) units (\(zeroToHero.percent)%)")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 12, weight: .bold, design: .monospaced)
                                 .monospacedDigit()
                         }
                         ProgressView(value: Double(zeroToHero.percent), total: 100.0)
@@ -90,11 +90,11 @@ public struct IntensiveCoursesNativeView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
                                             Text(course.level.rawValue)
-                                                .font(.system(size: 15, weight: .bold, design: .monospaced))
+                                                .scaledFont(size: 15, weight: .bold, design: .monospaced)
                                                 .foregroundStyle(selected ? tint : .primary)
                                             if enrolled {
                                                 Text("Suggested")
-                                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                                    .scaledFont(size: 9, weight: .bold, design: .monospaced)
                                                     .padding(.horizontal, 5)
                                                     .padding(.vertical, 2)
                                                     .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
@@ -102,7 +102,7 @@ public struct IntensiveCoursesNativeView: View {
                                             }
                                         }
                                         Text("\(course.durationWeeks)w · \(pct)%")
-                                            .font(.system(size: 11, design: .monospaced))
+                                            .scaledFont(size: 11, design: .monospaced)
                                             .foregroundStyle(.secondary)
                                     }
                                     .padding(.horizontal, 12)
@@ -130,12 +130,12 @@ public struct IntensiveCoursesNativeView: View {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("\(course.level.rawValue) · \(course.heroRole)")
-                                    .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                    .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                     .foregroundStyle(BrandTheme.cefrColor(for: course.level.rawValue))
                                 Text(course.title)
-                                    .font(.system(size: 21, weight: .bold, design: .serif))
+                                    .scaledFont(size: 21, weight: .bold, design: .serif)
                                 Text(course.subtitle)
-                                    .font(.subheadline)
+                                    .scaledFont(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -143,13 +143,13 @@ public struct IntensiveCoursesNativeView: View {
 
                         FlowLayout(spacing: 6, lineSpacing: 6) {
                             Label("\(course.durationWeeks) weeks · \(course.dailyHours)", systemImage: "clock")
-                                .font(.caption.monospaced())
+                                .scaledFont(.caption, design: .monospaced)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 4)
                                 .background(Capsule().fill(Color.primary.opacity(0.06)))
                             ForEach(course.targetCertificates, id: \.self) { cert in
                                 Label(cert, systemImage: "rosette")
-                                    .font(.caption.weight(.semibold))
+                                    .scaledFont(.caption, weight: .semibold)
                                     .padding(.horizontal, 9)
                                     .padding(.vertical, 4)
                                     .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.16)))
@@ -205,10 +205,10 @@ public struct IntensiveCoursesNativeView: View {
                             ForEach(SkillType.allCases) { skill in
                                 VStack(alignment: .leading, spacing: 5) {
                                     Label(skill.displayName, systemImage: skill.systemImage)
-                                        .font(.caption.weight(.bold))
+                                        .scaledFont(.caption, weight: .bold)
                                         .foregroundStyle(BrandTheme.celestialSky)
                                     Text(course.examBlueprint.description(for: skill))
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 .padding(11)
@@ -224,25 +224,25 @@ public struct IntensiveCoursesNativeView: View {
                     ViewThatFits(in: .horizontal) {
                         HStack {
                             Text("INTENSIVE SYLLABUS UNITS (\(course.modules.count))")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             accentMenu(for: course.languageId)
                             Toggle("0.75x Slow Audio", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                                 .toggleStyle(.switch)
-                                .font(.caption.monospaced())
+                                .scaledFont(.caption, design: .monospaced)
                                 .fixedSize()
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             Text("INTENSIVE SYLLABUS UNITS (\(course.modules.count))")
-                                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             HStack {
                                 accentMenu(for: course.languageId)
                                 Spacer()
                                 Toggle("0.75x Slow Audio", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                                     .toggleStyle(.switch)
-                                    .font(.caption.monospaced())
+                                    .scaledFont(.caption, design: .monospaced)
                                     .fixedSize()
                             }
                         }
@@ -257,10 +257,10 @@ public struct IntensiveCoursesNativeView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("OFFICIAL CERTIFICATION PORTALS & FREE MOCK TESTS")
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                     .foregroundStyle(BrandTheme.emeraldMint)
                                 Text("Verified Exam Boards (Goethe, telc, TestDaF, Cambridge, IELTS, TOEFL)")
-                                    .font(.headline)
+                                    .scaledFont(.headline)
                             }
                             Spacer()
                             Button(showAllReferences ? "\(course.level.rawValue) Only" : "Show All") {
@@ -276,28 +276,28 @@ public struct IntensiveCoursesNativeView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text(ref.provider)
-                                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                             .padding(.horizontal, 7)
                                             .padding(.vertical, 3)
                                             .background(Capsule().fill(Color.primary.opacity(0.08)))
                                         Spacer()
                                         Text(ref.levels.map(\.rawValue).joined(separator: "·"))
-                                            .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                            .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                                             .foregroundStyle(BrandTheme.celestialSky)
                                     }
                                     Text(ref.certificateName)
-                                        .font(.subheadline.weight(.bold))
+                                        .scaledFont(.subheadline, weight: .bold)
                                     Text(ref.description)
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(.secondary)
                                     Text("⏱ \(ref.examDuration)\n🎯 \(ref.passingScore)")
-                                        .font(.system(size: 11, design: .monospaced))
+                                        .scaledFont(size: 11, design: .monospaced)
                                         .foregroundStyle(.secondary)
 
                                     if let url = URL(string: ref.url) {
                                         Link(destination: url) {
                                             Label("Open Official Mock / Portal", systemImage: "arrow.up.right.square")
-                                                .font(.caption.weight(.bold))
+                                                .scaledFont(.caption, weight: .bold)
                                         }
                                         .buttonStyle(.borderedProminent)
                                         .tint(BrandTheme.celestialSky)
@@ -323,10 +323,10 @@ public struct IntensiveCoursesNativeView: View {
     private var headerTitle: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("ZERO-TO-HERO INTENSIVE ACADEMY")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .scaledFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundStyle(BrandTheme.celestialSky)
             Text("\(store.courseLanguageId == "german" ? "🇩🇪 German" : "🇬🇧 English") A1 → C2 Mastery Track")
-                .font(.system(size: 22, weight: .bold, design: .serif))
+                .scaledFont(size: 22, weight: .bold, design: .serif)
         }
     }
 
@@ -360,7 +360,7 @@ public struct IntensiveCoursesNativeView: View {
             }
         } label: {
             Label("\(activeOption?.flag ?? "🎙️") \(activeOption?.label ?? activeCode)", systemImage: "waveform")
-                .font(.caption.monospaced())
+                .scaledFont(.caption, design: .monospaced)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -390,13 +390,13 @@ public struct IntensiveCoursesNativeView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     FlowLayout(spacing: 6, lineSpacing: 4) {
                         Text("Unit \(index) · \(mod.weekLabel)")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(Capsule().fill(Color.primary.opacity(0.08)))
                         if inProgress {
                             Text("In Progress · \(stepsDone)/5")
-                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
@@ -404,7 +404,7 @@ public struct IntensiveCoursesNativeView: View {
                         }
                         if let score = savedProg?.checkpointScore {
                             Text("Checkpoint \(score)%")
-                                .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
@@ -412,7 +412,7 @@ public struct IntensiveCoursesNativeView: View {
                         }
                         ForEach(mod.focusSkills) { sk in
                             Label(sk.shortName, systemImage: sk.systemImage)
-                                .font(.system(size: 11, weight: .semibold))
+                                .scaledFont(size: 11, weight: .semibold)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
@@ -420,9 +420,9 @@ public struct IntensiveCoursesNativeView: View {
                         }
                     }
                     Text(mod.title)
-                        .font(.headline)
+                        .scaledFont(.headline)
                     Text(mod.summary)
-                        .font(.subheadline)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -435,7 +435,7 @@ public struct IntensiveCoursesNativeView: View {
                             done ? "Review Unit \(index)" : inProgress ? "Resume Unit \(index)" : "Start Unit \(index)",
                             systemImage: "play.fill"
                         )
-                        .font(.caption.weight(.bold))
+                        .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(BrandTheme.celestialSky)
@@ -450,7 +450,7 @@ public struct IntensiveCoursesNativeView: View {
                         }
                     } label: {
                         Label(done ? "Completed" : "Complete", systemImage: done ? "checkmark.circle.fill" : "circle")
-                            .font(.caption.weight(.bold))
+                            .scaledFont(.caption, weight: .bold)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(done ? BrandTheme.emeraldMint : .accentColor)
@@ -463,10 +463,10 @@ public struct IntensiveCoursesNativeView: View {
                 ForEach(mod.objectives, id: \.self) { obj in
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "checkmark.seal.fill")
-                            .font(.caption2)
+                            .scaledFont(.caption2)
                             .foregroundStyle(BrandTheme.celestialSky)
                             .padding(.top, 2)
-                        Text(obj).font(.caption)
+                        Text(obj).scaledFont(.caption)
                     }
                 }
             }
@@ -478,7 +478,7 @@ public struct IntensiveCoursesNativeView: View {
                         NativeAudioEngine.shared.speak(word, languageId: course.languageId)
                     } label: {
                         Label(word, systemImage: "speaker.wave.2.fill")
-                            .font(.system(size: 11.5, design: .monospaced))
+                            .scaledFont(size: 11.5, design: .monospaced)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(RoundedRectangle(cornerRadius: 7).fill(BrandTheme.celestialSky.opacity(0.12)))
@@ -492,7 +492,7 @@ public struct IntensiveCoursesNativeView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
                         Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
-                            .font(.caption.weight(.bold))
+                            .scaledFont(.caption, weight: .bold)
                             .foregroundStyle(BrandTheme.celestialSky)
                         Spacer()
                         Button {
@@ -504,17 +504,17 @@ public struct IntensiveCoursesNativeView: View {
                             )
                         } label: {
                             Label("AI Coach", systemImage: "sparkles")
-                                .font(.caption2.weight(.bold))
+                                .scaledFont(.caption2, weight: .bold)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
                     }
-                    Text(drill.title).font(.subheadline.weight(.semibold))
-                    Text(drill.instruction).font(.caption).foregroundStyle(.secondary)
+                    Text(drill.title).scaledFont(.subheadline, weight: .semibold)
+                    Text(drill.instruction).scaledFont(.caption).foregroundStyle(.secondary)
 
                     if let passage = drill.samplePassage {
                         Text(passage)
-                            .font(.caption)
+                            .scaledFont(.caption)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
@@ -526,7 +526,7 @@ public struct IntensiveCoursesNativeView: View {
                                 NativeAudioEngine.shared.speak(script, languageId: course.languageId)
                             } label: {
                                 Label("Play Listening / Hearing Audio", systemImage: "speaker.wave.2.fill")
-                                    .font(.caption.weight(.bold))
+                                    .scaledFont(.caption, weight: .bold)
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(.purple)
@@ -534,11 +534,11 @@ public struct IntensiveCoursesNativeView: View {
                         }
                         DisclosureGroup("Reveal Audio Transcript") {
                             Text(script)
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .padding(.top, 4)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .font(.caption)
+                        .scaledFont(.caption)
                     }
                 }
                 .padding(12)
@@ -546,7 +546,7 @@ public struct IntensiveCoursesNativeView: View {
             }
 
             Text("🎯 Checkpoint: \(mod.checkpointPrompt)")
-                .font(.caption.weight(.medium))
+                .scaledFont(.caption, weight: .medium)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.12)))

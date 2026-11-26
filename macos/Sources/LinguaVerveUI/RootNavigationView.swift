@@ -10,6 +10,7 @@ public struct RootNavigationView: View {
     @Binding var showFalseFriendsSheet: Bool
     @Binding var showAISettingsSheet: Bool
     @State private var showVoiceStudioSheet: Bool = false
+    @State private var showDisplaySettingsSheet: Bool = false
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -39,17 +40,25 @@ public struct RootNavigationView: View {
             splitLayout
             #endif
         }
+        .applyAppFontScale(store)
         .sheet(isPresented: $showDiagnosticSheet) {
             DiagnosticSheet(store: store)
+                .applyAppFontScale(store)
         }
         .sheet(isPresented: $showFalseFriendsSheet) {
             FalseFriendsView(store: store)
+                .applyAppFontScale(store)
         }
         .sheet(isPresented: $showAISettingsSheet) {
             AIProviderSheetView(store: store)
+                .applyAppFontScale(store)
         }
         .sheet(isPresented: $showVoiceStudioSheet) {
             VoiceStudioSheetView(store: store)
+                .applyAppFontScale(store)
+        }
+        .sheet(isPresented: $showDisplaySettingsSheet) {
+            DisplaySettingsSheetView(store: store)
         }
     }
 
@@ -63,9 +72,9 @@ public struct RootNavigationView: View {
                         BrandCrestView(size: 34)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("LinguaVerve")
-                                .font(.system(size: 16, weight: .bold, design: .serif))
+                                .scaledFont(size: 16, weight: .bold, design: .serif)
                             Text("A1 → C2 Academy")
-                                .font(.system(size: 11, design: .monospaced))
+                                .scaledFont(size: 11, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -84,14 +93,14 @@ public struct RootNavigationView: View {
                                     .foregroundStyle(selected ? BrandTheme.celestialSky : .secondary)
                                     .frame(width: 18)
                                 Text(section.title)
-                                    .font(.system(size: 13.5, weight: selected ? .semibold : .regular))
+                                    .scaledFont(size: 13.5, weight: selected ? .semibold : .regular)
                                     .foregroundStyle(.primary)
                                 Spacer()
                                 if section == .progress {
                                     let count = store.learnerState.completedModuleIds.count + store.learnerState.examHistory.count
                                     if count > 0 {
                                         Text("\(count)")
-                                            .font(.caption2.monospaced().bold())
+                                            .scaledFont(.caption2, weight: .bold, design: .monospaced)
                                             .foregroundStyle(BrandTheme.emeraldMint)
                                     }
                                 }
@@ -114,7 +123,7 @@ public struct RootNavigationView: View {
                     } label: {
                         HStack {
                             Label(store.aiConfig.isReady ? "AI: \(store.aiConfig.model)" : "Connect Local/Cloud AI", systemImage: "cpu")
-                                .font(.system(size: 13))
+                                .scaledFont(size: 13)
                             Spacer()
                             Circle()
                                 .fill(store.aiConfig.isReady ? BrandTheme.emeraldMint : .orange)
@@ -129,10 +138,24 @@ public struct RootNavigationView: View {
                         let accent = NativeAudioEngine.shared.activeAccentOption(for: store.courseLanguageId)
                         HStack {
                             Label("Voice & Accents", systemImage: "waveform")
-                                .font(.system(size: 13))
+                                .scaledFont(size: 13)
                             Spacer()
                             Text("\(accent?.flag ?? "🎙️") \(NativeAudioEngine.shared.voiceSettings.provider.shortLabel)")
-                                .font(.caption2.monospaced())
+                                .scaledFont(.caption2, design: .monospaced)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showDisplaySettingsSheet = true
+                    } label: {
+                        HStack {
+                            Label("Text Size", systemImage: "textformat.size")
+                                .scaledFont(size: 13)
+                            Spacer()
+                            Text("\(store.fontScalePercent)%")
+                                .scaledFont(.caption2, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -142,7 +165,7 @@ public struct RootNavigationView: View {
                         showFalseFriendsSheet = true
                     } label: {
                         Label("False Friends Traps", systemImage: "exclamationmark.shield")
-                            .font(.system(size: 13))
+                            .scaledFont(size: 13)
                     }
                     .buttonStyle(.plain)
 
@@ -150,7 +173,7 @@ public struct RootNavigationView: View {
                         showDiagnosticSheet = true
                     } label: {
                         Label("Quick CEFR Check", systemImage: "scope")
-                            .font(.system(size: 13))
+                            .scaledFont(size: 13)
                     }
                     .buttonStyle(.plain)
 
@@ -164,7 +187,7 @@ public struct RootNavigationView: View {
                                     : "Check for Updates",
                                 systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
                             )
-                            .font(.system(size: 13))
+                            .scaledFont(size: 13)
                             Spacer()
                             if store.isUpdateAvailable {
                                 Circle()
@@ -172,7 +195,7 @@ public struct RootNavigationView: View {
                                     .frame(width: 7, height: 7)
                             } else {
                                 Text("v\(store.currentAppVersion)")
-                                    .font(.caption2.monospaced())
+                                    .scaledFont(.caption2, design: .monospaced)
                                     .foregroundStyle(.tertiary)
                             }
                         }
@@ -282,6 +305,54 @@ public struct RootNavigationView: View {
     @ToolbarContentBuilder
     private var sharedToolbarItems: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
+            Menu {
+                Button {
+                    store.increaseFontScale()
+                } label: {
+                    Label("Increase Text Size (⌘+)", systemImage: "textformat.size.larger")
+                }
+                .disabled(store.fontScale >= CurriculumStore.maxFontScale - 0.001)
+
+                Button {
+                    store.decreaseFontScale()
+                } label: {
+                    Label("Decrease Text Size (⌘-)", systemImage: "textformat.size.smaller")
+                }
+                .disabled(store.fontScale <= CurriculumStore.minFontScale + 0.001)
+
+                Button {
+                    store.resetFontScale()
+                } label: {
+                    Label("Reset to 100% (⌘0)", systemImage: "arrow.counterclockwise")
+                }
+                .disabled(abs(store.fontScale - 1.0) < 0.01)
+
+                Divider()
+
+                ForEach(CurriculumStore.fontScalePresets, id: \.label) { preset in
+                    Button {
+                        store.setFontScale(preset.scale)
+                    } label: {
+                        let pct = Int((preset.scale * 100).rounded())
+                        if abs(store.fontScale - preset.scale) < 0.03 {
+                            Label("\(preset.label) (\(pct)%)", systemImage: "checkmark")
+                        } else {
+                            Text("\(preset.label) (\(pct)%)")
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button {
+                    showDisplaySettingsSheet = true
+                } label: {
+                    Label("Display & Text Size Settings…", systemImage: "slider.horizontal.3")
+                }
+            } label: {
+                Label("Text \(store.fontScalePercent)%", systemImage: "textformat.size")
+            }
+
             Button {
                 showFalseFriendsSheet = true
             } label: {

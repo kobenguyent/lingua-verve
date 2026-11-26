@@ -49,7 +49,7 @@ public struct AIProviderSheetView: View {
                     }
 
                     Text(draft.provider.setupHint)
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -57,43 +57,43 @@ public struct AIProviderSheetView: View {
                     Section("On-Device Apple Intelligence Status") {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: appleStatus.isAvailable ? "apple.intelligence" : "exclamationmark.triangle.fill")
-                                .font(.title3)
+                                .scaledFont(.title3)
                                 .foregroundStyle(appleStatus.isAvailable ? BrandTheme.emeraldMint : .orange)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(appleStatus.statusTitle)
-                                    .font(.subheadline.weight(.bold))
+                                    .scaledFont(.subheadline, weight: .bold)
                                     .foregroundStyle(appleStatus.isAvailable ? BrandTheme.emeraldMint : .primary)
                                 Text(appleStatus.detail)
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .padding(.vertical, 4)
 
                         LabeledContent("Model", value: "SystemLanguageModel.default")
-                            .font(.caption.monospaced())
+                            .scaledFont(.caption, design: .monospaced)
                         LabeledContent("System OS", value: LiveAppleFoundationModelBackend.currentOSLabel())
-                            .font(.caption.monospaced())
+                            .scaledFont(.caption, design: .monospaced)
                         LabeledContent(
                             "FoundationModels SDK",
                             value: LiveAppleFoundationModelBackend.isCompiledWithFoundationModels ? "Linked (SDK 26+)" : "Not Linked (Pre-26 SDK)"
                         )
-                        .font(.caption.monospaced())
+                        .scaledFont(.caption, design: .monospaced)
                         LabeledContent("Privacy", value: "100% On-Device · Zero API Key")
-                            .font(.caption)
+                            .scaledFont(.caption)
 
                         Button {
                             NativeAudioEngine.shared.playClickSound()
                             appleStatus = LiveAppleFoundationModelBackend().availability()
                         } label: {
                             Label("Refresh Apple Intelligence Status", systemImage: "arrow.clockwise")
-                                .font(.caption.weight(.semibold))
+                                .scaledFont(.caption, weight: .semibold)
                         }
                     }
                 } else {
                     Section("Connection Settings") {
                         TextField("Endpoint URL", text: $draft.endpoint)
-                            .font(.system(size: 13, design: .monospaced))
+                            .scaledFont(size: 13, design: .monospaced)
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -108,10 +108,10 @@ public struct AIProviderSheetView: View {
                             draft.provider.requiresAPIKey ? "API Key (Required)" : "API Key (Optional for Local)",
                             text: $draft.apiKey
                         )
-                        .font(.system(size: 13, design: .monospaced))
+                        .scaledFont(size: 13, design: .monospaced)
 
                         TextField("Model Name", text: $draft.model)
-                            .font(.system(size: 13, design: .monospaced))
+                            .scaledFont(size: 13, design: .monospaced)
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -136,21 +136,21 @@ public struct AIProviderSheetView: View {
 
                             if !fetchedModels.isEmpty {
                                 Text("\(fetchedModels.count) loaded")
-                                    .font(.caption2.monospaced().bold())
+                                    .scaledFont(.caption2, weight: .bold, design: .monospaced)
                                     .foregroundStyle(BrandTheme.emeraldMint)
                             }
                         }
 
                         if let fetchModelsError {
                             Label(fetchModelsError, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .foregroundStyle(.red)
                         }
 
                         if !fetchedModels.isEmpty {
                             if fetchedModels.count > 8 {
                                 TextField("Filter fetched models…", text: $modelFilterText)
-                                    .font(.system(size: 12, design: .monospaced))
+                                    .scaledFont(size: 12, design: .monospaced)
                                     #if os(iOS)
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
@@ -160,7 +160,7 @@ public struct AIProviderSheetView: View {
                             let visibleModels = filteredFetchedModels
                             if visibleModels.isEmpty {
                                 Text("No models match \"\(modelFilterText)\".")
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundStyle(.secondary)
                             } else {
                                 Picker(
@@ -176,7 +176,7 @@ public struct AIProviderSheetView: View {
                                 ) {
                                     ForEach(visibleModels) { item in
                                         Text(item.pickerLabel)
-                                            .font(.system(size: 12, design: .monospaced))
+                                            .scaledFont(size: 12, design: .monospaced)
                                             .tag(item.id)
                                     }
                                 }
@@ -187,7 +187,7 @@ public struct AIProviderSheetView: View {
                             HStack(spacing: 6) {
                                 ForEach(draft.provider.suggestedModels, id: \.self) { m in
                                     Button(m) { draft.model = m }
-                                        .font(.caption2.monospaced())
+                                        .scaledFont(.caption2, design: .monospaced)
                                         .buttonStyle(.bordered)
                                         .controlSize(.mini)
                                 }
@@ -227,7 +227,7 @@ public struct AIProviderSheetView: View {
                                 : "Failed (\(status.latencyMs)ms): \(status.message)",
                             systemImage: status.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                         )
-                        .font(.caption)
+                        .scaledFont(.caption)
                         .foregroundStyle(status.ok ? BrandTheme.emeraldMint : .red)
                     }
                 }

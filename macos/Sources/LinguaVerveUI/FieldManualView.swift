@@ -36,7 +36,7 @@ public struct FieldManualView: View {
                         Button("Reset") {
                             store.resetFilters()
                         }
-                        .font(.caption.weight(.semibold))
+                        .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(.red)
                     }
                 }
@@ -78,30 +78,30 @@ public struct FieldManualView: View {
                             HStack(spacing: 6) {
                                 Text(store.language(for: tip.languageId)?.flag ?? "🌐")
                                 Text(tip.level)
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .foregroundStyle(tierColor)
                                     .background(Capsule().fill(tierColor.opacity(0.15)))
                                 Text(tip.category.displayName)
-                                    .font(.caption)
+                                    .scaledFont(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
                                 if store.isBookmarked(tip.id) {
                                     Image(systemName: "bookmark.fill")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(BrandTheme.celestialSky)
                                 }
                                 if store.isMastered(tip.id) {
                                     Image(systemName: "checkmark.seal.fill")
-                                        .font(.caption)
+                                        .scaledFont(.caption)
                                         .foregroundStyle(BrandTheme.emeraldMint)
                                 }
                             }
                             Text(tip.title)
-                                .font(.headline)
+                                .scaledFont(.headline)
                             Text(tip.summary)
-                                .font(.caption)
+                                .scaledFont(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         }
@@ -120,7 +120,7 @@ public struct FieldManualView: View {
             store.activeLevel = id
         } label: {
             Text(title)
-                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(selected ? tint.opacity(0.22) : Color.primary.opacity(0.06)))

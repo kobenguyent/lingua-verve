@@ -382,6 +382,11 @@ export interface MockExam {
   passingScorePercent: number;
   totalMinutes: number;
   requireAllSkillsPass?: boolean;
+  aiGenerated?: boolean;
+  generatedTheme?: string;
+  generatedByModel?: string;
+  generatedAt?: string;
+  aiGeneratedSkills?: SkillType[];
   reading: ReadingExamSection;
   listening: ListeningExamSection;
   writing: WritingExamSection;

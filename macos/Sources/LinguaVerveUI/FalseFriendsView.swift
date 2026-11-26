@@ -43,15 +43,15 @@ public struct FalseFriendsView: View {
                                 VStack(alignment: .leading, spacing: 7) {
                                     FlowLayout(spacing: 8, lineSpacing: 4) {
                                         Text(item.word)
-                                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                            .scaledFont(size: 16, weight: .bold, design: .monospaced)
                                         Text("≠ \(item.confusedWith)")
-                                            .font(.system(size: 12, weight: .bold))
+                                            .scaledFont(size: 12, weight: .bold)
                                             .foregroundStyle(.red)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
                                             .background(Capsule().fill(Color.red.opacity(0.12)))
                                         Text("✓ \(item.actualMeaning)")
-                                            .font(.system(size: 12, weight: .bold))
+                                            .scaledFont(size: 12, weight: .bold)
                                             .foregroundStyle(BrandTheme.emeraldMint)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
@@ -60,19 +60,19 @@ public struct FalseFriendsView: View {
                                             NativeAudioEngine.shared.speak(item.word, languageId: item.languageId)
                                         } label: {
                                             Label("Hear", systemImage: "speaker.wave.2.fill")
-                                                .font(.system(size: 12, weight: .semibold))
+                                                .scaledFont(size: 12, weight: .semibold)
                                         }
                                         .buttonStyle(.bordered)
                                         .controlSize(.small)
                                     }
 
                                     Text("❌ Trap: \(item.mistakeExample)")
-                                        .font(.system(size: 13))
+                                        .scaledFont(size: 13)
                                         .foregroundStyle(.secondary)
                                     Text("✅ Say instead: \(item.correctAlternative)")
-                                        .font(.system(size: 13, weight: .medium))
+                                        .scaledFont(size: 13, weight: .medium)
                                     Text("🧠 Hack: \(item.memoryHack)")
-                                        .font(.system(size: 13))
+                                        .scaledFont(size: 13)
                                         .foregroundStyle(.orange)
                                 }
                                 .padding(14)
