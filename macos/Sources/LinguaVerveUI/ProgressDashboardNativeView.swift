@@ -5,6 +5,8 @@ public struct ProgressDashboardNativeView: View {
     @Bindable var store: CurriculumStore
     @State private var copiedBackup = false
     @State private var showResetConfirm = false
+    @State private var filterLang: String = "all"
+    @State private var selectedAttempt: ExamAttemptRecord? = nil
 
     public init(store: CurriculumStore) {
         self.store = store
@@ -14,7 +16,10 @@ public struct ProgressDashboardNativeView: View {
         let streak = store.studyStreak()
         let totalModules = store.bundle.intensiveCourses.flatMap(\.modules).count
         let passedExams = store.learnerState.examHistory.filter(\.passed).count
-        let skillAvgs = store.skillAverages()
+        let skillAvgs = store.skillAverages(languageId: filterLang)
+        let filteredExams = store.learnerState.examHistory.filter {
+            filterLang == "all" || $0.languageId == filterLang
+        }
 
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -44,9 +49,21 @@ public struct ProgressDashboardNativeView: View {
 
                 // 4-Skill Averages
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("4-SKILL COMPETENCY AVERAGES")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.secondary)
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Text("4-SKILL COMPETENCY AVERAGES")
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            languageFilterPicker
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("4-SKILL COMPETENCY AVERAGES")
+                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                                .foregroundStyle(.secondary)
+                            languageFilterPicker
+                        }
+                    }
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
                         ForEach(SkillType.allCases) { sk in
@@ -81,39 +98,27 @@ public struct ProgressDashboardNativeView: View {
 
                 // Exam History
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("SIMULATED EXAM HISTORY (\(store.learnerState.examHistory.count))")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("SIMULATED EXAM HISTORY (\(filteredExams.count))")
+                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if !filteredExams.isEmpty {
+                            Text("Click any exam for full report")
+                                .scaledFont(.caption2, design: .monospaced)
+                                .foregroundStyle(BrandTheme.celestialSky)
+                        }
+                    }
 
-                    if store.learnerState.examHistory.isEmpty {
-                        Text("No simulated exams recorded yet. Open Exam Arena to take your first 4-skill exam.")
+                    if filteredExams.isEmpty {
+                        Text(store.learnerState.examHistory.isEmpty
+                             ? "No simulated exams recorded yet. Open Exam Arena to take your first 4-skill exam."
+                             : "No simulated exams recorded for this language filter yet.")
                             .scaledFont(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(store.learnerState.examHistory) { attempt in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text("\(attempt.languageId == "german" ? "🇩🇪" : "🇬🇧") \(attempt.examTitle)")
-                                        .scaledFont(.subheadline, weight: .bold)
-                                    Spacer()
-                                    Text("\(attempt.overallScore)% · \(attempt.passed ? "PASS" : "RETRY")")
-                                        .scaledFont(.caption, weight: .bold, design: .monospaced)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Capsule().fill((attempt.passed ? BrandTheme.emeraldMint : .orange).opacity(0.16)))
-                                        .foregroundStyle(attempt.passed ? BrandTheme.emeraldMint : .orange)
-                                }
-                                FlowLayout(spacing: 10, lineSpacing: 4) {
-                                    ForEach(SkillType.allCases) { sk in
-                                        let sc = attempt.skills[sk.rawValue]?.score ?? 0
-                                        Text("\(sk.shortName): \(sc)%")
-                                            .scaledFont(.caption, design: .monospaced)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                        ForEach(filteredExams) { attempt in
+                            examHistoryRowButton(attempt: attempt)
                         }
                     }
                 }
@@ -151,12 +156,107 @@ public struct ProgressDashboardNativeView: View {
             .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
+        .sheet(item: $selectedAttempt) { attempt in
+            ExamAttemptDetailSheetView(store: store, attempt: attempt)
+                .applyAppFontScale(store)
+        }
         .confirmationDialog("Reset All Progress & Test History?", isPresented: $showResetConfirm) {
             Button("Reset Everything", role: .destructive) {
                 store.resetLearnerProgress()
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    private var languageFilterPicker: some View {
+        Picker("Language Filter", selection: $filterLang) {
+            Text("All").tag("all")
+            Text("🇬🇧 English").tag("english")
+            Text("🇩🇪 German").tag("german")
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 270)
+    }
+
+    private func examHistoryRowButton(attempt: ExamAttemptRecord) -> some View {
+        let gradeLabel = attempt.officialGradeLabel ?? MockExam.officialGradeLabel(
+            languageId: attempt.languageId,
+            level: attempt.level,
+            overallScore: attempt.overallScore,
+            allModulesPassed: SkillType.allCases.allSatisfy { attempt.skills[$0.rawValue]?.passed ?? false },
+            passingScorePercent: store.exam(for: attempt)?.exam.passingScorePercent ?? 60
+        )
+
+        return Button {
+            NativeAudioEngine.shared.playClickSound()
+            selectedAttempt = attempt
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text("\(attempt.languageId == "german" ? "🇩🇪" : "🇬🇧") \(attempt.examTitle)")
+                                .scaledFont(.subheadline, weight: .bold)
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                            Text(attempt.level.rawValue)
+                                .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
+                                .foregroundStyle(BrandTheme.celestialSky)
+                        }
+                        Text(gradeLabel)
+                            .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                            .foregroundStyle(.indigo)
+                    }
+                    Spacer()
+                    Text("\(attempt.overallScore)% · \(attempt.passed ? "PASS" : "RETRY")")
+                        .scaledFont(.caption, weight: .bold, design: .monospaced)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill((attempt.passed ? BrandTheme.emeraldMint : .orange).opacity(0.16)))
+                        .foregroundStyle(attempt.passed ? BrandTheme.emeraldMint : .orange)
+                }
+
+                FlowLayout(spacing: 8, lineSpacing: 4) {
+                    ForEach(SkillType.allCases) { sk in
+                        let skillScore = attempt.skills[sk.rawValue]
+                        let sc = skillScore?.score ?? 0
+                        let passedSkill = skillScore?.passed ?? false
+                        Text("\(sk.shortName): \(sc)%")
+                            .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: 6).fill((passedSkill ? BrandTheme.emeraldMint : Color.orange).opacity(0.12)))
+                            .foregroundStyle(passedSkill ? BrandTheme.emeraldMint : .orange)
+                    }
+                }
+
+                HStack {
+                    Text("\(ExamAttemptDetailSheetView.formattedTimestamp(attempt.timestamp)) · \(attempt.mode.uppercased()) · \(ExamAttemptDetailSheetView.formatClock(attempt.durationUsedSeconds))")
+                        .scaledFont(.caption2, design: .monospaced)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Label("Inspect Details", systemImage: "chevron.right")
+                        .labelStyle(.titleAndIcon)
+                        .scaledFont(.caption2, weight: .semibold)
+                        .foregroundStyle(BrandTheme.celestialSky)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(Color.primary.opacity(0.04))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var titleBlock: some View {

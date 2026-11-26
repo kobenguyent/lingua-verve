@@ -1004,6 +1004,37 @@ public struct SkillExamScore: Codable, Equatable, Sendable {
     }
 }
 
+public struct ExamQuestionReview: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let skill: String // "reading" | "listening"
+    public let sectionTag: String
+    public let prompt: String
+    public let chosenOption: String?
+    public let correctOption: String
+    public let isCorrect: Bool
+    public let explanation: String
+
+    public init(
+        id: String,
+        skill: String,
+        sectionTag: String,
+        prompt: String,
+        chosenOption: String? = nil,
+        correctOption: String,
+        isCorrect: Bool,
+        explanation: String
+    ) {
+        self.id = id
+        self.skill = skill
+        self.sectionTag = sectionTag
+        self.prompt = prompt
+        self.chosenOption = chosenOption
+        self.correctOption = correctOption
+        self.isCorrect = isCorrect
+        self.explanation = explanation
+    }
+}
+
 public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let timestamp: String
@@ -1020,6 +1051,9 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let skills: [String: SkillExamScore]
     public let writingSubmission: String?
     public let speakingTranscript: String?
+    public let questionReviews: [ExamQuestionReview]?
+    public let writingNotes: [String]?
+    public let speakingNotes: [String]?
 
     public init(
         id: String,
@@ -1036,7 +1070,10 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         officialGradeLabel: String? = nil,
         skills: [String: SkillExamScore],
         writingSubmission: String? = nil,
-        speakingTranscript: String? = nil
+        speakingTranscript: String? = nil,
+        questionReviews: [ExamQuestionReview]? = nil,
+        writingNotes: [String]? = nil,
+        speakingNotes: [String]? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -1053,6 +1090,9 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         self.skills = skills
         self.writingSubmission = writingSubmission
         self.speakingTranscript = speakingTranscript
+        self.questionReviews = questionReviews
+        self.writingNotes = writingNotes
+        self.speakingNotes = speakingNotes
     }
 }
 

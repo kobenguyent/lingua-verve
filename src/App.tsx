@@ -23,6 +23,7 @@ import { loadAIConfig, saveAIConfig } from './utils/aiClient';
 import {
   completeModuleInState,
   createEmptyLearnerState,
+  deleteExamAttempt,
   loadLearnerState,
   recordAISession,
   recordExamAttempt,
@@ -459,6 +460,10 @@ export const App: React.FC = () => {
             onImportState={(imported) => setLearnerState(imported)}
             onResetProgress={() => setLearnerState(createEmptyLearnerState())}
             onJumpToCourse={handleJumpToCourse}
+            onLaunchExam={handleLaunchExam}
+            onDeleteExamAttempt={(attemptId) =>
+              setLearnerState((prev) => deleteExamAttempt(prev, attemptId))
+            }
           />
         </main>
       )}

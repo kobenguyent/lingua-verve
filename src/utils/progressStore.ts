@@ -207,6 +207,16 @@ export function recordExamAttempt(
   };
 }
 
+export function deleteExamAttempt(
+  state: LearnerProgressState,
+  attemptId: string
+): LearnerProgressState {
+  return {
+    ...state,
+    examHistory: state.examHistory.filter((item) => item.id !== attemptId),
+  };
+}
+
 export function recordAISession(
   state: LearnerProgressState,
   session: AISessionRecord

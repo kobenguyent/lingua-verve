@@ -26,6 +26,7 @@ import {
   AIProviderConfig,
   CEFRLevel,
   ExamAttemptRecord,
+  ExamQuestionReview,
   MockExam,
   OfficialRubricBreakdown,
   SkillType,
@@ -642,6 +643,42 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
       passingScorePercent: passMark,
     });
 
+    const questionReviews: ExamQuestionReview[] = [
+      ...readingParts.flatMap((part, pIdx) =>
+        part.questions.map((q) => {
+          const chosenIdx = readingAnswers[q.id];
+          return {
+            id: q.id,
+            skill: 'reading' as const,
+            sectionTag: `Reading P${pIdx + 1}`,
+            prompt: q.prompt,
+            chosenOption: typeof chosenIdx === 'number' ? q.options[chosenIdx] : undefined,
+            correctOption: q.options[q.correctIndex] || '',
+            isCorrect: chosenIdx === q.correctIndex,
+            explanation: q.explanation,
+          };
+        })
+      ),
+      ...listeningTracks.flatMap((track, tIdx) =>
+        track.questions.map((q) => {
+          const chosenIdx = listeningAnswers[q.id];
+          return {
+            id: q.id,
+            skill: 'listening' as const,
+            sectionTag: `Listening T${tIdx + 1}`,
+            prompt: q.prompt,
+            chosenOption: typeof chosenIdx === 'number' ? q.options[chosenIdx] : undefined,
+            correctOption: q.options[q.correctIndex] || '',
+            isCorrect: chosenIdx === q.correctIndex,
+            explanation: q.explanation,
+          };
+        })
+      ),
+    ];
+
+    const writingNotes = writingEvals.flatMap((ev) => ev.corrections).slice(0, 6);
+    const speakingNotes = speakingEval.corrections.slice(0, 6);
+
     const record: ExamAttemptRecord = {
       id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toISOString(),
@@ -683,11 +720,14 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
       },
       writingSubmission: labeledCombinedWriting,
       speakingTranscript: labeledCombinedSpeaking,
+      questionReviews,
+      writingNotes,
+      speakingNotes,
     };
 
     setGradingDetails({
       writingStrengths: writingEvals.flatMap((ev) => ev.strengths).slice(0, 5),
-      writingCorrections: writingEvals.flatMap((ev) => ev.corrections).slice(0, 6),
+      writingCorrections: writingNotes,
       writingUpgraded: writingEvals.map((ev) => ev.upgradedVersion).filter(Boolean).join('\n\n'),
       speakingStrengths: speakingEval.strengths,
       speakingCorrections: speakingEval.corrections,

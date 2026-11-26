@@ -476,6 +476,124 @@ describe('ProgressDashboardView Component', () => {
     expect(screen.getByText(/English Zero-to-Hero Map/i)).toBeInTheDocument();
     expect(screen.getByText(/German Zero-to-Hero Map/i)).toBeInTheDocument();
   });
+
+  it('opens the Past Exam Detail Inspector when clicking a recorded exam attempt', () => {
+    const onLaunchExam = vi.fn();
+    const onDeleteExamAttempt = vi.fn();
+    const state = {
+      ...createEmptyLearnerState(),
+      examHistory: [
+        {
+          id: 'attempt-hist-1',
+          timestamp: '2026-11-26T10:00:00.000Z',
+          examId: 'exam-de-b1',
+          examTitle: 'Goethe-Zertifikat B1 Simulation',
+          alignedCertificate: 'Goethe-Zertifikat B1',
+          languageId: 'german',
+          level: 'B1' as const,
+          mode: 'strict' as const,
+          durationUsedSeconds: 1845,
+          overallScore: 84,
+          passed: true,
+          officialGradeLabel: 'Goethe/telc: gut (84/100)',
+          skills: {
+            reading: { score: 89, passed: true, feedback: '8/9 correct (P1: 3/3 · P2: 3/3 · P3: 2/3).' },
+            listening: { score: 78, passed: true, feedback: '7/9 correct (T1: 3/3 · T2: 2/3 · T3: 2/3) · 4 plays.' },
+            writing: {
+              score: 85,
+              passed: true,
+              feedback: 'T1 (40%): 86% · T2 (60%): 84% — Strong formal register.',
+              aiGraded: true,
+              rubric: {
+                taskFulfillment: 88,
+                coherenceCohesion: 84,
+                lexicalRange: 82,
+                grammaticalAccuracy: 86,
+              },
+            },
+            speaking: {
+              score: 84,
+              passed: true,
+              feedback: 'Parts completed: 3/3 — Confident spontaneous responses.',
+              aiGraded: true,
+              rubric: {
+                taskFulfillment: 85,
+                coherenceCohesion: 83,
+                lexicalRange: 82,
+                grammaticalAccuracy: 84,
+              },
+            },
+          },
+          writingSubmission: '[Task 1 · 40%]\nSehr geehrte Damen und Herren, ich schreibe wegen meines Kurses.',
+          speakingTranscript: '[Part 1]\nIch fahre meistens mit der S-Bahn ins Büro.',
+          questionReviews: [
+            {
+              id: 'q1',
+              skill: 'reading' as const,
+              sectionTag: 'Reading P1',
+              prompt: 'Wann öffnet die Bibliothek?',
+              chosenOption: 'Um 9 Uhr',
+              correctOption: 'Um 9 Uhr',
+              isCorrect: true,
+              explanation: 'Sie öffnet morgens um neun Uhr.',
+            },
+            {
+              id: 'q2',
+              skill: 'listening' as const,
+              sectionTag: 'Listening T2',
+              prompt: 'Von welchem Gleis fährt der Zug?',
+              chosenOption: 'Gleis 2',
+              correctOption: 'Gleis 5',
+              isCorrect: false,
+              explanation: 'Der Zug wurde auf Gleis fünf verlegt.',
+            },
+          ],
+          writingNotes: ['Remember verb-final word order after "obwohl".'],
+          speakingNotes: ['Expand on your counterargument in Part 2.'],
+        },
+      ],
+    };
+
+    render(
+      <ProgressDashboardView
+        learnerState={state}
+        masteredTipsCount={2}
+        onImportState={vi.fn()}
+        onResetProgress={vi.fn()}
+        onJumpToCourse={vi.fn()}
+        onLaunchExam={onLaunchExam}
+        onDeleteExamAttempt={onDeleteExamAttempt}
+      />
+    );
+
+    // Click the recorded exam row
+    fireEvent.click(screen.getByRole('button', { name: /Goethe-Zertifikat B1 Simulation/i }));
+
+    // Verify modal renders official grade, rubric, submissions, action notes, and question review
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Past Simulated Exam Dossier/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Goethe\/telc: gut \(84\/100\)/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Task Fulfillment/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Sehr geehrte Damen und Herren, ich schreibe wegen meines Kurses./i)).toBeInTheDocument();
+    expect(screen.getByText(/Ich fahre meistens mit der S-Bahn ins Büro./i)).toBeInTheDocument();
+    expect(screen.getByText(/Remember verb-final word order after "obwohl"./i)).toBeInTheDocument();
+    expect(screen.getByText(/Question-by-Question Review \(1\/2 Correct\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Wann öffnet die Bibliothek\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/Von welchem Gleis fährt der Zug\?/i)).toBeInTheDocument();
+
+    // Filter to Missed Only and verify only the missed listening item remains
+    fireEvent.click(screen.getByRole('button', { name: 'Missed Only' }));
+    expect(screen.queryByText(/Wann öffnet die Bibliothek\?/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Your answer: Gleis 2/i)).toBeInTheDocument();
+    expect(screen.getByText(/Correct answer: Gleis 5/i)).toBeInTheDocument();
+
+    // Reference benchmarks collapsible exists
+    expect(screen.getByText(/Reference Benchmarks: Listening Dialogues & Model Answers/i)).toBeInTheDocument();
+
+    // Retake action works
+    fireEvent.click(screen.getByRole('button', { name: /Retake B1/i }));
+    expect(onLaunchExam).toHaveBeenCalledWith('german', 'B1');
+  });
 });
 
 describe('VoiceSettingsModal Component', () => {

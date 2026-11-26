@@ -563,4 +563,136 @@ final class AcademyAndAITests: XCTestCase {
         reloaded.deleteGeneratedExam(id: result.exam.id)
         XCTAssertTrue(reloaded.generatedExams(for: "german", level: .B1).isEmpty)
     }
+
+    func testExamAttemptDetailRoundTripLegacyDecodingAndExamLookup() throws {
+        let store = makeTestStore()
+        guard let deB1 = store.mockExam(for: "german", level: .B1) else {
+            XCTFail("Expected German B1 exam")
+            return
+        }
+
+        // 1. Rich attempt with questionReviews + writing/speaking notes
+        let richAttempt = ExamAttemptRecord(
+            id: "attempt-rich-1",
+            timestamp: "2026-11-26T10:30:00Z",
+            examId: deB1.id,
+            examTitle: deB1.title,
+            alignedCertificate: deB1.alignedCertificate,
+            languageId: "german",
+            level: .B1,
+            mode: "strict",
+            durationUsedSeconds: 1845,
+            overallScore: 82,
+            passed: true,
+            officialGradeLabel: "Goethe/telc: gut (82/100)",
+            skills: [
+                SkillType.reading.rawValue: SkillExamScore(score: 89, passed: true, feedback: "8/9 correct (P1: 3/3 · P2: 3/3 · P3: 2/3)"),
+                SkillType.listening.rawValue: SkillExamScore(score: 78, passed: true, feedback: "7/9 correct"),
+                SkillType.writing.rawValue: SkillExamScore(
+                    score: 80,
+                    passed: true,
+                    feedback: "T1 (40%): 82% · T2 (60%): 79%",
+                    aiGraded: true,
+                    rubric: OfficialRubricBreakdown(taskFulfillment: 84, coherenceCohesion: 80, lexicalRange: 78, grammaticalAccuracy: 79)
+                ),
+                SkillType.speaking.rawValue: SkillExamScore(
+                    score: 81,
+                    passed: true,
+                    feedback: "Parts: 3/3 — Clear structured delivery",
+                    aiGraded: true,
+                    rubric: OfficialRubricBreakdown(taskFulfillment: 82, coherenceCohesion: 81, lexicalRange: 80, grammaticalAccuracy: 81)
+                )
+            ],
+            writingSubmission: "[Task 1 · 40%]\nSehr geehrte Damen und Herren...",
+            speakingTranscript: "[Part 1: Warm-Up]\nIch fahre jeden Tag mit der Bahn.",
+            questionReviews: [
+                ExamQuestionReview(
+                    id: "q-read-1",
+                    skill: "reading",
+                    sectionTag: "Reading P1",
+                    prompt: "Wann öffnet das Bürgeramt?",
+                    chosenOption: "Um 8 Uhr",
+                    correctOption: "Um 8 Uhr",
+                    isCorrect: true,
+                    explanation: "Im Text steht ab acht Uhr."
+                ),
+                ExamQuestionReview(
+                    id: "q-listen-1",
+                    skill: "listening",
+                    sectionTag: "Listening T2",
+                    prompt: "Welcher Bahnsteig?",
+                    chosenOption: "Gleis 1",
+                    correctOption: "Gleis 3",
+                    isCorrect: false,
+                    explanation: "Die Durchsage korrigiert auf Gleis drei."
+                )
+            ],
+            writingNotes: ["Check subordinate verb-end order after 'obwohl'."],
+            speakingNotes: ["Add one explicit counterargument in Part 2."]
+        )
+
+        store.recordExamAttempt(richAttempt)
+        let backupJSON = store.exportProgressJSON()
+        let restored = makeTestStore()
+        try restored.importProgressJSON(backupJSON)
+
+        let decodedRich = try XCTUnwrap(restored.learnerState.examHistory.first)
+        XCTAssertEqual(decodedRich.questionReviews?.count, 2)
+        XCTAssertEqual(decodedRich.questionReviews?.last?.isCorrect, false)
+        XCTAssertEqual(decodedRich.questionReviews?.last?.chosenOption, "Gleis 1")
+        XCTAssertEqual(decodedRich.writingNotes, ["Check subordinate verb-end order after 'obwohl'."])
+        XCTAssertEqual(decodedRich.speakingNotes, ["Add one explicit counterargument in Part 2."])
+
+        // 2. Exact match lookup for built-in exam + fallback when deleted AI exam ID is queried
+        let exactLookup = restored.exam(for: decodedRich)
+        XCTAssertEqual(exactLookup?.exam.id, deB1.id)
+        XCTAssertEqual(exactLookup?.isExactMatch, true)
+
+        let deletedAIAttempt = ExamAttemptRecord(
+            id: "attempt-deleted-ai",
+            timestamp: "2026-11-26T11:00:00Z",
+            examId: "ai-exam-deleted-999",
+            examTitle: "Deleted AI B1 Exam",
+            alignedCertificate: deB1.alignedCertificate,
+            languageId: "german",
+            level: .B1,
+            mode: "practice",
+            durationUsedSeconds: 600,
+            overallScore: 70,
+            passed: true,
+            skills: decodedRich.skills
+        )
+        let fallbackLookup = restored.exam(for: deletedAIAttempt)
+        XCTAssertEqual(fallbackLookup?.exam.id, deB1.id)
+        XCTAssertEqual(fallbackLookup?.isExactMatch, false)
+
+        // 3. Backward-compatible decoding of legacy pre-update JSON lacking new optional fields
+        let legacyJSON = """
+        {
+          "id": "legacy-1",
+          "timestamp": "2026-10-01T08:00:00Z",
+          "examId": "exam-de-b1",
+          "examTitle": "Legacy B1 Exam",
+          "alignedCertificate": "Goethe-Zertifikat B1",
+          "languageId": "german",
+          "level": "B1",
+          "mode": "strict",
+          "durationUsedSeconds": 1200,
+          "overallScore": 74,
+          "passed": true,
+          "skills": {
+            "reading": { "score": 78, "passed": true, "feedback": "7/9", "aiGraded": false }
+          }
+        }
+        """
+        let legacyDecoded = try JSONDecoder().decode(ExamAttemptRecord.self, from: Data(legacyJSON.utf8))
+        XCTAssertEqual(legacyDecoded.id, "legacy-1")
+        XCTAssertNil(legacyDecoded.questionReviews)
+        XCTAssertNil(legacyDecoded.writingNotes)
+        XCTAssertNil(legacyDecoded.speakingNotes)
+
+        // 4. Individual attempt deletion
+        restored.deleteExamAttempt(id: richAttempt.id)
+        XCTAssertTrue(restored.learnerState.examHistory.isEmpty)
+    }
 }

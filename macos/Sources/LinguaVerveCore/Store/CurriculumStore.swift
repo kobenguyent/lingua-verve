@@ -503,6 +503,23 @@ public final class CurriculumStore {
             ?? bundle.mockExams.first { $0.languageId == target }
     }
 
+    public func exactExam(byId examId: String) -> MockExam? {
+        if let generated = generatedExams.first(where: { $0.id == examId }) {
+            return generated
+        }
+        return bundle.mockExams.first(where: { $0.id == examId })
+    }
+
+    public func exam(for attempt: ExamAttemptRecord) -> (exam: MockExam, isExactMatch: Bool)? {
+        if let exact = exactExam(byId: attempt.examId) {
+            return (exact, true)
+        }
+        if let fallback = mockExam(for: attempt.languageId, level: attempt.level) {
+            return (fallback, false)
+        }
+        return nil
+    }
+
     public func generatedExams(for languageId: String, level: CEFRLevel) -> [MockExam] {
         let target = languageId == "german" ? "german" : "english"
         return generatedExams.filter { $0.languageId == target && $0.level == level }
@@ -542,6 +559,11 @@ public final class CurriculumStore {
                 score: attempt.overallScore
             )
         )
+        persistLearnerState()
+    }
+
+    public func deleteExamAttempt(id: String) {
+        learnerState.examHistory.removeAll { $0.id == id }
         persistLearnerState()
     }
 

@@ -1463,6 +1463,49 @@ public struct ExamSimulatorNativeView: View {
             passingScorePercent: passMark
         )
 
+        var reviews: [ExamQuestionReview] = []
+        for (pIdx, part) in readingParts.enumerated() {
+            for q in part.questions {
+                let chosenIdx = readingAnswers[q.id]
+                let chosenOpt = chosenIdx.flatMap { q.options.indices.contains($0) ? q.options[$0] : nil }
+                let correctOpt = q.options.indices.contains(q.correctIndex) ? q.options[q.correctIndex] : ""
+                reviews.append(
+                    ExamQuestionReview(
+                        id: q.id,
+                        skill: SkillType.reading.rawValue,
+                        sectionTag: "Reading P\(pIdx + 1)",
+                        prompt: q.prompt,
+                        chosenOption: chosenOpt,
+                        correctOption: correctOpt,
+                        isCorrect: chosenIdx == q.correctIndex,
+                        explanation: q.explanation
+                    )
+                )
+            }
+        }
+        for (tIdx, track) in listeningTracks.enumerated() {
+            for q in track.questions {
+                let chosenIdx = listeningAnswers[q.id]
+                let chosenOpt = chosenIdx.flatMap { q.options.indices.contains($0) ? q.options[$0] : nil }
+                let correctOpt = q.options.indices.contains(q.correctIndex) ? q.options[q.correctIndex] : ""
+                reviews.append(
+                    ExamQuestionReview(
+                        id: q.id,
+                        skill: SkillType.listening.rawValue,
+                        sectionTag: "Listening T\(tIdx + 1)",
+                        prompt: q.prompt,
+                        chosenOption: chosenOpt,
+                        correctOption: correctOpt,
+                        isCorrect: chosenIdx == q.correctIndex,
+                        explanation: q.explanation
+                    )
+                )
+            }
+        }
+
+        let capturedWritingNotes = Array(writeEvals.flatMap(\.corrections).prefix(6))
+        let capturedSpeakingNotes = Array(speakEval.corrections.prefix(6))
+
         let rec = ExamAttemptRecord(
             id: "exam-\(UUID().uuidString.prefix(8))",
             timestamp: ISO8601DateFormatter().string(from: Date()),
@@ -1503,11 +1546,14 @@ public struct ExamSimulatorNativeView: View {
                 )
             ],
             writingSubmission: labeledWriting,
-            speakingTranscript: labeledSpeaking
+            speakingTranscript: labeledSpeaking,
+            questionReviews: reviews,
+            writingNotes: capturedWritingNotes,
+            speakingNotes: capturedSpeakingNotes
         )
 
-        writingNotes = Array(writeEvals.flatMap(\.corrections).prefix(6))
-        speakingNotes = speakEval.corrections
+        writingNotes = capturedWritingNotes
+        speakingNotes = capturedSpeakingNotes
         allModulesPassed = allPassed
         report = rec
         store.recordExamAttempt(rec)

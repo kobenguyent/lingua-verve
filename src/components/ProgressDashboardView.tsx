@@ -14,8 +14,9 @@ import {
   PenTool,
   Mic,
   CheckCircle2,
+  ChevronRight,
 } from 'lucide-react';
-import { CEFRLevel, LearnerProgressState, SkillType } from '../types';
+import { CEFRLevel, ExamAttemptRecord, LearnerProgressState, SkillType } from '../types';
 import { INTENSIVE_COURSES } from '../data';
 import {
   computeSkillAverages,
@@ -24,6 +25,11 @@ import {
   parseImportedLearnerProgressJSON,
 } from '../utils/progressStore';
 import { soundEngine } from '../utils/audio';
+import {
+  ExamAttemptDetailModal,
+  formatExamClock,
+  resolveOfficialGradeLabel,
+} from './ExamAttemptDetailModal';
 
 interface ProgressDashboardViewProps {
   learnerState: LearnerProgressState;
@@ -31,6 +37,8 @@ interface ProgressDashboardViewProps {
   onImportState: (state: LearnerProgressState) => void;
   onResetProgress: () => void;
   onJumpToCourse: (languageId: string, level: CEFRLevel) => void;
+  onLaunchExam?: (languageId: string, level: CEFRLevel) => void;
+  onDeleteExamAttempt?: (attemptId: string) => void;
 }
 
 const SKILL_META: Record<SkillType, { label: string; icon: React.ComponentType<{ className?: string }>; barClass: string }> = {
@@ -46,10 +54,13 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
   onImportState,
   onResetProgress,
   onJumpToCourse,
+  onLaunchExam,
+  onDeleteExamAttempt,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [filterLang, setFilterLang] = useState<'all' | 'english' | 'german'>('all');
+  const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptRecord | null>(null);
 
   const streak = computeStudyStreak(learnerState.studyDays);
   const skillAverages = computeSkillAverages(learnerState, filterLang);
@@ -311,45 +322,94 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Simulated Exam History */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 space-y-3">
-          <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-            Simulated Exam Results ({filteredExams.length})
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+              Simulated Exam Results ({filteredExams.length})
+            </h3>
+            {filteredExams.length > 0 && (
+              <span className="text-[11px] font-mono text-sky-600 dark:text-sky-400">
+                Click any exam for full report
+              </span>
+            )}
+          </div>
           {filteredExams.length === 0 ? (
             <p className="text-xs text-slate-500 py-6 text-center">
               No simulated exams completed yet. Launch the 4-Skill Exam Arena to record your first scorecard!
             </p>
           ) : (
-            <div className="space-y-2.5 max-h-80 overflow-y-auto">
-              {filteredExams.map((attempt) => (
-                <div
-                  key={attempt.id}
-                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2 text-xs"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {attempt.languageId === 'german' ? '🇩🇪' : '🇬🇧'} {attempt.examTitle}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded font-mono font-bold ${
-                        attempt.passed
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                      }`}
-                    >
-                      {attempt.overallScore}% · {attempt.passed ? 'PASS' : 'RETRY'}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5 font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                    <div>Read: {attempt.skills.reading.score}%</div>
-                    <div>Listen: {attempt.skills.listening.score}%</div>
-                    <div>Write: {attempt.skills.writing.score}%</div>
-                    <div>Speak: {attempt.skills.speaking.score}%</div>
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400">
-                    {new Date(attempt.timestamp).toLocaleString()} · {attempt.mode} mode
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-2.5 max-h-96 overflow-y-auto pr-0.5">
+              {filteredExams.map((attempt) => {
+                const gradeLabel = resolveOfficialGradeLabel(attempt);
+                return (
+                  <button
+                    type="button"
+                    key={attempt.id}
+                    onClick={() => {
+                      soundEngine.playClickSound();
+                      setSelectedAttempt(attempt);
+                    }}
+                    className="w-full text-left p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors space-y-2 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-1.5">
+                          <span>
+                            {attempt.languageId === 'german' ? '🇩🇪' : '🇬🇧'} {attempt.examTitle}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/15 text-sky-700 dark:text-sky-300">
+                            {attempt.level}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-mono font-semibold text-indigo-700 dark:text-indigo-300">
+                          {gradeLabel}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded font-mono font-bold shrink-0 ${
+                          attempt.passed
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {attempt.overallScore}% · {attempt.passed ? 'PASS' : 'RETRY'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5 font-mono text-[11px]">
+                      {(
+                        [
+                          ['Read', attempt.skills.reading],
+                          ['Listen', attempt.skills.listening],
+                          ['Write', attempt.skills.writing],
+                          ['Speak', attempt.skills.speaking],
+                        ] as const
+                      ).map(([shortLabel, s]) => (
+                        <div
+                          key={shortLabel}
+                          className={`px-2 py-0.5 rounded text-center font-semibold ${
+                            s?.passed
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                          }`}
+                        >
+                          {shortLabel}: {s?.score ?? 0}%
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
+                      <span>
+                        {new Date(attempt.timestamp).toLocaleString()} · {attempt.mode} ·{' '}
+                        {formatExamClock(attempt.durationUsedSeconds)}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 font-semibold text-sky-700 dark:text-sky-400">
+                        Inspect Details
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -408,6 +468,13 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
           </div>
         </div>
       </section>
+
+      <ExamAttemptDetailModal
+        attempt={selectedAttempt}
+        onClose={() => setSelectedAttempt(null)}
+        onRetakeLevel={onLaunchExam}
+        onDeleteAttempt={onDeleteExamAttempt}
+      />
     </div>
   );
 };

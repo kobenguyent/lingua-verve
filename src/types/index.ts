@@ -408,6 +408,17 @@ export interface SkillExamScore {
   rubric?: OfficialRubricBreakdown;
 }
 
+export interface ExamQuestionReview {
+  id: string;
+  skill: 'reading' | 'listening';
+  sectionTag: string; // e.g. "Reading P1", "Listening T2"
+  prompt: string;
+  chosenOption?: string;
+  correctOption: string;
+  isCorrect: boolean;
+  explanation: string;
+}
+
 export interface ExamAttemptRecord {
   id: string;
   timestamp: string;
@@ -424,6 +435,9 @@ export interface ExamAttemptRecord {
   skills: Record<SkillType, SkillExamScore>;
   writingSubmission?: string;
   speakingTranscript?: string;
+  questionReviews?: ExamQuestionReview[];
+  writingNotes?: string[];
+  speakingNotes?: string[];
 }
 
 // ============================================================
