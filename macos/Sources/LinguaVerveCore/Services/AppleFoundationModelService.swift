@@ -18,6 +18,7 @@ public struct AppleFoundationAvailability: Equatable, Sendable {
 
 public enum AppleFoundationError: LocalizedError, Sendable {
     case unsupportedOS
+    case missingSDKInBuild(String)
     case unavailable(String)
     case emptyPrompt
 
@@ -25,6 +26,8 @@ public enum AppleFoundationError: LocalizedError, Sendable {
         switch self {
         case .unsupportedOS:
             return "Apple Foundation Model requires macOS 26+, iPadOS 26+, or iOS 26+ with Apple Intelligence."
+        case .missingSDKInBuild(let osLabel):
+            return "Your system (\(osLabel)) supports Apple Intelligence, but this app build was compiled with an older pre-26 SDK without FoundationModels.framework. Update to a macOS 26+ SDK build or rebuild locally with Xcode 26+."
         case .unavailable(let reason):
             return reason
         case .emptyPrompt:
@@ -43,7 +46,50 @@ public protocol AppleFoundationModelBackend: Sendable {
 public struct LiveAppleFoundationModelBackend: AppleFoundationModelBackend, Sendable {
     public init() {}
 
+    /// Indicates whether this app binary was compiled with an SDK that includes Apple's FoundationModels.framework (Xcode 26+ / macOS 26+ SDK).
+    public static var isCompiledWithFoundationModels: Bool {
+        #if canImport(FoundationModels)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    public static func currentOSLabel(version: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion) -> String {
+        #if os(macOS)
+        let platform = "macOS"
+        #elseif os(iOS)
+        let platform = "iOS/iPadOS"
+        #else
+        let platform = "Apple OS"
+        #endif
+        return "\(platform) \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    /// Distinguishes an older runtime OS (< 26) from a newer OS (26/27+) running a binary compiled against an older SDK (e.g. macOS 15 / Xcode 16).
+    public static func fallbackAvailability(
+        osVersion: OperatingSystemVersion,
+        compiledWithFoundationModels: Bool
+    ) -> AppleFoundationAvailability {
+        let osLabel = currentOSLabel(version: osVersion)
+        if !compiledWithFoundationModels && osVersion.majorVersion >= 26 {
+            return AppleFoundationAvailability(
+                isAvailable: false,
+                statusTitle: "App Build Missing macOS 26+ SDK",
+                detail: "Detected \(osLabel), which supports Apple Intelligence, but this copy of LinguaVerve was built with an older pre-26 SDK without FoundationModels.framework. Install a macOS 26+ SDK release or rebuild locally with Xcode 26+."
+            )
+        }
+        return AppleFoundationAvailability(
+            isAvailable: false,
+            statusTitle: "Requires macOS 26 / iOS 26+",
+            detail: "Detected \(osLabel). Upgrade to macOS 26+, iPadOS 26+, or iOS 26+ for built-in Apple Foundation Models, or use Ollama / Cloud AI."
+        )
+    }
+
     public func availability() -> AppleFoundationAvailability {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let osLabel = Self.currentOSLabel(version: osVersion)
+
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
@@ -51,7 +97,7 @@ public struct LiveAppleFoundationModelBackend: AppleFoundationModelBackend, Send
                 return AppleFoundationAvailability(
                     isAvailable: true,
                     statusTitle: "Ready On-Device",
-                    detail: "Apple Intelligence SystemLanguageModel is available locally — zero API key, 100% private & offline."
+                    detail: "Apple Intelligence SystemLanguageModel is available locally on \(osLabel) — zero API key, 100% private & offline."
                 )
             case .unavailable(let reason):
                 switch reason {
@@ -65,32 +111,34 @@ public struct LiveAppleFoundationModelBackend: AppleFoundationModelBackend, Send
                     return AppleFoundationAvailability(
                         isAvailable: false,
                         statusTitle: "Apple Intelligence Disabled",
-                        detail: "Turn on Apple Intelligence in System Settings → Apple Intelligence & Siri to enable on-device coaching."
+                        detail: "Detected \(osLabel). Turn on Apple Intelligence in System Settings → Apple Intelligence & Siri, then click Refresh Status."
                     )
                 case .modelNotReady:
                     return AppleFoundationAvailability(
                         isAvailable: false,
                         statusTitle: "Model Preparing",
-                        detail: "Apple Intelligence is downloading or preparing on-device model assets. Please retry in a moment."
+                        detail: "Detected \(osLabel). Apple Intelligence is still downloading or preparing on-device model assets (check System Settings → Apple Intelligence & Siri), then click Refresh Status."
                     )
                 @unknown default:
                     return AppleFoundationAvailability(
                         isAvailable: false,
                         statusTitle: "Temporarily Unavailable",
-                        detail: "On-device Apple Foundation Model is currently unavailable."
+                        detail: "On-device Apple Foundation Model is currently unavailable on \(osLabel)."
                     )
                 }
             }
         }
         #endif
-        return AppleFoundationAvailability(
-            isAvailable: false,
-            statusTitle: "Requires macOS 26 / iOS 26+",
-            detail: "Upgrade to macOS 26, iPadOS 26, or iOS 26 for built-in Apple Foundation Models, or use Ollama / Cloud AI."
+
+        return Self.fallbackAvailability(
+            osVersion: osVersion,
+            compiledWithFoundationModels: Self.isCompiledWithFoundationModels
         )
     }
 
     public func respond(messages: [AIChatMessage], temperature: Double) async throws -> String {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, *) {
             let status = availability()
@@ -139,6 +187,10 @@ public struct LiveAppleFoundationModelBackend: AppleFoundationModelBackend, Send
             return output
         }
         #endif
+
+        if !Self.isCompiledWithFoundationModels && osVersion.majorVersion >= 26 {
+            throw AppleFoundationError.missingSDKInBuild(Self.currentOSLabel(version: osVersion))
+        }
         throw AppleFoundationError.unsupportedOS
     }
 }

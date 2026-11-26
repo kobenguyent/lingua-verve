@@ -180,6 +180,23 @@ final class AcademyAndAITests: XCTestCase {
         let liveStatus = LiveAppleFoundationModelBackend().availability()
         XCTAssertFalse(liveStatus.statusTitle.isEmpty)
 
+        // Fallback diagnostics distinguish pre-26 runtime OS from pre-26 SDK build on macOS 26/27+
+        let newerOSOldSDK = LiveAppleFoundationModelBackend.fallbackAvailability(
+            osVersion: OperatingSystemVersion(majorVersion: 27, minorVersion: 2, patchVersion: 1),
+            compiledWithFoundationModels: false
+        )
+        XCTAssertFalse(newerOSOldSDK.isAvailable)
+        XCTAssertEqual(newerOSOldSDK.statusTitle, "App Build Missing macOS 26+ SDK")
+        XCTAssertTrue(newerOSOldSDK.detail.contains("27.2.1"))
+
+        let olderOS = LiveAppleFoundationModelBackend.fallbackAvailability(
+            osVersion: OperatingSystemVersion(majorVersion: 15, minorVersion: 5, patchVersion: 0),
+            compiledWithFoundationModels: true
+        )
+        XCTAssertFalse(olderOS.isAvailable)
+        XCTAssertEqual(olderOS.statusTitle, "Requires macOS 26 / iOS 26+")
+        XCTAssertTrue(olderOS.detail.contains("15.5.0"))
+
         // Mock on-device Apple Foundation Model chat + structured exam grading
         let jsonReply = """
         {"score":91,"cefrEstimate":"C1","strengths":["Crisp Nominalstil"],"corrections":["Minor comma"],"upgradedVersion":"Angesichts der Entwicklung...","examinerSummary":"Excellent C1 German response."}

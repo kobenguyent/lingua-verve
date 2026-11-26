@@ -17,7 +17,7 @@ permissions:
 jobs:
   build-and-test:
     name: Test & Package Native Apple Apps (macOS, iPadOS, iOS) + Web
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
       - name: Checkout Repository
@@ -39,9 +39,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: macos/.build
-          key: ${{ runner.os }}-spm-${{ hashFiles('macos/Package.swift') }}
+          key: macos-26-spm-${{ hashFiles('macos/Package.swift') }}
           restore-keys: |
-            ${{ runner.os }}-spm-
+            macos-26-spm-
 
       - name: Install Web Dependencies
         run: npm ci
@@ -62,6 +62,7 @@ jobs:
         run: |
           test -d "dist-macos/LinguaVerve.app"
           lipo -info "dist-macos/LinguaVerve.app/Contents/MacOS/LinguaVerve"
+          otool -L "dist-macos/LinguaVerve.app/Contents/MacOS/LinguaVerve" | grep -q "FoundationModels.framework"
           codesign --verify --deep --strict --verbose=2 "dist-macos/LinguaVerve.app"
           test -f "dist-macos/LinguaVerve.dmg"
           test -f "dist-macos/LinguaVerve.zip"

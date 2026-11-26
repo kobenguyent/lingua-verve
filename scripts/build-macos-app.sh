@@ -41,9 +41,25 @@ fi
 CLEAN_VERSION="${RAW_VERSION#v}"
 CLEAN_VERSION="${CLEAN_VERSION#V}"
 
-if [ -d "/Applications/Xcode.app/Contents/Developer" ]; then
-  export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+  BEST_XCODE_DEV=""
+  BEST_SDK_MAJOR=0
+  for xapp in /Applications/Xcode*.app; do
+    if [ -d "${xapp}/Contents/Developer" ]; then
+      SDK_VER="$(DEVELOPER_DIR="${xapp}/Contents/Developer" xcrun --show-sdk-version 2>/dev/null || echo "0")"
+      SDK_MAJ="${SDK_VER%%.*}"
+      if [[ "${SDK_MAJ}" =~ ^[0-9]+$ ]] && [ "${SDK_MAJ}" -gt "${BEST_SDK_MAJOR}" ]; then
+        BEST_SDK_MAJOR="${SDK_MAJ}"
+        BEST_XCODE_DEV="${xapp}/Contents/Developer"
+      fi
+    fi
+  done
+  if [ -n "${BEST_XCODE_DEV}" ]; then
+    export DEVELOPER_DIR="${BEST_XCODE_DEV}"
+  fi
 fi
+ACTIVE_SDK_VER="$(xcrun --show-sdk-version 2>/dev/null || echo "unknown")"
+echo "==> Using Xcode DEVELOPER_DIR=${DEVELOPER_DIR:-$(xcode-select -p)} (macOS SDK ${ACTIVE_SDK_VER})"
 
 mkdir -p "${OUT_DIR}"
 

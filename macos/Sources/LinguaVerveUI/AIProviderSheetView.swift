@@ -6,6 +6,7 @@ public struct AIProviderSheetView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft: AIProviderConfig
+    @State private var appleStatus: AppleFoundationAvailability
     @State private var isTesting = false
     @State private var testStatus: (ok: Bool, latencyMs: Int, message: String)?
 
@@ -17,6 +18,7 @@ public struct AIProviderSheetView: View {
     public init(store: CurriculumStore) {
         self.store = store
         self._draft = State(initialValue: store.aiConfig)
+        self._appleStatus = State(initialValue: LiveAppleFoundationModelBackend().availability())
     }
 
     private var filteredFetchedModels: [AIModelInfo] {
@@ -29,8 +31,6 @@ public struct AIProviderSheetView: View {
     }
 
     public var body: some View {
-        let appleStatus = LiveAppleFoundationModelBackend().availability()
-
         NavigationStack {
             Form {
                 Section("Provider (On-Device Apple, Local, or Cloud)") {
@@ -72,8 +72,23 @@ public struct AIProviderSheetView: View {
 
                         LabeledContent("Model", value: "SystemLanguageModel.default")
                             .font(.caption.monospaced())
+                        LabeledContent("System OS", value: LiveAppleFoundationModelBackend.currentOSLabel())
+                            .font(.caption.monospaced())
+                        LabeledContent(
+                            "FoundationModels SDK",
+                            value: LiveAppleFoundationModelBackend.isCompiledWithFoundationModels ? "Linked (SDK 26+)" : "Not Linked (Pre-26 SDK)"
+                        )
+                        .font(.caption.monospaced())
                         LabeledContent("Privacy", value: "100% On-Device · Zero API Key")
                             .font(.caption)
+
+                        Button {
+                            NativeAudioEngine.shared.playClickSound()
+                            appleStatus = LiveAppleFoundationModelBackend().availability()
+                        } label: {
+                            Label("Refresh Apple Intelligence Status", systemImage: "arrow.clockwise")
+                                .font(.caption.weight(.semibold))
+                        }
                     }
                 } else {
                     Section("Connection Settings") {
@@ -228,6 +243,9 @@ public struct AIProviderSheetView: View {
                         }
                     }
                 }
+            }
+            .onAppear {
+                appleStatus = LiveAppleFoundationModelBackend().availability()
             }
             .formStyle(.grouped)
             .navigationTitle("Local & Cloud AI")
