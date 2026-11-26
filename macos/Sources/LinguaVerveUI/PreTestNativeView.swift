@@ -37,8 +37,8 @@ public struct PreTestNativeView: View {
                         }
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
                 if started, currentIndex < questions.count {
                     let q = questions[currentIndex]
@@ -76,8 +76,7 @@ public struct PreTestNativeView: View {
                                 } label: {
                                     Label(used >= 2 ? "Replays Used (2/2)" : "Play Spoken Audio (\(2 - used) left)", systemImage: "speaker.wave.2.fill")
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.purple)
+                                .buttonStyle(GoldenGatePrimaryButtonStyle())
                                 .disabled(used >= 2)
                             }
                         }

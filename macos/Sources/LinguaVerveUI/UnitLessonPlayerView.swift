@@ -292,9 +292,8 @@ public struct UnitLessonPlayerView: View {
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+        .padding(18)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     private var backButton: some View {
@@ -709,11 +708,8 @@ public struct UnitLessonPlayerView: View {
                     NativeAudioEngine.shared.speak(audioScript, languageId: course.languageId)
                 } label: {
                     Label("Play Listening Clip", systemImage: "speaker.wave.2.fill")
-                        .scaledFont(.caption, weight: .bold)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
-                .controlSize(.small)
+                .buttonStyle(GoldenGateGlassPillButtonStyle())
 
                 if isAnswered {
                     DisclosureGroup("View Audio Transcript") {
@@ -796,9 +792,9 @@ public struct UnitLessonPlayerView: View {
     private var drillsStepView: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("ACTIVE SKILL WORKBENCH · \(completedDrills.count)/\(module.drills.count) PRACTICED")
-                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                    .foregroundStyle(BrandTheme.celestialSky)
+                Text("Active Skill Workbench · \(completedDrills.count)/\(module.drills.count) practiced")
+                    .scaledFont(.footnote, weight: .semibold, design: .monospaced)
+                    .foregroundStyle(BrandTheme.editorialBlue)
 
                 if let msg = speechRecognizer.statusMessage {
                     Text(msg)
@@ -871,11 +867,8 @@ public struct UnitLessonPlayerView: View {
                         drillAudioPlays[idx, default: 0] += 1
                     } label: {
                         Label("Play Listening Audio", systemImage: "speaker.wave.2.fill")
-                            .scaledFont(.caption, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle())
 
                     if let count = drillAudioPlays[idx], count > 0 {
                         Text("Played \(count)×")

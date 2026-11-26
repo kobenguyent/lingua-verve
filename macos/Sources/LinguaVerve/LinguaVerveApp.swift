@@ -22,7 +22,6 @@ struct LinguaVerveApp: App {
                 UpdateSheetView(store: store)
                     .applyAppFontScale(store)
             }
-            .applyAppFontScale(store)
             .task {
                 await store.startPeriodicUpdateChecks()
             }

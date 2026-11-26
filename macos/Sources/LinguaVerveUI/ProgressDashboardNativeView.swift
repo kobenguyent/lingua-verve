@@ -36,8 +36,8 @@ public struct ProgressDashboardNativeView: View {
                         backupButtons
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
                 // KPI Grid
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(155, scale: fontScale)), spacing: 10)], spacing: 10) {
@@ -52,16 +52,14 @@ public struct ProgressDashboardNativeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ViewThatFits(in: .horizontal) {
                         HStack {
-                            Text("4-SKILL COMPETENCY AVERAGES")
-                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                                .foregroundStyle(.secondary)
+                            Text("4-Skill Competency Averages")
+                                .scaledFont(.headline, weight: .semibold)
                             Spacer()
                             languageFilterPicker
                         }
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("4-SKILL COMPETENCY AVERAGES")
-                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                                .foregroundStyle(.secondary)
+                            Text("4-Skill Competency Averages")
+                                .scaledFont(.headline, weight: .semibold)
                             languageFilterPicker
                         }
                     }
@@ -88,8 +86,8 @@ public struct ProgressDashboardNativeView: View {
                         }
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
                 // Zero-to-Hero Maps (English & German)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(310, scale: fontScale)), spacing: 14)], spacing: 14) {
@@ -100,14 +98,13 @@ public struct ProgressDashboardNativeView: View {
                 // Exam History
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("SIMULATED EXAM HISTORY (\(filteredExams.count))")
-                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                            .foregroundStyle(.secondary)
+                        Text("Simulated Exam History (\(filteredExams.count))")
+                            .scaledFont(.headline, weight: .semibold)
                         Spacer()
                         if !filteredExams.isEmpty {
                             Text("Click any exam for full report")
-                                .scaledFont(.caption2, design: .monospaced)
-                                .foregroundStyle(BrandTheme.celestialSky)
+                                .scaledFont(.footnote, design: .monospaced)
+                                .foregroundStyle(BrandTheme.editorialBlue)
                         }
                     }
 
@@ -115,7 +112,7 @@ public struct ProgressDashboardNativeView: View {
                         Text(store.learnerState.examHistory.isEmpty
                              ? "No simulated exams recorded yet. Open Exam Arena to take your first 4-skill exam."
                              : "No simulated exams recorded for this language filter yet.")
-                            .scaledFont(.caption)
+                            .scaledFont(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(filteredExams) { attempt in
@@ -123,17 +120,16 @@ public struct ProgressDashboardNativeView: View {
                         }
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
                 // Recent Study Activity
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("RECENT STUDY TIMELINE")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.secondary)
+                    Text("Recent Study Timeline")
+                        .scaledFont(.headline, weight: .semibold)
                     if store.learnerState.activityLog.isEmpty {
                         Text("Complete course units, pre-tests, or mock exams to log your learning history.")
-                            .scaledFont(.caption)
+                            .scaledFont(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(store.learnerState.activityLog.prefix(15)) { entry in
@@ -150,8 +146,8 @@ public struct ProgressDashboardNativeView: View {
                         }
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
             }
             .padding(16)
             .frame(maxWidth: 980)

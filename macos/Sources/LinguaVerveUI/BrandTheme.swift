@@ -8,6 +8,11 @@ public enum BrandTheme {
     public static let celestialSky = Color(red: 0.220, green: 0.741, blue: 0.973)
     public static let emeraldMint = Color(red: 0.063, green: 0.725, blue: 0.506)
 
+    // macOS 27 Golden Gate Editorial tokens
+    public static let editorialBlue = Color(red: 0.039, green: 0.518, blue: 1.0)
+    public static let editorialHairline = Color.primary.opacity(0.09)
+    public static let editorialSpecularTop = Color.white.opacity(0.20)
+
     public static func cefrColor(for level: String) -> Color {
         switch level {
         case "A1": return emeraldMint

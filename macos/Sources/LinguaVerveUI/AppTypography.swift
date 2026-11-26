@@ -18,17 +18,17 @@ public enum AppTextStyle: Sendable {
 
     public var baseSize: CGFloat {
         switch self {
-        case .largeTitle: return 30
-        case .title: return 26
-        case .title2: return 21
-        case .title3: return 18
-        case .headline: return 16.5
-        case .body: return 15.5
-        case .callout: return 15
-        case .subheadline: return 14.5
-        case .footnote: return 13.5
-        case .caption: return 13
-        case .caption2: return 12
+        case .largeTitle: return 34
+        case .title: return 27
+        case .title2: return 22
+        case .title3: return 20
+        case .headline: return 18
+        case .body: return 17
+        case .callout: return 16
+        case .subheadline: return 15.5
+        case .footnote: return 14.5
+        case .caption: return 14
+        case .caption2: return 13
         }
     }
 
@@ -43,18 +43,18 @@ public enum AppTextStyle: Sendable {
 
 /// Shared optical legibility and responsive sizing helpers for break-free text scaling (85%–160%).
 public enum AppTypography {
-    public static let minimumReadablePointSize: CGFloat = 10.5
+    public static let minimumReadablePointSize: CGFloat = 11.5
 
     /// Applies an optical legibility uplift to explicit point sizes (`scaledFont(size:)`) while preserving hero display sizes.
     public static func comfortableBaseSize(for rawSize: CGFloat) -> CGFloat {
         if rawSize <= 14 {
-            return rawSize + 2.0
+            return rawSize + 2.5
         }
         if rawSize < 24 {
-            return rawSize + (2.0 - ((rawSize - 14.0) / 10.0))
+            return rawSize + (2.5 - ((rawSize - 14.0) / 10.0) * 1.5)
         }
         if rawSize < 32 {
-            return rawSize + 1.0
+            return rawSize + (1.0 - ((rawSize - 24.0) / 8.0))
         }
         return rawSize
     }
@@ -75,7 +75,7 @@ public enum AppTypography {
 
     /// Expands ideal sidebar width harmoniously within safe bounds as global font scale increases.
     public static func scaledSidebarIdealWidth(scale: CGFloat) -> CGFloat {
-        min(330, max(252, (252 * min(max(scale, 1.0), 1.32)).rounded()))
+        min(340, max(258, (258 * min(max(scale, 1.0), 1.32)).rounded()))
     }
 
     /// Scales bounded control widths (segmented pickers, popovers) up to an explicit maximum cap.
@@ -244,16 +244,8 @@ public struct DisplaySettingsSheetView: View {
                                 store.setFontScale(preset.scale)
                             } label: {
                                 Text("\(preset.label) (\(Int((preset.scale * 100).rounded()))%)")
-                                    .scaledFont(.caption, weight: .bold)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(selected ? BrandTheme.celestialSky : Color.primary.opacity(0.07))
-                                    )
-                                    .foregroundStyle(selected ? Color.white : Color.primary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: selected))
                         }
                     }
 
@@ -266,9 +258,9 @@ public struct DisplaySettingsSheetView: View {
 
                 Section("Live Reading & Study Preview") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("CEFR B2 · READING & LESSON PREVIEW")
-                            .scaledFont(.caption2, weight: .bold, design: .monospaced)
-                            .foregroundStyle(BrandTheme.celestialSky)
+                        Text("CEFR B2 · Reading & Lesson Preview")
+                            .scaledFont(.footnote, weight: .semibold, design: .monospaced)
+                            .foregroundStyle(BrandTheme.editorialBlue)
                         Text("Konjunktiv II & Höfliche Formulierungen")
                             .scaledFont(.title3, weight: .bold, design: .serif)
                             .fixedSize(horizontal: false, vertical: true)
@@ -276,8 +268,8 @@ public struct DisplaySettingsSheetView: View {
                             .scaledFont(.body)
                             .lineSpacing(4)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Tip: Every workspace, guided lesson, exam passage, flashcard, and sidebar scales immediately.")
-                            .scaledFont(.caption)
+                        Text("Every workspace, guided lesson, exam passage, flashcard, and sidebar scales immediately.")
+                            .scaledFont(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

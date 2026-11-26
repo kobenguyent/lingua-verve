@@ -3,6 +3,16 @@ import SwiftUI
 /// A wrapping horizontal flow layout for badges, tags, filter pills, and tool chips.
 /// Clamps individual child widths to `maxWidth` so enlarged text (up to 160%) wraps instead of overflowing horizontally.
 public struct FlowLayout: Layout {
+    public struct Cache: Sendable {
+        public var widthKey: CGFloat?
+        public var itemSizes: [CGSize] = []
+
+        public init(widthKey: CGFloat? = nil, itemSizes: [CGSize] = []) {
+            self.widthKey = widthKey
+            self.itemSizes = itemSizes
+        }
+    }
+
     public var spacing: CGFloat
     public var lineSpacing: CGFloat
 
@@ -11,19 +21,45 @@ public struct FlowLayout: Layout {
         self.lineSpacing = lineSpacing
     }
 
-    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    public func makeCache(subviews: Subviews) -> Cache {
+        Cache()
+    }
+
+    public func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache = Cache()
+    }
+
+    private func resolvedSizes(maxWidth: CGFloat, subviews: Subviews, cache: inout Cache) -> [CGSize] {
+        let normalizedWidth: CGFloat? = maxWidth.isFinite ? maxWidth : nil
+        if cache.itemSizes.count == subviews.count,
+           let cachedWidth = cache.widthKey,
+           let targetWidth = normalizedWidth,
+           abs(cachedWidth - targetWidth) < 0.5 {
+            return cache.itemSizes
+        }
+        if cache.itemSizes.count == subviews.count, cache.widthKey == nil, normalizedWidth == nil {
+            return cache.itemSizes
+        }
+        let childProposal = ProposedViewSize(width: normalizedWidth, height: nil)
+        let sizes = subviews.map { subview -> CGSize in
+            let rawSize = subview.sizeThatFits(childProposal)
+            let itemWidth = maxWidth.isFinite ? min(rawSize.width, maxWidth) : rawSize.width
+            return CGSize(width: itemWidth, height: rawSize.height)
+        }
+        cache.widthKey = normalizedWidth
+        cache.itemSizes = sizes
+        return sizes
+    }
+
+    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
-        let childProposal = ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
+        let sizes = resolvedSizes(maxWidth: maxWidth, subviews: subviews, cache: &cache)
         var currentX: CGFloat = 0
         var currentY: CGFloat = 0
         var lineHeight: CGFloat = 0
         var totalWidth: CGFloat = 0
 
-        for subview in subviews {
-            let rawSize = subview.sizeThatFits(childProposal)
-            let itemWidth = maxWidth.isFinite ? min(rawSize.width, maxWidth) : rawSize.width
-            let size = CGSize(width: itemWidth, height: rawSize.height)
-
+        for size in sizes {
             if currentX > 0 && currentX + size.width > maxWidth {
                 currentX = 0
                 currentY += lineHeight + lineSpacing
@@ -35,23 +71,19 @@ public struct FlowLayout: Layout {
         }
 
         return CGSize(
-            width: maxWidth.isFinite ? maxWidth : totalWidth,
+            width: maxWidth.isFinite ? min(maxWidth, totalWidth) : totalWidth,
             height: currentY + lineHeight
         )
     }
 
-    public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
         let maxWidth = bounds.width
-        let childProposal = ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)
+        let sizes = resolvedSizes(maxWidth: maxWidth, subviews: subviews, cache: &cache)
         var currentX = bounds.minX
         var currentY = bounds.minY
         var lineHeight: CGFloat = 0
 
-        for subview in subviews {
-            let rawSize = subview.sizeThatFits(childProposal)
-            let itemWidth = maxWidth.isFinite ? min(rawSize.width, maxWidth) : rawSize.width
-            let size = CGSize(width: itemWidth, height: rawSize.height)
-
+        for (subview, size) in zip(subviews, sizes) {
             if currentX > bounds.minX && currentX + size.width > bounds.maxX + 0.5 {
                 currentX = bounds.minX
                 currentY += lineHeight + lineSpacing

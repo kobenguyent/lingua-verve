@@ -424,6 +424,13 @@ public final class NativeAudioEngine {
     private static let settingsKey = "linguaverve_voice_settings_v1"
     private static let sharedAIConfigKey = "linguaverve.apple.aiConfig.v1"
     private static let legacySharedAIConfigKey = "linguaverve_ai_provider_v1"
+    private static let voiceCatalogLock = NSLock()
+    private static var cachedVoiceCatalog: (voices: [AVSpeechSynthesisVoice], descriptors: [VoiceCandidateDescriptor])?
+    private static var cachedDescriptorOnly: [VoiceCandidateDescriptor]?
+    private static let dialogueTurnRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+"#,
+        options: []
+    )
 
     private var synthesizer = AVSpeechSynthesizer()
     private let speechDelegate = SpeechTurnDelegate()
@@ -432,6 +439,12 @@ public final class NativeAudioEngine {
     private var neuralCache: [String: Data] = [:]
     private var neuralCacheOrder: [String] = []
     private let defaults: UserDefaults
+    #if os(macOS)
+    @ObservationIgnored private var cachedTinkSound: NSSound?
+    @ObservationIgnored private var didLoadTinkSound: Bool = false
+    @ObservationIgnored private var cachedGlassSound: NSSound?
+    @ObservationIgnored private var didLoadGlassSound: Bool = false
+    #endif
 
     public var isMuted: Bool = false
     public var slowPace: Bool = false
@@ -461,6 +474,73 @@ public final class NativeAudioEngine {
                 self?.activeSpeakerName = nil
             }
         }
+    }
+
+    /// Populates the cached voice descriptor catalog if not yet loaded.
+    public func warmVoiceCache() {
+        _ = Self.systemVoiceCatalog()
+    }
+
+    private static func systemVoiceCatalog() -> (voices: [AVSpeechSynthesisVoice], descriptors: [VoiceCandidateDescriptor]) {
+        voiceCatalogLock.lock()
+        if let cached = cachedVoiceCatalog {
+            voiceCatalogLock.unlock()
+            return cached
+        }
+        voiceCatalogLock.unlock()
+
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        let descriptors = voices.map {
+            VoiceCandidateDescriptor(
+                identifier: $0.identifier,
+                name: $0.name,
+                language: $0.language,
+                qualityRaw: $0.quality.rawValue
+            )
+        }
+        let snapshot = (voices: voices, descriptors: descriptors)
+
+        voiceCatalogLock.lock()
+        cachedVoiceCatalog = snapshot
+        voiceCatalogLock.unlock()
+        return snapshot
+    }
+
+    /// Clears the cached system voice catalog so newly downloaded macOS/iOS voices are picked up on next lookup.
+    public func invalidateVoiceCache() {
+        Self.voiceCatalogLock.lock()
+        Self.cachedVoiceCatalog = nil
+        Self.cachedDescriptorOnly = nil
+        Self.voiceCatalogLock.unlock()
+    }
+
+    /// Ranked human voice descriptors from the cached catalog (`loader` injectable for headless tests).
+    public static func cachedHumanVoiceDescriptors(
+        for languageOrLocale: String,
+        loader: (() -> [VoiceCandidateDescriptor])? = nil
+    ) -> [VoiceCandidateDescriptor] {
+        let target = languageOrLocale.replacingOccurrences(of: "_", with: "-")
+        let base = String(target.prefix(2)).lowercased()
+        let descriptors: [VoiceCandidateDescriptor]
+        if let loader {
+            voiceCatalogLock.lock()
+            if let cached = cachedDescriptorOnly {
+                descriptors = cached
+                voiceCatalogLock.unlock()
+            } else {
+                voiceCatalogLock.unlock()
+                let loaded = loader()
+                voiceCatalogLock.lock()
+                cachedDescriptorOnly = loaded
+                descriptors = loaded
+                voiceCatalogLock.unlock()
+            }
+        } else {
+            descriptors = systemVoiceCatalog().descriptors
+        }
+        return descriptors
+            .filter { $0.language.lowercased().hasPrefix(base) && !isRoboticVoice($0) }
+            .sorted { scoreVoice($0, targetBcp47: target) > scoreVoice($1, targetBcp47: target) }
     }
 
     public func updateVoiceSettings(_ next: VoiceSettings) {
@@ -566,7 +646,14 @@ public final class NativeAudioEngine {
     public func playClickSound() {
         guard !isMuted else { return }
         #if os(macOS)
-        NSSound(named: NSSound.Name("Tink"))?.play()
+        if !didLoadTinkSound {
+            didLoadTinkSound = true
+            cachedTinkSound = NSSound(named: NSSound.Name("Tink"))
+        }
+        if cachedTinkSound?.isPlaying == true {
+            cachedTinkSound?.stop()
+        }
+        cachedTinkSound?.play()
         #elseif canImport(UIKit)
         DispatchQueue.main.async {
             let generator = UIImpactFeedbackGenerator(style: .light)
@@ -578,8 +665,15 @@ public final class NativeAudioEngine {
     public func playSuccessChime() {
         guard !isMuted else { return }
         #if os(macOS)
-        if let glass = NSSound(named: NSSound.Name("Glass")) {
-            glass.play()
+        if !didLoadGlassSound {
+            didLoadGlassSound = true
+            cachedGlassSound = NSSound(named: NSSound.Name("Glass"))
+        }
+        if let glassSound = cachedGlassSound {
+            if glassSound.isPlaying {
+                glassSound.stop()
+            }
+            glassSound.play()
         } else {
             NSSound.beep()
         }
@@ -750,15 +844,9 @@ public final class NativeAudioEngine {
 
     public func activeSystemVoiceDiagnostic(for accentCode: String, settings: VoiceSettings? = nil) -> ActiveVoiceDiagnostic {
         let cfg = settings ?? voiceSettings
-        let voices = AVSpeechSynthesisVoice.speechVoices()
-        let descriptors = voices.map {
-            VoiceCandidateDescriptor(
-                identifier: $0.identifier,
-                name: $0.name,
-                language: $0.language,
-                qualityRaw: $0.quality.rawValue
-            )
-        }
+        let catalog = Self.systemVoiceCatalog()
+        let voices = catalog.voices
+        let descriptors = catalog.descriptors
         let targetBase = String(accentCode.prefix(2)).lowercased()
         let hqCount = descriptors.filter {
             $0.language.lowercased().hasPrefix(targetBase) && Self.isHighQualityVoice($0)
@@ -820,22 +908,15 @@ public final class NativeAudioEngine {
     public static func humanSystemVoices(for languageOrLocale: String) -> [AVSpeechSynthesisVoice] {
         let target = languageOrLocale.replacingOccurrences(of: "_", with: "-")
         let base = String(target.prefix(2)).lowercased()
-        let all = AVSpeechSynthesisVoice.speechVoices()
-        return all
-            .filter { voice in
-                let desc = VoiceCandidateDescriptor(
-                    identifier: voice.identifier,
-                    name: voice.name,
-                    language: voice.language,
-                    qualityRaw: voice.quality.rawValue
-                )
-                return voice.language.lowercased().hasPrefix(base) && !isRoboticVoice(desc)
+        let catalog = systemVoiceCatalog()
+        return zip(catalog.voices, catalog.descriptors)
+            .filter { pair in
+                pair.0.language.lowercased().hasPrefix(base) && !isRoboticVoice(pair.1)
             }
             .sorted { lhs, rhs in
-                let lDesc = VoiceCandidateDescriptor(identifier: lhs.identifier, name: lhs.name, language: lhs.language, qualityRaw: lhs.quality.rawValue)
-                let rDesc = VoiceCandidateDescriptor(identifier: rhs.identifier, name: rhs.name, language: rhs.language, qualityRaw: rhs.quality.rawValue)
-                return scoreVoice(lDesc, targetBcp47: target) > scoreVoice(rDesc, targetBcp47: target)
+                scoreVoice(lhs.1, targetBcp47: target) > scoreVoice(rhs.1, targetBcp47: target)
             }
+            .map(\.0)
     }
 
     public static func friendlyDisplayName(for voice: AVSpeechSynthesisVoice) -> String {
@@ -915,8 +996,7 @@ public final class NativeAudioEngine {
         guard !trimmed.isEmpty else { return [] }
 
         // Match speaker labels at start of string, after newline, or after sentence punctuation (. ! ? —)
-        let pattern = #"(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+        guard let regex = dialogueTurnRegex else {
             return []
         }
 
@@ -1090,15 +1170,9 @@ public final class NativeAudioEngine {
         }
         speechDelegate.speakerByUtteranceId.removeAll()
 
-        let voices = AVSpeechSynthesisVoice.speechVoices()
-        let descriptors = voices.map {
-            VoiceCandidateDescriptor(
-                identifier: $0.identifier,
-                name: $0.name,
-                language: $0.language,
-                qualityRaw: $0.quality.rawValue
-            )
-        }
+        let catalog = Self.systemVoiceCatalog()
+        let voices = catalog.voices
+        let descriptors = catalog.descriptors
         let prefId = cfg.preferredSystemVoices[bcp47]
         let chosenDesc = Self.pickBestCandidate(from: descriptors, targetBcp47: bcp47, preferredIdentifier: prefId)
         let chosenVoice = chosenDesc.flatMap { d in voices.first { $0.identifier == d.identifier } }

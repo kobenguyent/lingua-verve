@@ -12,7 +12,7 @@ public struct RootNavigationView: View {
     @Environment(\.appFontScale) private var fontScale
     @State private var showVoiceStudioSheet: Bool = false
     @State private var showDisplaySettingsSheet: Bool = false
-    @State private var hoveredWorkspace: WorkspaceSection? = nil
+    @Namespace private var sidebarSelectionNamespace
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -28,6 +28,18 @@ public struct RootNavigationView: View {
         self._showDiagnosticSheet = showDiagnosticSheet
         self._showFalseFriendsSheet = showFalseFriendsSheet
         self._showAISettingsSheet = showAISettingsSheet
+    }
+
+    public static func compactAISidebarLabel(for config: AIProviderConfig) -> String {
+        guard config.isReady else { return "Connect AI" }
+        if config.provider.isOnDeviceApple || config.model.localizedCaseInsensitiveContains("Apple Intelligence") {
+            return "Apple Intelligence"
+        }
+        let prefixed = "AI: \(config.model)"
+        if prefixed.count <= 20 {
+            return prefixed
+        }
+        return String(config.model.prefix(19)) + "…"
     }
 
     public static func workspaceSubtitle(
@@ -84,6 +96,13 @@ public struct RootNavigationView: View {
         .sheet(isPresented: $showDisplaySettingsSheet) {
             DisplaySettingsSheetView(store: store)
         }
+        .task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            await Task.detached(priority: .utility) {
+                NativeAudioEngine.shared.warmVoiceCache()
+            }.value
+        }
     }
 
     // MARK: - iPad & MacBook Native Split View
@@ -105,63 +124,33 @@ public struct RootNavigationView: View {
                     .padding(.vertical, 6)
                 }
 
-                Section("Academy Workspaces") {
+                Section("Study") {
                     let iconColumnWidth = max(18, 18 * min(fontScale, 1.35))
+                    let progressBadgeCount = store.learnerState.completedModuleIds.count + store.learnerState.examHistory.count
                     ForEach(WorkspaceSection.allCases) { section in
-                        let selected = store.activeWorkspace == section
-                        let hovered = hoveredWorkspace == section
-                        Button {
+                        SidebarWorkspaceRow(
+                            section: section,
+                            isSelected: store.activeWorkspace == section,
+                            iconColumnWidth: iconColumnWidth,
+                            badgeCount: section == .progress ? progressBadgeCount : 0,
+                            selectionNamespace: sidebarSelectionNamespace
+                        ) {
                             NativeAudioEngine.shared.playClickSound()
-                            store.activeWorkspace = section
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: section.systemImage)
-                                    .foregroundStyle(selected ? BrandTheme.celestialSky : .secondary)
-                                    .frame(width: iconColumnWidth)
-                                Text(section.title)
-                                    .scaledFont(size: 13.5, weight: selected ? .semibold : .regular)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                                Spacer()
-                                if section == .progress {
-                                    let count = store.learnerState.completedModuleIds.count + store.learnerState.examHistory.count
-                                    if count > 0 {
-                                        Text("\(count)")
-                                            .scaledFont(.caption2, weight: .bold, design: .monospaced, monospacedDigit: true)
-                                            .foregroundStyle(BrandTheme.emeraldMint)
-                                    }
-                                }
+                            withAnimation(GoldenGateMetrics.snappySpring) {
+                                store.activeWorkspace = section
                             }
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(
-                                        selected
-                                            ? BrandTheme.celestialSky.opacity(0.15)
-                                            : (hovered ? Color.primary.opacity(0.05) : .clear)
-                                    )
-                            )
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        #if os(macOS)
-                        .onHover { isInside in
-                            hoveredWorkspace = isInside ? section : (hoveredWorkspace == section ? nil : hoveredWorkspace)
-                        }
-                        #endif
                     }
-                    .animation(.snappy(duration: 0.18), value: store.activeWorkspace)
-                    .animation(.easeOut(duration: 0.12), value: hoveredWorkspace)
+                    .animation(GoldenGateMetrics.snappySpring, value: store.activeWorkspace)
                 }
 
-                Section("Tools & AI") {
+                Section("Tools") {
                     Button {
                         showAISettingsSheet = true
                     } label: {
                         HStack {
-                            Label(store.aiConfig.isReady ? "AI: \(store.aiConfig.model)" : "Connect Local/Cloud AI", systemImage: "cpu")
-                                .scaledFont(size: 13)
+                            Label(Self.compactAISidebarLabel(for: store.aiConfig), systemImage: "cpu")
+                                .scaledFont(.footnote)
                                 .lineLimit(1)
                             Spacer()
                             Circle()
@@ -177,12 +166,13 @@ public struct RootNavigationView: View {
                         let accent = NativeAudioEngine.shared.activeAccentOption(for: store.courseLanguageId)
                         HStack {
                             Label("Voice & Accents", systemImage: "waveform")
-                                .scaledFont(size: 13)
+                                .scaledFont(.footnote)
                                 .lineLimit(1)
                             Spacer()
-                            Text("\(accent?.flag ?? "🎙️") \(NativeAudioEngine.shared.voiceSettings.provider.shortLabel)")
-                                .scaledFont(.caption2, design: .monospaced)
-                                .foregroundStyle(.secondary)
+                            if let flag = accent?.flag {
+                                Text(flag)
+                                    .scaledFont(.caption2)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
@@ -192,7 +182,7 @@ public struct RootNavigationView: View {
                     } label: {
                         HStack {
                             Label("Text Size", systemImage: "textformat.size")
-                                .scaledFont(size: 13)
+                                .scaledFont(.footnote)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(store.fontScalePercent)%")
@@ -206,7 +196,7 @@ public struct RootNavigationView: View {
                         showFalseFriendsSheet = true
                     } label: {
                         Label("False Friends Traps", systemImage: "exclamationmark.shield")
-                            .scaledFont(size: 13)
+                            .scaledFont(.footnote)
                             .lineLimit(1)
                     }
                     .buttonStyle(.plain)
@@ -215,7 +205,7 @@ public struct RootNavigationView: View {
                         showDiagnosticSheet = true
                     } label: {
                         Label("Quick CEFR Check", systemImage: "scope")
-                            .scaledFont(size: 13)
+                            .scaledFont(.footnote)
                             .lineLimit(1)
                     }
                     .buttonStyle(.plain)
@@ -234,7 +224,7 @@ public struct RootNavigationView: View {
                                     : "Check for Updates",
                                 systemImage: store.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath"
                             )
-                            .scaledFont(size: 13)
+                            .scaledFont(.footnote)
                             .lineLimit(1)
                             Spacer()
                             if store.isUpdateAvailable {
@@ -259,28 +249,35 @@ public struct RootNavigationView: View {
             )
         } detail: {
             NavigationStack {
-                withDetailUpdateBanner(activeWorkspaceView)
-                    .navigationTitle(store.activeWorkspace.title)
-                    #if os(macOS)
-                    .navigationSubtitle(Self.workspaceSubtitle(for: store))
-                    #endif
-                    .toolbar {
-                        sharedToolbarItems
-                    }
+                withDetailUpdateBanner(
+                    activeWorkspaceView
+                        .id(store.activeWorkspace)
+                        .transition(.opacity)
+                        .animation(GoldenGateMetrics.snappySpring, value: store.activeWorkspace)
+                )
+                .navigationTitle(store.activeWorkspace.title)
+                #if os(macOS)
+                .navigationSubtitle(Self.workspaceSubtitle(for: store))
+                #endif
+                .toolbar {
+                    sharedToolbarItems
+                }
             }
         }
     }
 
     @ViewBuilder
     private func withDetailUpdateBanner<Content: View>(_ content: Content) -> some View {
+        let isShowing = store.shouldShowUpdateBanner && store.availableUpdate != nil
         content
             .safeAreaInset(edge: .top, spacing: 0) {
-                if store.shouldShowUpdateBanner, let update = store.availableUpdate {
-                    UpdateNotificationBanner(store: store, update: update)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                GoldenGateCollapsiblePanel(isExpanded: isShowing) {
+                    if let update = store.availableUpdate {
+                        UpdateNotificationBanner(store: store, update: update)
+                    }
                 }
             }
-            .animation(.snappy(duration: 0.28), value: store.shouldShowUpdateBanner)
+            .animation(GoldenGateMetrics.panelAnimation, value: isShowing)
     }
 
     // MARK: - iPhone Native TabView
@@ -418,14 +415,10 @@ public struct RootNavigationView: View {
                     Label("Display & Text Size Settings…", systemImage: "slider.horizontal.3")
                 }
             } label: {
-                if store.fontScalePercent != 100 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "textformat.size")
-                        Text("\(store.fontScalePercent)%")
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                    }
-                } else {
-                    Label("Text Size", systemImage: "textformat.size")
+                HStack(spacing: 4) {
+                    Image(systemName: "textformat.size")
+                    Text("\(store.fontScalePercent)%")
+                        .font(.caption.monospacedDigit().weight(.semibold))
                 }
             }
             .help("Text Size (\(store.fontScalePercent)%) — ⌘+ / ⌘-")
@@ -507,5 +500,59 @@ public struct RootNavigationView: View {
             }
             .help("More Study Tools & Updates")
         }
+    }
+}
+
+private struct SidebarWorkspaceRow: View {
+    let section: WorkspaceSection
+    let isSelected: Bool
+    let iconColumnWidth: CGFloat
+    let badgeCount: Int
+    let selectionNamespace: Namespace.ID
+    let action: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: section.systemImage)
+                    .foregroundStyle(isSelected ? BrandTheme.editorialBlue : .secondary)
+                    .frame(width: iconColumnWidth)
+                Text(section.title)
+                    .scaledFont(.subheadline, weight: isSelected ? .semibold : .regular)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer()
+                if badgeCount > 0 {
+                    Text("\(badgeCount)")
+                        .scaledFont(.caption2, weight: .bold, design: .monospaced, monospacedDigit: true)
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: GoldenGateMetrics.nestedCornerRadius, style: .continuous)
+                        .fill(BrandTheme.editorialBlue.opacity(0.14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: GoldenGateMetrics.nestedCornerRadius, style: .continuous)
+                                .strokeBorder(BrandTheme.editorialBlue.opacity(0.28), lineWidth: 0.75)
+                        )
+                        .matchedGeometryEffect(id: "SidebarActiveRow", in: selectionNamespace)
+                } else if isHovered {
+                    RoundedRectangle(cornerRadius: GoldenGateMetrics.nestedCornerRadius, style: .continuous)
+                        .fill(Color.primary.opacity(0.055))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { isInside in
+            isHovered = isInside
+        }
+        #endif
     }
 }

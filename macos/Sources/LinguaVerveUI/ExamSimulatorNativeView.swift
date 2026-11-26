@@ -51,9 +51,7 @@ public struct ExamSimulatorNativeView: View {
     @State private var speakingNotes: [String] = []
     @State private var allModulesPassed: Bool = false
 
-    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    private enum ExamPhase {
+    private enum ExamPhase: Equatable {
         case lobby, running, grading, report
     }
 
@@ -101,36 +99,12 @@ public struct ExamSimulatorNativeView: View {
             .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
-        .onReceive(ticker) { _ in
+        .task(id: phase) {
             guard phase == .running else { return }
-            elapsedSeconds += 1
-            if remainingSeconds > 0 {
-                remainingSeconds -= 1
-            }
-            if isPreReading && preReadSecondsLeft > 0 {
-                preReadSecondsLeft -= 1
-                if preReadSecondsLeft == 0 {
-                    isPreReading = false
-                    NativeAudioEngine.shared.playClickSound()
-                }
-            }
-            if isPrepping && prepSecondsLeft > 0 {
-                prepSecondsLeft -= 1
-                if prepSecondsLeft == 0 {
-                    isPrepping = false
-                    NativeAudioEngine.shared.playClickSound()
-                }
-            }
-            if speechRecognizer.isRecording && speakSecondsLeft > 0 {
-                speakSecondsLeft -= 1
-                if speakSecondsLeft == 0 {
-                    speechRecognizer.stop()
-                    NativeAudioEngine.shared.playClickSound()
-                }
-            }
-            if mode == "strict" && remainingSeconds == 0 && elapsedSeconds > 2,
-               let active = exam {
-                Task { await submitExam(active) }
+            while phase == .running && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard phase == .running, !Task.isCancelled else { break }
+                handleTimerTick(activeExam: exam)
             }
         }
         .onChange(of: speechRecognizer.transcript) { _, newVal in
@@ -141,6 +115,38 @@ public struct ExamSimulatorNativeView: View {
         .onDisappear {
             speechRecognizer.stop()
             NativeAudioEngine.shared.stopSpeech()
+        }
+    }
+
+    private func handleTimerTick(activeExam: MockExam?) {
+        elapsedSeconds += 1
+        if remainingSeconds > 0 {
+            remainingSeconds -= 1
+        }
+        if isPreReading && preReadSecondsLeft > 0 {
+            preReadSecondsLeft -= 1
+            if preReadSecondsLeft == 0 {
+                isPreReading = false
+                NativeAudioEngine.shared.playClickSound()
+            }
+        }
+        if isPrepping && prepSecondsLeft > 0 {
+            prepSecondsLeft -= 1
+            if prepSecondsLeft == 0 {
+                isPrepping = false
+                NativeAudioEngine.shared.playClickSound()
+            }
+        }
+        if speechRecognizer.isRecording && speakSecondsLeft > 0 {
+            speakSecondsLeft -= 1
+            if speakSecondsLeft == 0 {
+                speechRecognizer.stop()
+                NativeAudioEngine.shared.playClickSound()
+            }
+        }
+        if mode == "strict" && remainingSeconds == 0 && elapsedSeconds > 2,
+           let active = activeExam {
+            Task { await submitExam(active) }
         }
     }
 
@@ -339,11 +345,11 @@ public struct ExamSimulatorNativeView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label("AI UNLIMITED EXAM GENERATOR", systemImage: "wand.and.stars")
-                        .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.purple)
+                    Label("AI Exam Generator", systemImage: "wand.and.stars")
+                        .scaledFont(.footnote, weight: .semibold)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     Text("Generate brand-new unseen 4-skill \(baseExam.level.rawValue) exams (9 Reading Qs, 3 Multi-Accent Listening Tracks, 2 Writing Tasks & 3 Speaking Parts) using your connected AI provider.")
-                        .scaledFont(.caption)
+                        .scaledFont(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -353,9 +359,7 @@ public struct ExamSimulatorNativeView: View {
                     } label: {
                         Label("Connect AI", systemImage: "sparkles")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle())
                 }
             }
 
@@ -476,8 +480,7 @@ public struct ExamSimulatorNativeView: View {
                         Text(isGeneratingExam ? "Crafting…" : "Generate Fresh \(baseExam.level.rawValue) AI Exam")
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .buttonStyle(GoldenGatePrimaryButtonStyle())
                 .disabled(isGeneratingExam)
             }
 
@@ -492,7 +495,7 @@ public struct ExamSimulatorNativeView: View {
 
                 TextField(placeholder, text: $customTopic)
                     .textFieldStyle(.roundedBorder)
-                    .scaledFont(.caption)
+                    .scaledFont(.subheadline)
                     .disabled(isGeneratingExam)
 
                 Button {
@@ -504,8 +507,7 @@ public struct ExamSimulatorNativeView: View {
                     )
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .buttonStyle(GoldenGatePrimaryButtonStyle())
                 .disabled(isGeneratingExam)
             }
         }
@@ -775,8 +777,7 @@ public struct ExamSimulatorNativeView: View {
                     } label: {
                         Label(locked ? "All Official Plays Used" : "Play Official Audio Track", systemImage: "speaker.wave.2.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                     .disabled(locked)
 
                     Button {
@@ -812,9 +813,9 @@ public struct ExamSimulatorNativeView: View {
                     .scaledFont(.caption)
                 }
             }
-            .padding(12)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.purple.opacity(0.08)))
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue)
 
             ForEach(Array(track.questions.enumerated()), id: \.element.id) { idx, q in
                 questionPicker(index: safeIdx * 3 + idx + 1, question: q, selection: listeningAnswers[q.id]) { chosen in
@@ -831,8 +832,7 @@ public struct ExamSimulatorNativeView: View {
                         NativeAudioEngine.shared.playClickSound()
                         activeListeningIdx = safeIdx + 1
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 } else {
                     Button("Next: Writing →") {
                         stopAudioAndMic()
@@ -1083,9 +1083,7 @@ public struct ExamSimulatorNativeView: View {
                         } label: {
                             Label("Generate Fresh AI Exam", systemImage: "sparkles")
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.purple)
-                        .controlSize(.small)
+                        .buttonStyle(GoldenGateGlassPillButtonStyle())
                     }
                     Button("New Exam") { phase = .lobby }
                         .buttonStyle(.bordered)

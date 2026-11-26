@@ -27,12 +27,12 @@ public struct AICoachNativeView: View {
             // Controls Header
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("AI 4-SKILL MASTERY STUDIO")
-                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("4-Skill Mastery Studio")
+                            .scaledFont(.footnote, weight: .semibold)
                             .foregroundStyle(BrandTheme.emeraldMint)
                         Text("\(langName) \(store.aiCoachLevel.rawValue) · \(store.aiCoachSkill.displayName)")
-                            .scaledFont(.headline)
+                            .scaledFont(.title3, weight: .bold, design: .serif)
                     }
                     Spacer()
                     Button {
@@ -42,11 +42,8 @@ public struct AICoachNativeView: View {
                             store.aiConfig.isReady ? store.aiConfig.model : "Setup AI",
                             systemImage: "cpu"
                         )
-                        .scaledFont(.caption, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(store.aiConfig.isReady ? BrandTheme.emeraldMint : BrandTheme.celestialSky)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: store.aiConfig.isReady, accent: BrandTheme.emeraldMint))
                 }
 
                 ViewThatFits(in: .horizontal) {

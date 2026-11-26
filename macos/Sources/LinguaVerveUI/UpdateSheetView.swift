@@ -33,20 +33,8 @@ public struct UpdateNotificationBanner: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(BrandTheme.celestialSky.opacity(0.08))
-                )
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(BrandTheme.celestialSky.opacity(0.24), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
-        .padding(.horizontal, 16)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue, useMaterial: true)
+        .padding(.horizontal, 20)
         .padding(.vertical, 8)
     }
 
@@ -61,10 +49,10 @@ public struct UpdateNotificationBanner: View {
                     .foregroundStyle(BrandTheme.emeraldMint)
             }
 
-            FlowLayout(spacing: 8, lineSpacing: 4) {
+            HStack(spacing: 8) {
                 Text("LinguaVerve v\(update.latestVersion) available")
                     .scaledFont(.subheadline, weight: .semibold)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
 
                 Text("v\(store.currentAppVersion) → v\(update.latestVersion)")
                     .scaledFont(.caption2, weight: .medium, design: .monospaced, monospacedDigit: true)
@@ -72,8 +60,10 @@ public struct UpdateNotificationBanner: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2.5)
                     .background(Capsule().fill(Color.primary.opacity(0.07)))
+                    .fixedSize()
             }
         }
+        .layoutPriority(1)
     }
 
     @ViewBuilder

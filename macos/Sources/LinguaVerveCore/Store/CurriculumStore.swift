@@ -89,6 +89,17 @@ public final class CurriculumStore {
     private let terminateAppHandler: @MainActor () -> Void
     private let terminationDelayMs: UInt64
     private let defaults: UserDefaults
+    @ObservationIgnored private let persistSynchronously: Bool
+    @ObservationIgnored private let persistQueue = DispatchQueue(label: "com.linguaverve.store.persistence", qos: .utility)
+
+    // Pre-indexed O(1) lookup tables (rebuilt when bundle or learnerState changes)
+    @ObservationIgnored private var coursesByLanguage: [String: [IntensiveCourse]] = [:]
+    @ObservationIgnored private var courseByKey: [String: IntensiveCourse] = [:]
+    @ObservationIgnored private var examReferencesById: [String: OfficialExamReference] = [:]
+    @ObservationIgnored private var examReferencesByLanguage: [String: [OfficialExamReference]] = [:]
+    @ObservationIgnored private var completedModuleIdSet: Set<String> = []
+    @ObservationIgnored private var enrolledCourseIdSet: Set<String> = []
+    private static let gregorianCalendar = Calendar(identifier: .gregorian)
     private let bookmarksKey = "linguaverve.macos.bookmarks"
     private let masteredKey = "linguaverve.macos.mastered"
     private let autoUpdateKey = "linguaverve.macos.autoCheckForUpdates"
@@ -104,9 +115,11 @@ public final class CurriculumStore {
         updateService: any UpdateServiceProtocol = UpdateService(),
         currentAppVersion: String = SemanticVersion.currentAppVersion(),
         terminationDelayMs: UInt64 = 250,
+        persistSynchronously: Bool? = nil,
         terminateAppHandler: (@MainActor () -> Void)? = nil
     ) {
         self.defaults = defaults
+        self.persistSynchronously = persistSynchronously ?? (defaults !== UserDefaults.standard)
         self.updateService = updateService
         self.currentAppVersion = SemanticVersion.normalize(currentAppVersion)
         self.terminationDelayMs = terminationDelayMs
@@ -159,6 +172,9 @@ public final class CurriculumStore {
         } else {
             self.aiConfig = AIProviderConfig(provider: .appleFoundation, enabled: false)
         }
+
+        rebuildBundleIndices()
+        rebuildLearnerIndices()
     }
 
     public static func loadDefaultBundle() -> CurriculumBundle {
@@ -189,19 +205,64 @@ public final class CurriculumStore {
         )
     }
 
-    // MARK: - Persistence Helpers
+    // MARK: - Persistence & Index Helpers
+
+    private static func courseIndexKey(languageId: String, level: CEFRLevel) -> String {
+        "\(languageId)::\(level.rawValue)"
+    }
+
+    private func rebuildBundleIndices() {
+        var byLang: [String: [IntensiveCourse]] = [:]
+        var byKey: [String: IntensiveCourse] = [:]
+        for course in bundle.intensiveCourses {
+            byLang[course.languageId, default: []].append(course)
+            byKey[Self.courseIndexKey(languageId: course.languageId, level: course.level)] = course
+        }
+        self.coursesByLanguage = byLang
+        self.courseByKey = byKey
+
+        var refsById: [String: OfficialExamReference] = [:]
+        var refsByLang: [String: [OfficialExamReference]] = [:]
+        for ref in bundle.examReferences {
+            refsById[ref.id] = ref
+            refsByLang[ref.languageId, default: []].append(ref)
+        }
+        self.examReferencesById = refsById
+        self.examReferencesByLanguage = refsByLang
+    }
+
+    private func rebuildLearnerIndices() {
+        completedModuleIdSet = Set(learnerState.completedModuleIds)
+        enrolledCourseIdSet = Set(learnerState.enrolledCourseIds)
+    }
+
+    private func persistEncoded<T: Encodable & Sendable>(_ value: T, forKey key: String) {
+        let storage = defaults
+        if persistSynchronously {
+            if let encoded = try? JSONEncoder().encode(value) {
+                storage.set(encoded, forKey: key)
+            }
+        } else {
+            persistQueue.async {
+                if let encoded = try? JSONEncoder().encode(value) {
+                    storage.set(encoded, forKey: key)
+                }
+            }
+        }
+    }
+
+    /// Blocks until any queued background persistence writes finish flushing to UserDefaults.
+    public func flushPersistence() {
+        persistQueue.sync {}
+    }
 
     private func persistLearnerState() {
-        if let encoded = try? JSONEncoder().encode(learnerState) {
-            defaults.set(encoded, forKey: learnerStateKey)
-        }
+        persistEncoded(learnerState, forKey: learnerStateKey)
     }
 
     public func saveAIConfig(_ nextConfig: AIProviderConfig) {
         self.aiConfig = nextConfig
-        if let encoded = try? JSONEncoder().encode(nextConfig) {
-            defaults.set(encoded, forKey: aiConfigKey)
-        }
+        persistEncoded(nextConfig, forKey: aiConfigKey)
     }
 
     // MARK: - Overall App Font Size Controls
@@ -232,11 +293,13 @@ public final class CurriculumStore {
     }
 
     private static func todayKey(from date: Date = Date()) -> String {
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar(identifier: .gregorian)
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.dateFormat = "yyyy-MM-dd"
-        return fmt.string(from: date)
+        let comps = gregorianCalendar.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            comps.year ?? 1970,
+            comps.month ?? 1,
+            comps.day ?? 1
+        )
     }
 
     private func touchStudyDay() {
@@ -258,37 +321,42 @@ public final class CurriculumStore {
 
     public func courses(for languageId: String) -> [IntensiveCourse] {
         let target = languageId == "german" ? "german" : "english"
-        return bundle.intensiveCourses.filter { $0.languageId == target }
+        return coursesByLanguage[target] ?? []
     }
 
     public func course(for languageId: String, level: CEFRLevel) -> IntensiveCourse? {
-        courses(for: languageId).first { $0.level == level }
+        let target = languageId == "german" ? "german" : "english"
+        return courseByKey[Self.courseIndexKey(languageId: target, level: level)]
     }
 
     public func examReferences(for course: IntensiveCourse, showAllForLanguage: Bool = false) -> [OfficialExamReference] {
         if showAllForLanguage {
-            return bundle.examReferences.filter { $0.languageId == course.languageId }
+            return examReferencesByLanguage[course.languageId] ?? []
         }
-        let idSet = Set(course.referenceIds)
-        return bundle.examReferences.filter { idSet.contains($0.id) }
+        return course.referenceIds.compactMap { examReferencesById[$0] }
     }
 
     public func isModuleCompleted(_ moduleId: String) -> Bool {
-        learnerState.completedModuleIds.contains(moduleId)
+        completedModuleIdSet.contains(moduleId)
     }
 
     public func isCourseEnrolled(_ courseId: String) -> Bool {
-        learnerState.enrolledCourseIds.contains(courseId)
+        enrolledCourseIdSet.contains(courseId)
     }
 
     @discardableResult
     public func toggleModuleComplete(_ module: CourseModule, languageId: String, level: CEFRLevel) -> Bool {
-        if let idx = learnerState.completedModuleIds.firstIndex(of: module.id) {
+        if completedModuleIdSet.contains(module.id),
+           let idx = learnerState.completedModuleIds.firstIndex(of: module.id) {
             learnerState.completedModuleIds.remove(at: idx)
+            completedModuleIdSet.remove(module.id)
             persistLearnerState()
             return false
         } else {
-            learnerState.completedModuleIds.append(module.id)
+            if !completedModuleIdSet.contains(module.id) {
+                learnerState.completedModuleIds.append(module.id)
+                completedModuleIdSet.insert(module.id)
+            }
             touchStudyDay()
             appendActivity(
                 StudyActivityEntry(
@@ -320,8 +388,9 @@ public final class CurriculumStore {
         level: CEFRLevel,
         score: Int? = nil
     ) {
-        if !learnerState.completedModuleIds.contains(module.id) {
+        if !completedModuleIdSet.contains(module.id) {
             learnerState.completedModuleIds.append(module.id)
+            completedModuleIdSet.insert(module.id)
         }
         touchStudyDay()
         let detail: String
@@ -477,8 +546,9 @@ public final class CurriculumStore {
         if learnerState.preTestHistory.count > 50 {
             learnerState.preTestHistory = Array(learnerState.preTestHistory.prefix(50))
         }
-        for step in recommendations where !learnerState.enrolledCourseIds.contains(step.courseId) {
+        for step in recommendations where !enrolledCourseIdSet.contains(step.courseId) {
             learnerState.enrolledCourseIds.append(step.courseId)
+            enrolledCourseIdSet.insert(step.courseId)
         }
         touchStudyDay()
         appendActivity(
@@ -662,11 +732,13 @@ public final class CurriculumStore {
         } else {
             self.learnerState = try JSONDecoder().decode(LearnerProgressState.self, from: data)
         }
+        rebuildLearnerIndices()
         persistLearnerState()
     }
 
     public func resetLearnerProgress() {
         self.learnerState = LearnerProgressState()
+        rebuildLearnerIndices()
         persistLearnerState()
     }
 
