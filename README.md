@@ -57,10 +57,12 @@ LinguaVerve shares one single source of truth (`src/data/` → `curriculum.json`
 - **MacBook Extras & Auto-Updater:** Universal Apple Silicon + Intel `.app` / `.dmg` / `.zip`, macOS Menu Bar quick-drill popover, keyboard shortcuts (`⌘1`–`⌘6`), and automatic **GitHub Releases auto-updater** (checks on launch & every 6 hours, verifies `SHA256SUMS.txt`, closes the current app cleanly, swaps the bundle atomically with rollback protection, and relaunches).
 
 ```bash
-npm run apple:xcode   # Sync curriculum, generate icons + Xcode project, run Swift XCTests, build iOS/iPadOS & macOS
-npm run apple:open    # Open apple/LinguaVerve.xcodeproj to run on iPhone, iPad, or MacBook
-npm run macos:app     # Build & sign Universal (arm64 + x86_64) dist-macos/LinguaVerve.app (+ .dmg / .zip / SHA256SUMS.txt)
-npm run macos:test    # Run native Swift XCTest suite (18 tests)
+npm run apple:xcode       # Sync curriculum, generate icons + Xcode project, run Swift XCTests, build iOS/iPadOS & macOS
+npm run apple:open        # Open apple/LinguaVerve.xcodeproj to run on iPhone, iPad, or MacBook
+npm run macos:app         # Build & sign Universal (arm64 + x86_64) dist-macos/LinguaVerve.app (+ .dmg / .zip / SHA256SUMS.txt)
+npm run macos:launch:fast # Fast host-arch rebuild & smooth launch of dist-macos/LinguaVerve.app
+npm run macos:open        # Launch already-built dist-macos/LinguaVerve.app without rebuilding
+npm run macos:test        # Run native Swift XCTest suite
 ```
 
 ---

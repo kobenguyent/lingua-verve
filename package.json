@@ -16,7 +16,10 @@
     "macos:test": "npm run macos:sync && ([ -d /Applications/Xcode.app/Contents/Developer ] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer || true; cd macos && swift test)",
     "macos:build": "npm run macos:sync && ([ -d /Applications/Xcode.app/Contents/Developer ] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer || true; cd macos && swift build -c release)",
     "macos:app": "bash scripts/build-macos-app.sh",
-    "macos:launch": "npm run macos:app && bash scripts/launch-macos-app.sh"
+    "macos:app:fast": "bash scripts/build-macos-app.sh --fast",
+    "macos:launch": "npm run macos:app && bash scripts/launch-macos-app.sh",
+    "macos:launch:fast": "npm run macos:app:fast && bash scripts/launch-macos-app.sh",
+    "macos:open": "bash scripts/launch-macos-app.sh"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
