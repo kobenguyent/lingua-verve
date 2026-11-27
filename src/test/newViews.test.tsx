@@ -1028,6 +1028,72 @@ describe('VoiceSettingsModal Component', () => {
     expect(saved.provider).toBe('openai');
     expect(saved.neuralVoice).toBe('sage');
   });
+
+  it('supports French (3 accents) and Japanese (Tokyo) accent selection and saves', () => {
+    const onSave = vi.fn();
+    render(
+      <VoiceSettingsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        settings={getDefaultVoiceSettings()}
+        onSaveSettings={onSave}
+        activeLanguageId="french"
+      />
+    );
+
+    expect(screen.getByText(/French \(3 Accents\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Japanese \(Tokyo\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Canada \(CA\)/i));
+    fireEvent.click(screen.getByText(/Japanese \(Tokyo\)/i));
+    expect(screen.getAllByText(/Japan \(JP\)/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /Save Voice Profile/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const saved = onSave.mock.calls[0][0];
+    expect(saved.accents.french).toBe('fr-CA');
+    expect(saved.accents.japanese).toBe('ja-JP');
+  });
+});
+
+describe('French and Japanese Learning Languages UI', () => {
+  it('renders French DELF and Japanese JLPT courses and switches cleanly across all 4 languages', () => {
+    const onSelectLanguage = vi.fn();
+    const { rerender } = render(
+      <IntensiveCoursesView
+        activeLanguageId="french"
+        onSelectLanguage={onSelectLanguage}
+        activeLevel="B1"
+        onSelectLevel={vi.fn()}
+        completedModuleIds={[]}
+        enrolledCourseIds={[]}
+        onToggleModuleComplete={vi.fn()}
+        onLaunchExam={vi.fn()}
+        onLaunchAICoach={vi.fn()}
+        onLaunchPreTest={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText(/DELF B1/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /🇯🇵 Japanese/i }));
+    expect(onSelectLanguage).toHaveBeenCalledWith('japanese');
+
+    rerender(
+      <IntensiveCoursesView
+        activeLanguageId="japanese"
+        onSelectLanguage={onSelectLanguage}
+        activeLevel="A1"
+        onSelectLevel={vi.fn()}
+        completedModuleIds={[]}
+        enrolledCourseIds={[]}
+        onToggleModuleComplete={vi.fn()}
+        onLaunchExam={vi.fn()}
+        onLaunchAICoach={vi.fn()}
+        onLaunchPreTest={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText(/JLPT N5/i).length).toBeGreaterThan(0);
+  });
 });
 
 describe('AICoachView Speaking Audio & Coach Note Separation', () => {

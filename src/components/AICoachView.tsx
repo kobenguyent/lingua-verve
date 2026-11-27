@@ -33,6 +33,12 @@ import {
   parseCoachReply,
 } from '../utils/aiClient';
 import { resolveAIConfigForLanguage } from '../utils/aiModelAdvisor';
+import {
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 import { soundEngine } from '../utils/audio';
 import {
   isSpeechRecognitionSupported,
@@ -100,8 +106,8 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   onOpenAISettings,
   onLogAISession,
 }) => {
-  const coachLang = activeLanguageId === 'german' ? 'german' : 'english';
-  const langName = coachLang === 'german' ? 'German' : 'English';
+  const coachLang = normalizeLearningLanguageId(activeLanguageId);
+  const langName = getLearningLanguageMeta(coachLang).name;
 
   const [level, setLevel] = useState<CEFRLevel>(initialLevel || 'B1');
   const [skill, setSkill] = useState<SkillType>(initialSkill || 'speaking');
@@ -285,25 +291,22 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
         {/* Language + Level + 4-Skill Selectors */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => onSelectLanguage('english')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  coachLang === 'english' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                🇬🇧 English
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectLanguage('german')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  coachLang === 'german' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                🇩🇪 German
-              </button>
+            <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              {LEARNING_LANGUAGE_IDS.map((langId) => {
+                const m = LEARNING_LANGUAGE_META[langId];
+                return (
+                  <button
+                    key={langId}
+                    type="button"
+                    onClick={() => onSelectLanguage(langId)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                      coachLang === langId ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    {m.flag} {m.name}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">

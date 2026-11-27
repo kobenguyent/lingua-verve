@@ -29,6 +29,7 @@ import {
   SkillType,
 } from '../types';
 import { MOCK_EXAMS } from '../data';
+import { getLearningLanguageMeta, normalizeLearningLanguageId } from '../data/languages';
 import { isAIConfigReady } from '../utils/aiClient';
 import { loadGeneratedExams } from '../utils/aiExamGenerator';
 import { ACCENT_CATALOG, parseDialogueTurns, soundEngine } from '../utils/audio';
@@ -91,7 +92,7 @@ function resolveExamForAttempt(
   const exactBuiltin = MOCK_EXAMS.find((e) => e.id === attempt.examId);
   if (exactBuiltin) return { exam: exactBuiltin, isExactMatch: true };
 
-  const targetLang = attempt.languageId === 'german' ? 'german' : 'english';
+  const targetLang = normalizeLearningLanguageId(attempt.languageId);
   const fallback =
     MOCK_EXAMS.find((e) => e.languageId === targetLang && e.level === attempt.level) ||
     MOCK_EXAMS.find((e) => e.languageId === targetLang);
@@ -353,7 +354,7 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
               Past Simulated Exam Dossier
             </div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {attempt.languageId === 'german' ? '🇩🇪' : '🇬🇧'} {attempt.examTitle}
+              {getLearningLanguageMeta(attempt.languageId).flag} {attempt.examTitle}
             </h2>
           </div>
 

@@ -9,8 +9,8 @@
 Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulators · Real-Exam Readiness Advisor · Human Multi-Speaker Voice Studio · On-Device, Local & Cloud AI Coaching
 
 <p>
-  <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-66%20passed-10B981?style=flat-square" alt="Web Vitest 66 passed" /></a>
-  <a href="./macos/Tests/LinguaVerveTests"><img src="https://img.shields.io/badge/XCTest-43%20passed-F97316?style=flat-square" alt="Swift XCTest 43 passed" /></a>
+  <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-76%20passed-10B981?style=flat-square" alt="Web Vitest 76 passed" /></a>
+  <a href="./macos/Tests/LinguaVerveTests"><img src="https://img.shields.io/badge/XCTest-45%20passed-F97316?style=flat-square" alt="Swift XCTest 45 passed" /></a>
   <a href="./apple/LinguaVerve.xcodeproj"><img src="https://img.shields.io/badge/Apple-macOS%2014%2B%20%C2%B7%20iPadOS%2017%2B%20%C2%B7%20iOS%2017%2B-111827?style=flat-square&logo=apple" alt="Universal Apple App" /></a>
   <a href="./.github/workflows/deploy.yml"><img src="https://img.shields.io/badge/Deploy-GitHub%20Pages-0284C7?style=flat-square" alt="Deploy to GitHub Pages" /></a>
   <a href="./.github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-macOS%20%26%20Web-6366F1?style=flat-square" alt="CI & Native Apple Builds" /></a>
@@ -50,30 +50,31 @@ Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulat
 
 | Pillar | Scope in Repo |
 | :--- | :--- |
-| **Intensive Courses** | **12** full `A1 → C2` courses (6 English + 6 German) · **72** guided curriculum units |
-| **4-Skill Mock Exams** | **12** built-in timed certification exams + **unlimited AI-generated** multi-part exams |
-| **Placement Pre-Test** | **24** progressive `A1 → C2` items across Reading, Listening, Writing &amp; Speaking |
-| **Official Exam Portals** | **24** verified links (Goethe-Institut, telc, TestDaF, ÖSD, Cambridge, IELTS, TOEFL) |
-| **Tactical Field Manual** | **32** polyglot blueprints · **4** interactive visual diagrams · **10** False Friends |
-| **Automated Test Suite** | **109** passing tests (**66** Web Vitest + **43** Native Swift XCTest) |
+| **Learning Languages** | **4** active tracks: **English**, **German**, **French (DELF/DALF)** &amp; **Japanese (JLPT N5–N1)** |
+| **Intensive Courses** | **24** full `A1 → C2` courses (6 per language) · **144** guided curriculum units |
+| **4-Skill Mock Exams** | **24** built-in timed certification exams + **unlimited AI-generated** multi-part exams |
+| **Placement Pre-Test** | **48** progressive `A1 → C2` items across Reading, Listening, Writing &amp; Speaking |
+| **Official Exam Portals** | **40** verified links (Goethe, telc, TestDaF, Cambridge, IELTS, TOEFL, DELF/DALF, JLPT, IRODORI, NHK) |
+| **Tactical Field Manual** | **52** polyglot blueprints · **4** interactive visual diagrams · **10** False Friends |
+| **Automated Test Suite** | **121** passing tests (**76** Web Vitest + **45** Native Swift XCTest) |
 
 ---
 
 ## 🌟 Complete Polyglot Mastery Suite
 
 ### 1. 🎓 Zero-to-Hero Intensive Courses (`A1 → C2`)
-- **72 Guided Units across 12 Courses:** Structured multi-week syllabi for **English (`A1–C2`)** and **German (`A1–C2`)**, extensible to Spanish, French, Japanese, and beyond.
+- **144 Guided Units across 24 Courses:** Structured multi-week syllabi for **English (`A1–C2`)**, **German (`A1–C2`)**, **French (`DELF A1–DALF C2`)**, and **Japanese (`JLPT N5–N1+`)**, extensible to Spanish and Mandarin.
 - **5-Step Interactive Unit Lesson Player:** Progress smoothly through **1. Concept & Grammar → 2. Audio Flashcards → 3. Knowledge Check → 4. 4-Skill Drills → 5. Milestone Checkpoint** with persistent per-unit progress and one-click advancement to the next unit or CEFR tier.
-- **24 Official Certification & Mock Test References:** Direct links to **Goethe-Institut**, **telc Deutsch**, **TestDaF**, **ÖSD**, **Deutsche Welle** (*Nicos Weg*, *Top-Thema*), **vhs-Lernportal**, **Cambridge English** (`A2 Key`–`C2 Proficiency`), **IELTS**, **ETS TOEFL iBT**, **BBC Learning English**, and **British Council LearnEnglish**.
+- **40 Official Certification & Mock Test References:** Direct links to **Goethe-Institut**, **telc Deutsch**, **TestDaF**, **ÖSD**, **Deutsche Welle** (*Nicos Weg*, *Top-Thema*), **vhs-Lernportal**, **Cambridge English** (`A2 Key`–`C2 Proficiency`), **IELTS**, **ETS TOEFL iBT**, **BBC Learning English**, **British Council**, **France Éducation international (DELF/DALF)**, **TV5MONDE**, **RFI Savoirs**, **JLPT Official**, **Japan Foundation IRODORI / Marugoto**, **NHK World Easy Japanese**, and **BJT**.
 
 ### 2. 🎯 Scored 4-Skill Placement Pre-Test & Collective Course Recommender
-- **24 progressive `A1 → C2` diagnostic items** testing Reading, Listening/Hearing (spoken audio with replay caps), Writing/Grammar, and Speaking Pragmatics.
+- **48 progressive `A1 → C2` diagnostic items** (12 per active language) testing Reading, Listening/Hearing (spoken audio with replay caps), Writing/Grammar, and Speaking Pragmatics.
 - Pinpoints your authentic CEFR tier and skill gaps, then automatically prescribes and enrolls a **Collective Multi-Course Study Bundle** (*Foundation Reinforcement + Core Intensive + Bridge to Next Tier*).
 
-### 3. ⏱️ High-Pressure 4-Skill Simulated Exam Arena (`12 Built-In` + `AI Exam Generator`)
-- **12 Timed Certification Simulations:** Mirrors real Goethe-Zertifikat, telc, TestDaF, Cambridge, IELTS, and TOEFL structures across Reading, Listening, Writing, and Speaking.
+### 3. ⏱️ High-Pressure 4-Skill Simulated Exam Arena (`24 Built-In` + `AI Exam Generator`)
+- **24 Timed Certification Simulations:** Mirrors real **Goethe-Zertifikat / telc / TestDaF**, **Cambridge / IELTS / TOEFL**, **DELF / DALF**, and **JLPT N5–N1** structures across Reading, Listening, Writing, and Speaking (with Japanese character-unit scoring).
 - **On-Demand AI Exam Generator:** Synthesizes fresh, themed multi-part exams with automatic cloze-gap validation/repair and offline fallbacks.
-- **Strict Exam Pressure Mode vs. Practice Mode:** Live countdown clock with auto-submit, strict audio replay caps (`2x` for A1–B2, `1x` for C1–C2), locked transcripts until submission, live word counter, prep & speaking timers, and microphone Speech-to-Text dictation.
+- **Strict Exam Pressure Mode vs. Practice Mode:** Live countdown clock with auto-submit, strict audio replay caps (`2x` for A1–B2, `1x` for C1–C2), locked transcripts until submission, live word/character counter, prep & speaking timers, and microphone Speech-to-Text dictation.
 - **AI-Powered 4-Skill Examiner Assessment & Past Attempt Inspector:** Click any past attempt to inspect every question alongside AI examiner rubric scores, inline corrections, upgraded model answers, and targeted study plans.
 
 ### 4. 🛡️ Real-Exam Readiness Advisor
@@ -82,32 +83,32 @@ Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulat
 
 ### 5. 🤖 On-Device, Local & Cloud AI Coaching
 - **Apple Intelligence On-Device Foundation Model:** Uses `FoundationModels.framework` on macOS 26 / iPadOS 26 / iOS 26 for zero-API-key, 100% private offline coaching and evaluation.
-- **Local & Cloud AI with Live Model Discovery:** Connect **Ollama**, **LM Studio**, **OpenAI**, **Google Gemini**, **OpenRouter**, or any custom OpenAI-compatible endpoint (Groq, Mistral, vLLM, etc.), fetch live model catalogs across providers, and fall back gracefully to an offline CEFR rubric evaluator when disconnected. `NSAllowsLocalNetworking` also allows iPhone/iPad apps to reach Ollama/LM Studio running on your Mac over Wi-Fi.
+- **Local & Cloud AI with Live Model Discovery:** Connect **Ollama**, **LM Studio**, **OpenAI**, **Google Gemini**, **OpenRouter**, or any custom OpenAI-compatible endpoint (Groq, Mistral, vLLM, etc.), fetch live model catalogs across providers, get language-aware model recommendations across EN/DE/FR/JA, and fall back gracefully to an offline CEFR rubric evaluator when disconnected. `NSAllowsLocalNetworking` also allows iPhone/iPad apps to reach Ollama/LM Studio running on your Mac over Wi-Fi.
 
 ### 6. 📊 Progress Dashboard, Backup & Tactical Field Manual
 - **Persistent Progress & JSON Backup:** Saves completed units, guided lesson steps, Pre-Tests, Simulated Exam scorecards, AI assessments, readiness reports, and daily study streaks with one-click JSON export/import.
-- **Tactical Field Manual:** **32** polyglot cheat-codes, **4** interactive visual models (*Preposition Pyramid*, *German Gender Suffix Matrix*, *Wechselpräpositionen Movement*, *Articulatory Phonetics*), and **10** False Friends cards.
+- **Tactical Field Manual:** **52** polyglot cheat-codes (English, German, French, Japanese & Universal), **4** interactive visual models (*Preposition Pyramid*, *German Gender Suffix Matrix*, *Wechselpräpositionen Movement*, *Articulatory Phonetics*), and **10** False Friends cards.
 
 ---
 
 ## 🎙️ Human Voice & Multi-Accent Studio
 
-Designed to sound genuinely human across **6 English accents** (`en-GB`, `en-US`, `en-AU`, `en-IE`, `en-IN`, `en-ZA`), **3 German DACH accents** (`de-DE`, `de-AT`, `de-CH`), plus **Spanish** and **French**—with `0.75x` slow / `1.0x` normal playback, **4 expressive styles** (*Natural Human*, *Language Coach*, *Conversational*, *News Broadcast*), adaptive conversational turn pauses, and **persistent offline audio caching** (`Caches/LinguaVerveAudioCache` on Apple, `CacheStorage` on Web).
+Designed to sound genuinely human across **6 English accents** (`en-GB`, `en-US`, `en-AU`, `en-IE`, `en-IN`, `en-ZA`), **3 German DACH accents** (`de-DE`, `de-AT`, `de-CH`), **3 French accents** (`fr-FR`, `fr-CA`, `fr-CH`), and **Japanese** (`ja-JP`, Tokyo standard)—with `0.75x` slow / `1.0x` normal playback, **4 expressive styles** (*Natural Human*, *Language Coach*, *Conversational*, *News Broadcast*), adaptive conversational turn pauses, and **persistent offline audio caching** (`Caches/LinguaVerveAudioCache` on Apple, `CacheStorage` on Web).
 
 | Engine | Mode | Multi-Speaker & Human Prosody Highlights | Key / Setup |
 | :--- | :--- | :--- | :--- |
 | **Google Gemini 2.5 TTS**<br/>`gemini-2.5-flash-preview-tts` | Cloud | Renders **2-speaker dialogues in a single API call** (`multiSpeakerVoiceConfig`) with real breaths, reactions & 24kHz PCM→WAV output | Reuses Gemini AI key (`x-goog-api-key`) |
 | **OpenAI Human TTS**<br/>`gpt-4o-mini-tts` | Cloud | Accent-coached voices (`coral`, `sage`, `ash`, etc.) with **previous-speaker turn context** in dialogue prompts | Reuses OpenAI AI key |
 | **ElevenLabs**<br/>`eleven_v3` · `v2` · `Flash v2.5` | Cloud | Expressive style presets, `previous_text` / `next_text` turn continuity, speed control (`v2`/`Flash`), and `language_code` locking | ElevenLabs `xi-api-key` |
-| **Local Apple Silicon TTS**<br/>`mlx-audio` · `Kokoro` · `Piper` | 100% Private Local | 1-click presets for **MLX-Audio** (`localhost:8000` Kokoro-82M & Chatterbox Multilingual), **Kokoro-FastAPI** (`:8880`), and **Speaches/Piper** (German `Thorsten`/`Eva`), plus **Test Local Server** health check | Zero API key · Local daemon |
-| **On-Device Neural**<br/>Apple Siri/Premium · Browser | 100% Free Offline | Filters out legacy robotic/Eloquence voices, preserves pure `1.0` pitch on neural voices (no metallic shifting), and includes guided Apple Premium voice setup for English & German | Built-in · Zero setup |
+| **Local Apple Silicon TTS**<br/>`mlx-audio` · `Kokoro` · `Piper` | 100% Private Local | 1-click presets for **MLX-Audio** (`localhost:8000` Kokoro-82M & Chatterbox Multilingual), **Kokoro-FastAPI** (`:8880`, EN/FR/JA voices), and **Speaches/Piper** (German `Thorsten`/`Eva`), plus **Test Local Server** health check | Zero API key · Local daemon |
+| **On-Device Neural**<br/>Apple Siri/Premium · Browser | 100% Free Offline | Filters out legacy robotic/Eloquence voices, preserves pure `1.0` pitch on neural voices (no metallic shifting), and includes guided Apple Premium voice setup for English, German, French &amp; Japanese | Built-in · Zero setup |
 
 ---
 
 ## 🧩 Architecture
 
 ```text
-src/data/  (Single Source of Truth: courses, 72 guided units, 12 mock exams, 32 tips, pre-tests)
+src/data/  (Single Source of Truth: 4 active languages, 24 courses, 144 guided units, 24 mock exams, 52 tips, 48 pre-tests)
    │
    ├─► Web SPA (React 18 + TypeScript + Vite + Tailwind) ──► ./dist (GitHub Pages)
    │
@@ -125,7 +126,7 @@ src/data/  (Single Source of Truth: courses, 72 guided units, 12 mock exams, 32 
 ```bash
 npm install
 npm run dev      # Start local Vite dev server
-npm test         # Run Web Vitest suite (66 tests across 6 files)
+npm test         # Run Web Vitest suite (76 tests across 7 files)
 npm run build    # Type-check & build static bundle -> ./dist
 npm run preview  # Preview production build locally
 ```
@@ -139,7 +140,7 @@ npm run macos:launch:fast # Host-arch release rebuild + clean launch of dist-mac
 npm run macos:open        # Launch already-built dist-macos/LinguaVerve.app without rebuilding
 npm run macos:launch      # Full Universal (arm64 + x86_64) .app/.dmg/.zip/SHA256SUMS.txt & launch
 npm run macos:app         # Package Universal macOS release artifacts in dist-macos/
-npm run macos:test        # Sync curriculum.json & run native Swift XCTests (43 tests)
+npm run macos:test        # Sync curriculum.json & run native Swift XCTests (45 tests)
 npm run macos:sync        # Export src/data/ -> curriculum.json
 
 # Universal Xcode Project (macOS · iPadOS · iOS)

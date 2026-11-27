@@ -7,6 +7,7 @@ import {
   SpeakingExamPart,
   WritingExamTask,
 } from '../types';
+import { countLanguageUnits } from '../data/languages';
 
 /**
  * Normalizes any MockExam (legacy single-part or upgraded multi-part) into
@@ -106,6 +107,34 @@ export function computeOfficialGradeLabel(params: {
     return `Goethe/telc: ausreichend (${overallScore}/100)`;
   }
 
+  if (languageId === 'french') {
+    const diploma = level === 'C1' || level === 'C2' ? `DALF ${level}` : `DELF ${level}`;
+    if (!allModulesPassed || overallScore < passingScorePercent) {
+      return `${diploma}: Non admis (${overallScore}/100)`;
+    }
+    if (overallScore >= 85) return `${diploma}: Mention Très Bien (${overallScore}/100)`;
+    if (overallScore >= 75) return `${diploma}: Mention Bien (${overallScore}/100)`;
+    if (overallScore >= 65) return `${diploma}: Mention Assez Bien (${overallScore}/100)`;
+    return `${diploma}: Admis (${overallScore}/100)`;
+  }
+
+  if (languageId === 'japanese') {
+    const jlptTier: Record<CEFRLevel, string> = {
+      A1: 'JLPT N5',
+      A2: 'JLPT N4',
+      B1: 'JLPT N3',
+      B2: 'JLPT N2',
+      C1: 'JLPT N1',
+      C2: 'JLPT N1+ Mastery',
+    };
+    const scaled180 = Math.round((overallScore / 100) * 180);
+    const tier = jlptTier[level];
+    if (!allModulesPassed || overallScore < passingScorePercent) {
+      return `${tier}: 不合格 Below Pass (${scaled180}/180)`;
+    }
+    return `${tier}: 合格 Pass (${scaled180}/180)`;
+  }
+
   // English: Cambridge Grade + IELTS Band approximation calibrated to CEFR level
   const levelBaseBand: Record<CEFRLevel, number> = {
     A1: 2.5,
@@ -146,11 +175,18 @@ export function computeRubricBreakdown(params: {
     };
   }
   const words = cleaned.split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
+  const wordCount = countLanguageUnits(cleaned);
   const lower = cleaned.toLowerCase();
-  const sentences = cleaned.split(/[.!?]+/).filter((s) => s.trim().length > 2).length;
-  const uniqueWords = new Set(words.map((w) => w.toLowerCase().replace(/[^a-zäöüß]/gi, '')).filter(Boolean));
-  const diversity = uniqueWords.size / Math.max(1, wordCount);
+  const sentences = cleaned.split(/[.!?。！？]+/).filter((s) => s.trim().length > 2).length;
+  const hasJapanese = /[\u3040-\u30ff\u3400-\u9fff]/.test(cleaned);
+  const uniqueUnits = hasJapanese
+    ? new Set(
+        Array.from(cleaned.replace(/[\s。、！？「」『』（）・.,!?]/g, '')).map((_, idx, arr) =>
+          arr.slice(idx, idx + 2).join('')
+        )
+      )
+    : new Set(words.map((w) => w.toLowerCase().replace(/[^\p{L}]/gu, '')).filter(Boolean));
+  const diversity = uniqueUnits.size / Math.max(1, wordCount);
   const kwHits = params.expectedKeywords.filter((k) => lower.includes(k.toLowerCase())).length;
   const kwRatio = params.expectedKeywords.length > 0 ? kwHits / Math.min(5, params.expectedKeywords.length) : 0.6;
   const lengthRatio = Math.min(1, wordCount / Math.max(15, params.minWords));

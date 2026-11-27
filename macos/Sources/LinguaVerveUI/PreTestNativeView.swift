@@ -15,7 +15,7 @@ public struct PreTestNativeView: View {
     }
 
     public var body: some View {
-        let lang = store.courseLanguageId == "german" ? "german" : "english"
+        let lang = LearningLanguage.normalize(store.courseLanguageId)
         let questions = store.preTestQuestions(for: lang)
         let displayedResult = latestResult?.languageId == lang
             ? latestResult
@@ -247,12 +247,13 @@ public struct PreTestNativeView: View {
 
     private var langPicker: some View {
         Picker("Language", selection: $store.courseLanguageId) {
-            Text("🇬🇧 English").tag("english")
-            Text("🇩🇪 German").tag("german")
+            ForEach(LearningLanguage.allCases) { lang in
+                Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
+            }
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(maxWidth: AppTypography.scaledControlWidth(235, scale: fontScale, maxCap: 310))
+        .frame(maxWidth: AppTypography.scaledControlWidth(290, scale: fontScale, maxCap: 370))
         .onChange(of: store.courseLanguageId) { _, _ in
             started = false
             answers = [:]

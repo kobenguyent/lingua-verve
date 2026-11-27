@@ -89,10 +89,11 @@ public struct ProgressDashboardNativeView: View {
                 .padding(18)
                 .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
-                // Zero-to-Hero Maps (English & German)
+                // Zero-to-Hero Maps (English, German, French & Japanese)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(310, scale: fontScale)), spacing: 14)], spacing: 14) {
-                    zeroToHeroCard(languageId: "english", title: "🇬🇧 English Zero-to-Hero (A1–C2)")
-                    zeroToHeroCard(languageId: "german", title: "🇩🇪 German Zero-to-Hero (A1–C2)")
+                    ForEach(LearningLanguage.allCases) { lang in
+                        zeroToHeroCard(languageId: lang.rawValue, title: "\(lang.flag) \(lang.name) Zero-to-Hero (A1–C2)")
+                    }
                 }
 
                 // AI Real-Exam Readiness Advisor (Analyze Exam History -> Ready vs More Practice)
@@ -171,11 +172,12 @@ public struct ProgressDashboardNativeView: View {
     private var languageFilterPicker: some View {
         Picker("Language Filter", selection: $filterLang) {
             Text("All").tag("all")
-            Text("🇬🇧 English").tag("english")
-            Text("🇩🇪 German").tag("german")
+            ForEach(LearningLanguage.allCases) { lang in
+                Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
+            }
         }
         .pickerStyle(.segmented)
-        .frame(maxWidth: AppTypography.scaledControlWidth(285, scale: fontScale, maxCap: 370))
+        .frame(maxWidth: AppTypography.scaledControlWidth(330, scale: fontScale, maxCap: 420))
     }
 
     private func examHistoryRowButton(attempt: ExamAttemptRecord) -> some View {
@@ -195,7 +197,7 @@ public struct ProgressDashboardNativeView: View {
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Text("\(attempt.languageId == "german" ? "🇩🇪" : "🇬🇧") \(attempt.examTitle)")
+                            Text("\(LearningLanguage.from(attempt.languageId).flag) \(attempt.examTitle)")
                                 .scaledFont(.subheadline, weight: .bold)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)

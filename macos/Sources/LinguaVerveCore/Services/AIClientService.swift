@@ -500,8 +500,9 @@ public struct AIClientService: Sendable {
     }
 
     public static func buildCoachSystemPrompt(languageId: String, level: CEFRLevel, skill: SkillType) -> String {
-        let langName = languageId == "german" ? "German" : "English"
-        let examBoard = languageId == "german" ? "Goethe-Zertifikat, telc, and TestDaF" : "Cambridge English, IELTS, and TOEFL iBT"
+        let lang = LearningLanguage.from(languageId)
+        let langName = lang.name
+        let examBoard = lang.examBoard
 
         switch skill {
         case .reading:
@@ -515,8 +516,8 @@ public struct AIClientService: Sendable {
         case .writing:
             return "Act as a certified \(examBoard) Writing Examiner for \(langName) \(level.rawValue). Provide exam tasks or grade drafts across Task Achievement, Coherence, Lexis, and Grammar with a 0–100 score, exact fixes, and a higher-band rewrite."
         case .speaking:
-            let noEnglishClause = languageId == "german"
-                ? " and NEVER mix English words, explanations, or translations into your spoken German reply."
+            let noEnglishClause = lang != .english
+                ? " and NEVER mix English words, romaji/phonetic glosses, explanations, or translations into your spoken \(langName) reply."
                 : "."
             return """
             Act as a warm native \(langName) Speaking Examiner & Roleplay Partner at CEFR \(level.rawValue) aligned with \(examBoard).
@@ -623,13 +624,13 @@ public struct AIClientService: Sendable {
         )
 
         if skill == .speaking {
-            let rolePrefixPattern = #"^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*"#
+            let rolePrefixPattern = #"^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?|Examinateur|Examinatrice|Professeur(?:e)?|Interlocuteur|Interlocutrice|試験官|面接官|先生|コーチ|講師)(?:[:：]\*{0,2}|\*{0,2}[:：])[ \t]*"#
             if let capturedRole = firstCapturedGroup(in: working, pattern: rolePrefixPattern) {
                 speakerLabel = capturedRole.trimmingCharacters(in: .whitespacesAndNewlines)
                 working = regexReplace(working, pattern: rolePrefixPattern, with: "")
             }
             // Strip repeated role labels on subsequent lines within a single-speaker roleplay turn
-            let repeatedRolePattern = #"\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*"#
+            let repeatedRolePattern = #"\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Examinateur|Examinatrice|Professeur(?:e)?|試験官|面接官|先生|コーチ)(?:[:：]\*{0,2}|\*{0,2}[:：])[ \t]*"#
             working = regexReplace(working, pattern: repeatedRolePattern, with: "\n")
         }
 
@@ -773,7 +774,8 @@ public struct AIClientService: Sendable {
     ) -> AIEvaluationResult {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let words = cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
-        let wordCount = words.count
+        let lang = LearningLanguage.from(languageId)
+        let wordCount = LearningLanguage.countUnits(in: cleaned, languageId: languageId)
 
         if wordCount == 0 {
             return AIEvaluationResult(
@@ -789,20 +791,25 @@ public struct AIClientService: Sendable {
         }
 
         let lower = cleaned.lowercased()
-        let unique = Set(words.map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty })
-        let diversity = Double(unique.count) / Double(max(1, wordCount))
+        let uniqueCount: Int
+        if lang.usesCJKCharacters || LearningLanguage.containsJapaneseScript(cleaned) {
+            let chars = Array(cleaned.filter { !$0.isWhitespace && !$0.isPunctuation })
+            let bigrams = chars.count >= 2 ? Set((0..<(chars.count - 1)).map { String([chars[$0], chars[$0 + 1]]) }) : Set(chars.map(String.init))
+            uniqueCount = bigrams.count
+        } else {
+            uniqueCount = Set(words.map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }).count
+        }
+        let diversity = min(1.0, Double(uniqueCount) / Double(max(1, wordCount)))
         let lengthRatio = min(1.0, Double(wordCount) / Double(max(12, minWords)))
 
         let matchedKeywords = expectedKeywords.filter { lower.contains($0.lowercased()) }
         let keywordRatio = expectedKeywords.isEmpty ? 0.7 : Double(matchedKeywords.count) / Double(expectedKeywords.count)
 
-        let connectors = languageId == "german"
-            ? ["weil", "obwohl", "deshalb", "außerdem", "jedoch", "allerdings", "einerseits", "andererseits", "dennoch", "angesichts"]
-            : ["because", "although", "however", "moreover", "furthermore", "therefore", "nevertheless", "whereas", "consequently"]
+        let connectors = lang.connectors
         let matchedConnectors = connectors.filter { lower.contains($0) }
         let cohesionRatio = min(1.0, Double(matchedConnectors.count) / Double((level == .A1 || level == .A2) ? 1 : 2))
 
-        let sentenceCount = cleaned.components(separatedBy: CharacterSet(charactersIn: ".!?")).filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).count > 2 }.count
+        let sentenceCount = cleaned.components(separatedBy: CharacterSet(charactersIn: ".!?。！？")).filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).count > 2 }.count
         let punctuationRatio = sentenceCount >= 2 ? 1.0 : 0.6
 
         let lengthScore: Double = lengthRatio * 35.0
@@ -836,9 +843,7 @@ public struct AIClientService: Sendable {
             corrections.append("Expand by at least \(minWords - wordCount) more words to meet \(level.rawValue) depth.")
         }
         if matchedConnectors.isEmpty {
-            corrections.append(languageId == "german"
-                ? "Add subordinating connectors (weil, obwohl, außerdem, deshalb) to raise coherence."
-                : "Add discourse connectors (however, although, furthermore, consequently) to boost coherence.")
+            corrections.append(lang.connectorHint)
         }
         corrections.append("Connect Local (Ollama/LM Studio) or Cloud AI for full neural grammar & style rewrites.")
 
@@ -880,8 +885,9 @@ public struct AIClientService: Sendable {
             )
         }
 
-        let langName = languageId == "german" ? "German" : "English"
-        let examBoard = languageId == "german" ? "Goethe-Zertifikat / telc / TestDaF" : "Cambridge English / IELTS / TOEFL"
+        let lang = LearningLanguage.from(languageId)
+        let langName = lang.name
+        let examBoard = lang.examBoard
         let sys = """
         You are a strict, encouraging certified \(examBoard) examiner for \(langName) at CEFR \(level.rawValue).
         Evaluate the candidate's \(skill.rawValue) submission thoroughly against official CEFR \(level.rawValue) criteria.

@@ -27,6 +27,12 @@ import {
 } from '../types';
 import { INTENSIVE_COURSES } from '../data';
 import {
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  LearningLanguageId,
+} from '../data/languages';
+import {
   computeSkillAverages,
   computeStudyStreak,
   exportLearnerProgressJSON,
@@ -78,7 +84,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
-  const [filterLang, setFilterLang] = useState<'all' | 'english' | 'german'>('all');
+  const [filterLang, setFilterLang] = useState<'all' | LearningLanguageId>('all');
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptRecord | null>(null);
 
   const streak = computeStudyStreak(learnerState.studyDays);
@@ -246,8 +252,8 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
           <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
             4-Skill Competency Average (Pre-Tests + Simulated Exams)
           </h2>
-          <div className="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs">
-            {(['all', 'english', 'german'] as const).map((lang) => (
+          <div className="inline-flex flex-wrap p-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs">
+            {(['all', ...LEARNING_LANGUAGE_IDS] as const).map((lang) => (
               <button
                 type="button"
                 key={lang}
@@ -258,7 +264,9 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
                     : 'text-slate-500'
                 }`}
               >
-                {lang === 'all' ? 'All' : lang === 'english' ? '🇬🇧 English' : '🇩🇪 German'}
+                {lang === 'all'
+                  ? 'All'
+                  : `${LEARNING_LANGUAGE_META[lang].flag} ${LEARNING_LANGUAGE_META[lang].name}`}
               </button>
             ))}
           </div>
@@ -292,14 +300,15 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
         </div>
       </section>
 
-      {/* Zero-to-Hero CEFR Mastery Grids (English & German) */}
+      {/* Zero-to-Hero CEFR Mastery Grids (English, German, French & Japanese) */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {(['english', 'german'] as const).map((langId) => {
+        {LEARNING_LANGUAGE_IDS.map((langId) => {
+          const langMeta = LEARNING_LANGUAGE_META[langId];
           const courses = INTENSIVE_COURSES.filter((c) => c.languageId === langId);
           return (
             <div key={langId} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 space-y-3">
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {langId === 'german' ? '🇩🇪 German' : '🇬🇧 English'} Zero-to-Hero Map (A1 → C2)
+                {langMeta.flag} {langMeta.name} Zero-to-Hero Map (A1 → C2)
               </h3>
               <div className="space-y-2">
                 {courses.map((course) => {
@@ -385,7 +394,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
                       <div className="space-y-0.5">
                         <div className="font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-1.5">
                           <span>
-                            {attempt.languageId === 'german' ? '🇩🇪' : '🇬🇧'} {attempt.examTitle}
+                            {getLearningLanguageMeta(attempt.languageId).flag} {attempt.examTitle}
                           </span>
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/15 text-sky-700 dark:text-sky-300">
                             {attempt.level}
@@ -462,7 +471,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
                   >
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white">
-                        {pre.languageId === 'german' ? '🇩🇪 German' : '🇬🇧 English'} · Verified {pre.verifiedLevel}
+                        {getLearningLanguageMeta(pre.languageId).flag} {getLearningLanguageMeta(pre.languageId).name} · Verified {pre.verifiedLevel}
                       </div>
                       <div className="text-[11px] text-slate-500 font-mono">
                         {pre.correctCount}/{pre.totalCount} ({pre.overallScore}%) · {new Date(pre.timestamp).toLocaleDateString()}

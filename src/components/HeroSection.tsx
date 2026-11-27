@@ -28,6 +28,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       soundEngine.speak('ich, nicht, Buch, Bach', 'german');
     } else if (sound.includes('Knacklaut')) {
       soundEngine.speak('Vereinbaren, Spiegelei', 'german');
+    } else if (sound.includes('Uvular')) {
+      soundEngine.speak('Paris, merci, très bien', 'french');
+    } else if (sound.includes('Nasalized')) {
+      soundEngine.speak('bonjour, pain, enfant, lundi', 'french');
+    } else if (sound.includes('Liaison')) {
+      soundEngine.speak('les amis, nous avons, un petit enfant', 'french');
+    } else if (sound.includes('Pitch accent')) {
+      soundEngine.speak('はし、あめ、こんにちは', 'japanese');
+    } else if (sound.includes('Mora')) {
+      soundEngine.speak('きって、おばあさん、ありがとう', 'japanese');
     } else {
       soundEngine.speak(sound, currentLanguage?.id || 'english');
     }

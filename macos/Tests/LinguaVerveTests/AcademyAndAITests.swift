@@ -44,18 +44,22 @@ final class AcademyAndAITests: XCTestCase {
     func testCurriculumIncludesAll12IntensiveCoursesExamReferencesPreTestsAndMockExams() {
         let store = makeTestStore()
 
-        XCTAssertEqual(store.bundle.intensiveCourses.count, 12)
+        XCTAssertEqual(store.bundle.intensiveCourses.count, 24)
         XCTAssertEqual(store.courses(for: "english").map(\.level), CEFRLevel.allCases)
         XCTAssertEqual(store.courses(for: "german").map(\.level), CEFRLevel.allCases)
+        XCTAssertEqual(store.courses(for: "french").map(\.level), CEFRLevel.allCases)
+        XCTAssertEqual(store.courses(for: "japanese").map(\.level), CEFRLevel.allCases)
 
-        XCTAssertGreaterThanOrEqual(store.bundle.examReferences.count, 20)
+        XCTAssertGreaterThanOrEqual(store.bundle.examReferences.count, 40)
         for ref in store.bundle.examReferences {
             XCTAssertTrue(ref.url.hasPrefix("https://"), "Expected HTTPS reference URL: \(ref.url)")
         }
 
         XCTAssertEqual(store.preTestQuestions(for: "english").count, 12)
         XCTAssertEqual(store.preTestQuestions(for: "german").count, 12)
-        XCTAssertEqual(store.bundle.mockExams.count, 12)
+        XCTAssertEqual(store.preTestQuestions(for: "french").count, 12)
+        XCTAssertEqual(store.preTestQuestions(for: "japanese").count, 12)
+        XCTAssertEqual(store.bundle.mockExams.count, 24)
     }
 
     func testScoredPreTestVerifiesLevelAndSuggestsCollectiveCourseBundle() {
@@ -318,7 +322,7 @@ final class AcademyAndAITests: XCTestCase {
                 XCTAssertFalse(lesson.checkpointModelAnswer.isEmpty, "Missing checkpoint model answer for \(mod.id)")
             }
         }
-        XCTAssertEqual(totalModules, 72)
+        XCTAssertEqual(totalModules, 144)
 
         guard let course = store.course(for: "german", level: .A1),
               let unit1 = course.modules.first else {
@@ -368,8 +372,12 @@ final class AcademyAndAITests: XCTestCase {
     func testMultiAccentCatalogAndHumanVoiceRankingBlocksRoboticVoices() {
         let enAccents = NativeAudioEngine.accents(for: "english").map(\.code)
         let deAccents = NativeAudioEngine.accents(for: "german").map(\.code)
+        let frAccents = NativeAudioEngine.accents(for: "french").map(\.code)
+        let jaAccents = NativeAudioEngine.accents(for: "japanese").map(\.code)
         XCTAssertEqual(enAccents, ["en-GB", "en-US", "en-AU", "en-IE", "en-IN", "en-ZA"])
         XCTAssertEqual(deAccents, ["de-DE", "de-AT", "de-CH"])
+        XCTAssertEqual(frAccents, ["fr-FR", "fr-CA", "fr-CH"])
+        XCTAssertEqual(jaAccents, ["ja-JP"])
 
         let candidates: [VoiceCandidateDescriptor] = [
             VoiceCandidateDescriptor(identifier: "com.apple.speech.synthesis.voice.Albert", name: "Albert", language: "en-US", qualityRaw: 1),
@@ -550,7 +558,7 @@ final class AcademyAndAITests: XCTestCase {
 
     func testMultiPartRealWorldExamsDecodeWithOfficialGradesAndRubrics() {
         let store = makeTestStore()
-        XCTAssertEqual(store.bundle.mockExams.count, 12)
+        XCTAssertEqual(store.bundle.mockExams.count, 24)
 
         for exam in store.bundle.mockExams {
             XCTAssertEqual(exam.requireAllSkillsPass, true, "Expected modular pass gate on \(exam.id)")
@@ -563,7 +571,8 @@ final class AcademyAndAITests: XCTestCase {
             XCTAssertEqual(tracks.count, 3, "Expected 3 listening tracks in \(exam.id)")
             XCTAssertEqual(tracks.reduce(0) { $0 + $1.questions.count }, 9, "Expected 9 listening items in \(exam.id)")
             let accents = Set(tracks.compactMap(\.accentCode))
-            XCTAssertGreaterThanOrEqual(accents.count, 2, "Expected multiple accents in \(exam.id)")
+            let minAccents = exam.languageId == "japanese" ? 1 : 2
+            XCTAssertGreaterThanOrEqual(accents.count, minAccents, "Expected regional accent(s) in \(exam.id)")
             for track in tracks {
                 let turns = NativeAudioEngine.parseDialogueTurns(track.audioScript)
                 XCTAssertGreaterThanOrEqual(turns.count, 4, "Expected multi-turn human conversation in \(track.id)")
@@ -590,6 +599,31 @@ final class AcademyAndAITests: XCTestCase {
 
         let enPass = MockExam.officialGradeLabel(languageId: "english", level: .C1, overallScore: 88, allModulesPassed: true, passingScorePercent: 65)
         XCTAssertTrue(enPass.contains("Cambridge Grade A") && enPass.contains("Est. IELTS"))
+
+        let frPass = MockExam.officialGradeLabel(languageId: "french", level: .B2, overallScore: 86, allModulesPassed: true, passingScorePercent: 60)
+        XCTAssertTrue(frPass.contains("DELF B2: Mention Très Bien"))
+
+        let jaPass = MockExam.officialGradeLabel(languageId: "japanese", level: .B2, overallScore: 80, allModulesPassed: true, passingScorePercent: 60)
+        XCTAssertTrue(jaPass.contains("JLPT N2: 合格"))
+
+        // Japanese character-unit counting & offline evaluation
+        let jaUnits = LearningLanguage.countUnits(in: "私は毎日日本語を勉強しています。しかし、漢字はとても難しいです。", languageId: "japanese")
+        XCTAssertGreaterThanOrEqual(jaUnits, 12)
+        let jaOffline = AIClientService.evaluateOffline(
+            text: "私は毎日日本語を勉強しています。しかし、漢字と敬語はとても難しいです。そのため、毎日少しずつ練習しています。また、日本のニュースも聞いています。",
+            languageId: "japanese",
+            level: .B1,
+            skill: .writing,
+            minWords: 20,
+            expectedKeywords: ["日本語", "練習"]
+        )
+        XCTAssertGreaterThanOrEqual(jaOffline.score, 65)
+
+        // French & Japanese Coach Reply role prefix stripping
+        let jaParsed = AIClientService.parseCoachReply("試験官：素晴らしいですね！なぜ日本へ行きたいですか。[COACH NOTE: Use 行きたいです instead of 行くたいです.]", skill: .speaking)
+        XCTAssertEqual(jaParsed.spokenText, "素晴らしいですね！なぜ日本へ行きたいですか。")
+        XCTAssertFalse(jaParsed.spokenText.contains("COACH NOTE"))
+        XCTAssertEqual(jaParsed.coachNote, "Use 行きたいです instead of 行くたいです.")
 
         let rubric = OfficialRubricBreakdown.compute(
             text: "Although remote work increases flexibility, structured in-person workshops remain indispensable for building long-term institutional trust.",

@@ -30,6 +30,12 @@ import {
   INTENSIVE_COURSES,
   OFFICIAL_EXAM_REFERENCES,
 } from '../data';
+import {
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 import { getAccentsForLanguage, soundEngine } from '../utils/audio';
 import { UnitLessonPlayer } from './UnitLessonPlayer';
 
@@ -91,7 +97,8 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
   onLaunchAICoach,
   onLaunchPreTest,
 }) => {
-  const courseLang = activeLanguageId === 'german' ? 'german' : 'english';
+  const courseLang = normalizeLearningLanguageId(activeLanguageId);
+  const langMeta = getLearningLanguageMeta(courseLang);
   const selectedLevel: CEFRLevel = activeLevel === 'ALL' ? 'A1' : activeLevel;
   const [slowAudio, setSlowAudio] = useState(false);
   const [showAllRefs, setShowAllRefs] = useState(false);
@@ -269,7 +276,7 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
               <span>Zero-to-Hero Intensive Academy · A1 → C2</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-              {courseLang === 'german' ? '🇩🇪 German' : '🇬🇧 English'} Intensive Certification Curriculum
+              {langMeta.flag} {langMeta.name} Intensive Certification Curriculum
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-300 max-w-2xl">
               Master all 4 certification skills—<strong>Reading</strong>, <strong>Listening &amp; Hearing</strong>,{' '}
@@ -279,35 +286,27 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
 
           {/* Language Track Switch + Pre-Test CTA */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClickSound();
-                  onSelectLanguage('english');
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  courseLang === 'english'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                🇬🇧 English Track
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClickSound();
-                  onSelectLanguage('german');
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  courseLang === 'german'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                🇩🇪 German Track
-              </button>
+            <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              {LEARNING_LANGUAGE_IDS.map((langId) => {
+                const m = LEARNING_LANGUAGE_META[langId];
+                return (
+                  <button
+                    key={langId}
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClickSound();
+                      onSelectLanguage(langId);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      courseLang === langId
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {m.flag} {m.name}
+                  </button>
+                );
+              })}
             </div>
 
             <button
@@ -328,7 +327,7 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-mono">
             <span className="text-slate-600 dark:text-slate-400">
-              Overall {courseLang === 'german' ? 'German' : 'English'} Zero-to-Hero Progress (A1–C2)
+              Overall {langMeta.name} Zero-to-Hero Progress (A1–C2)
             </span>
             <span className="font-bold text-slate-900 dark:text-white tabular-nums">
               {overallCourseStats.done}/{overallCourseStats.total} Modules ({overallCourseStats.percent}%)
@@ -787,9 +786,13 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
               Official Certification Portals &amp; Free Real Mock Tests
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-              Train with official model papers, audio MP3s, and exam rules directly from{' '}
+              Train with official model papers, audio tracks, and exam rules directly from{' '}
               {courseLang === 'german'
                 ? 'Goethe-Institut, telc, TestDaF, ÖSD, Deutsche Welle, and vhs-Lernportal.'
+                : courseLang === 'french'
+                ? 'France Éducation international (DELF/DALF/TCF), TV5MONDE, and RFI Savoirs.'
+                : courseLang === 'japanese'
+                ? 'JLPT Official (Japan Foundation & JEES), IRODORI, Marugoto, NHK World, and BJT.'
                 : 'Cambridge English, IELTS (British Council & IDP), ETS TOEFL iBT, and BBC Learning English.'}
             </p>
           </div>
@@ -798,7 +801,7 @@ export const IntensiveCoursesView: React.FC<IntensiveCoursesViewProps> = ({
             onClick={() => setShowAllRefs(!showAllRefs)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-sky-500 shrink-0 self-start sm:self-auto"
           >
-            {showAllRefs ? `Filter to ${currentCourse.level} Only` : `Show All ${courseLang === 'german' ? 'German' : 'English'} Sources`}
+            {showAllRefs ? `Filter to ${currentCourse.level} Only` : `Show All ${langMeta.name} Sources`}
           </button>
         </div>
 

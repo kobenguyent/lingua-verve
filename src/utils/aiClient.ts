@@ -10,6 +10,7 @@ import {
   SkillType,
 } from '../types';
 import { resolveAIConfigForLanguage } from './aiModelAdvisor';
+import { countLanguageUnits, getLearningLanguageMeta, normalizeLearningLanguageId } from '../data/languages';
 
 export const AI_CONFIG_STORAGE_KEY = 'linguaverve_ai_provider_v1';
 
@@ -509,7 +510,7 @@ export function evaluateSubmissionOffline(params: {
 }): AIEvaluationResult {
   const cleaned = params.text.trim();
   const words = cleaned ? cleaned.split(/\s+/).filter(Boolean) : [];
-  const wordCount = words.length;
+  const wordCount = countLanguageUnits(cleaned, params.languageId);
 
   if (wordCount === 0) {
     return {
@@ -524,9 +525,17 @@ export function evaluateSubmissionOffline(params: {
     };
   }
 
+  const langMeta = getLearningLanguageMeta(params.languageId);
   const lowerText = cleaned.toLowerCase();
-  const uniqueWords = new Set(words.map((w) => w.toLowerCase().replace(/[^a-zäöüß]/gi, '')).filter(Boolean));
-  const lexicalDiversity = uniqueWords.size / Math.max(1, wordCount);
+  const hasJapanese = langMeta.usesCJKCharacters || /[\u3040-\u30ff\u3400-\u9fff]/.test(cleaned);
+  const uniqueWords = hasJapanese
+    ? new Set(
+        Array.from(cleaned.replace(/[\s。、！？「」『』（）・.,!?]/g, '')).map((_, idx, arr) =>
+          arr.slice(idx, idx + 2).join('')
+        )
+      )
+    : new Set(words.map((w) => w.toLowerCase().replace(/[^\p{L}]/gu, '')).filter(Boolean));
+  const lexicalDiversity = Math.min(1, uniqueWords.size / Math.max(1, wordCount));
 
   const lengthRatio = Math.min(1, wordCount / Math.max(12, params.minWords));
   const matchedKeywords = params.expectedKeywords.filter((kw) => lowerText.includes(kw.toLowerCase()));
@@ -535,15 +544,12 @@ export function evaluateSubmissionOffline(params: {
       ? matchedKeywords.length / params.expectedKeywords.length
       : 0.7;
 
-  const connectors =
-    params.languageId === 'german'
-      ? ['weil', 'obwohl', 'deshalb', 'außerdem', 'jedoch', 'allerdings', 'einerseits', 'andererseits', 'dennoch', 'darüber hinaus', 'meiner meinung nach']
-      : ['because', 'although', 'however', 'moreover', 'furthermore', 'therefore', 'nevertheless', 'whereas', 'consequently', 'in addition', 'on the other hand'];
+  const connectors = langMeta.connectors;
 
   const matchedConnectors = connectors.filter((c) => lowerText.includes(c));
   const cohesionScore = Math.min(1, matchedConnectors.length / (params.level === 'A1' || params.level === 'A2' ? 1 : 2));
 
-  const sentenceCount = cleaned.split(/[.!?]+/).filter((s) => s.trim().length > 2).length;
+  const sentenceCount = cleaned.split(/[.!?。！？]+/).filter((s) => s.trim().length > 2).length;
   const punctuationScore = sentenceCount >= 2 ? 1 : 0.6;
 
   const rawScore = Math.round(
@@ -588,11 +594,7 @@ export function evaluateSubmissionOffline(params: {
     );
   }
   if (matchedConnectors.length === 0) {
-    corrections.push(
-      params.languageId === 'german'
-        ? 'Add German subordinating & linking connectors (weil, obwohl, außerdem, deshalb) to raise your coherence band.'
-        : 'Add linking discourse markers (however, although, furthermore, consequently) to boost coherence.'
-    );
+    corrections.push(langMeta.connectorHint);
   }
   const missingKeywords = params.expectedKeywords.filter((kw) => !lowerText.includes(kw.toLowerCase()));
   if (missingKeywords.length > 0) {
@@ -634,8 +636,9 @@ export async function evaluateWithAIOrFallback(params: {
     return evaluateSubmissionOffline(params);
   }
 
-  const langName = params.languageId === 'german' ? 'German' : 'English';
-  const examBoard = params.languageId === 'german' ? 'Goethe-Zertifikat / telc / TestDaF' : 'Cambridge English / IELTS / TOEFL';
+  const langMeta = getLearningLanguageMeta(params.languageId);
+  const langName = langMeta.name;
+  const examBoard = langMeta.examBoard;
 
   const systemPrompt = `You are a strict, encouraging certified ${examBoard} examiner for ${langName} at CEFR ${params.level}.
 Evaluate the candidate's ${params.skill} response thoroughly against official CEFR ${params.level} criteria.
@@ -770,15 +773,14 @@ export function buildSkillCoachSystemPrompt(params: {
   level: CEFRLevel;
   skill: SkillType;
 }): string {
-  const langName = params.languageId === 'german' ? 'German' : 'English';
-  const examRef =
-    params.languageId === 'german'
-      ? 'Goethe-Zertifikat, telc, and TestDaF'
-      : 'Cambridge English, IELTS, and TOEFL iBT';
+  const normalizedLang = normalizeLearningLanguageId(params.languageId);
+  const langMeta = getLearningLanguageMeta(normalizedLang);
+  const langName = langMeta.name;
+  const examRef = langMeta.examBoard;
 
   const noEnglishClause =
-    params.languageId === 'german'
-      ? ' and NEVER mix English words, explanations, or translations into your spoken German reply.'
+    normalizedLang !== 'english'
+      ? ` and NEVER mix English words, romaji/phonetic glosses, explanations, or translations into your spoken ${langName} reply.`
       : '.';
 
   const skillDirectives: Record<SkillType, string> = {
@@ -949,14 +951,14 @@ export function parseCoachReply(raw: string, skill: SkillType): ParsedCoachReply
 
   if (skill === 'speaking') {
     const rolePrefixRe =
-      /^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*/i;
+      /^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?|Examinateur|Examinatrice|Professeur(?:e)?|Interlocuteur|Interlocutrice|試験官|面接官|先生|コーチ|講師)(?:[:：]\*{0,2}|\*{0,2}[:：])[ \t]*/i;
     const roleMatch = working.match(rolePrefixRe);
     if (roleMatch) {
       speakerLabel = roleMatch[1].trim();
       working = working.replace(rolePrefixRe, '');
     }
     working = working.replace(
-      /\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*/gi,
+      /\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Examinateur|Examinatrice|Professeur(?:e)?|試験官|面接官|先生|コーチ)(?:[:：]\*{0,2}|\*{0,2}[:：])[ \t]*/gi,
       '\n'
     );
   }

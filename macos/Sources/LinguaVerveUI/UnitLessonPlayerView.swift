@@ -962,7 +962,7 @@ public struct UnitLessonPlayerView: View {
     // MARK: - Step 5: Milestone Checkpoint & Unit Completion
 
     private var checkpointStepView: some View {
-        let wordCount = checkpointText.split(whereSeparator: \.isWhitespace).count
+        let wordCount = LearningLanguage.countUnits(in: checkpointText, languageId: course.languageId)
 
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 14) {

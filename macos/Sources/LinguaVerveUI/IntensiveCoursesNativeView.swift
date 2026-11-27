@@ -11,15 +11,19 @@ public struct IntensiveCoursesNativeView: View {
     }
 
     private enum CourseLanguageOption: String, CaseIterable, Identifiable, Hashable {
-        case german
         case english
+        case german
+        case french
+        case japanese
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .german: return "🇩🇪 Deutsch"
-            case .english: return "🇬🇧 English"
+            case .english: return "🇬🇧 EN"
+            case .german: return "🇩🇪 DE"
+            case .french: return "🇫🇷 FR"
+            case .japanese: return "🇯🇵 JA"
             }
         }
     }
@@ -245,7 +249,7 @@ public struct IntensiveCoursesNativeView: View {
     // MARK: - Open Unboxed Editorial Hero
 
     private func heroHeader(for course: IntensiveCourse) -> some View {
-        let langFlag = course.languageId == "german" ? "🇩🇪" : "🇬🇧"
+        let langFlag = LearningLanguage.from(course.languageId).flag
         let cefrColor = BrandTheme.cefrColor(for: course.level.rawValue)
 
         return VStack(alignment: .leading, spacing: 14) {

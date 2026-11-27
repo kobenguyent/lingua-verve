@@ -8,6 +8,9 @@ import {
 } from '../types';
 import { GERMAN_INTENSIVE_COURSES } from './courses/germanCourses';
 import { ENGLISH_INTENSIVE_COURSES } from './courses/englishCourses';
+import { FRENCH_INTENSIVE_COURSES } from './courses/frenchCourses';
+import { JAPANESE_INTENSIVE_COURSES } from './courses/japaneseCourses';
+import { getDefaultCertificateForLevel, normalizeLearningLanguageId } from './languages';
 
 export const PRETEST_QUESTIONS: PreTestQuestion[] = [
   // ============================ GERMAN PLACEMENT PRE-TEST (A1 → C2, 12 Qs) ============================
@@ -385,10 +388,386 @@ export const PRETEST_QUESTIONS: PreTestQuestion[] = [
     correctIndex: 1,
     explanation: 'In British diplomatic understatement, "brave proposal" + "revisit underlying assumptions" signals major reservations requiring revision.',
   },
+
+  // ============================ FRENCH PLACEMENT PRE-TEST (A1 → C2, 12 Qs) ============================
+  {
+    id: 'pre-fr-a1-read',
+    languageId: 'french',
+    level: 'A1',
+    skill: 'reading',
+    passage: 'Boulangerie Lumières : Ouvert du mardi au dimanche, 7h00–19h30. Fermé le lundi. Croissant : 1,30 €.',
+    prompt: 'Peut-on acheter un croissant le lundi matin ?',
+    options: [
+      'Oui, à partir de 7h00.',
+      'Non, la boulangerie est fermée le lundi.',
+      'Oui, seulement jusqu’à midi.',
+      'Non, elle ne vend pas de croissants.',
+    ],
+    correctIndex: 1,
+    explanation: '« Fermé le lundi » means the bakery is closed on Mondays.',
+  },
+  {
+    id: 'pre-fr-a1-listen',
+    languageId: 'french',
+    level: 'A1',
+    skill: 'listening',
+    audioScript: 'Bonjour ! Je voudrais deux baguettes et un café allongé, s’il vous plaît. Ça fait combien ? Quatre euros vingt, merci beaucoup !',
+    prompt: 'Que commande la cliente et combien paie-t-elle ?',
+    options: [
+      'Un croissant et un thé pour 4,20 €',
+      'Deux baguettes et un café allongé pour 4,20 €',
+      'Deux cafés et une baguette pour 2,40 €',
+      'Deux baguettes pour 4,80 €',
+    ],
+    correctIndex: 1,
+    explanation: 'She orders « deux baguettes et un café allongé » for « quatre euros vingt » (4,20 €).',
+  },
+  {
+    id: 'pre-fr-a2-write',
+    languageId: 'french',
+    level: 'A2',
+    skill: 'writing',
+    prompt: 'Quelle phrase au passé composé avec un verbe de mouvement est correcte ?',
+    options: [
+      'Hier, Marie a allé au musée avec ses amis.',
+      'Hier, Marie est allée au musée avec ses amis.',
+      'Hier, Marie est allé au musée avec ses amis.',
+      'Hier, Marie va allée au musée avec ses amis.',
+    ],
+    correctIndex: 1,
+    explanation: '« Aller » uses auxiliary « être » in Passé Composé, and the past participle agrees with feminine subject Marie (« allée »).',
+  },
+  {
+    id: 'pre-fr-a2-speak',
+    languageId: 'french',
+    level: 'A2',
+    skill: 'speaking',
+    prompt: 'Dans un restaurant à Lyon, comment demander poliment la carte ?',
+    options: [
+      'Donne-moi la carte maintenant !',
+      'Je veux la carte, serveur.',
+      'Excusez-moi, pourrais-je voir la carte, s’il vous plaît ?',
+      'Où tu mets la carte ?',
+    ],
+    correctIndex: 2,
+    explanation: 'Using the conditional (« pourrais-je / je voudrais ») with « Excusez-moi » and « s’il vous plaît » is the natural polite French register.',
+  },
+  {
+    id: 'pre-fr-b1-read',
+    languageId: 'french',
+    level: 'B1',
+    skill: 'reading',
+    passage: 'Bien que le trajet en train dure presque une heure, Claire préfère vivre à la campagne parce que les loyers y sont nettement moins élevés et que ses enfants profitent du jardin.',
+    prompt: 'Pourquoi Claire choisit-elle d’habiter à la campagne ?',
+    options: [
+      'Parce que son bureau est juste à côté de sa maison.',
+      'Parce que les loyers sont plus bas et le cadre convient à ses enfants, malgré le trajet.',
+      'Parce qu’elle n’aime pas prendre le train.',
+      'Parce qu’il n’y a plus d’appartements en ville.',
+    ],
+    correctIndex: 1,
+    explanation: '« Bien que » introduces the concession (1-hour commute), while « parce que » gives the reasons (lower rent + garden for children).',
+  },
+  {
+    id: 'pre-fr-b1-listen',
+    languageId: 'french',
+    level: 'B1',
+    skill: 'listening',
+    audioScript: 'Salut Thomas, c’est Nadia. Notre réunion de jeudi à quatorze heures est avancée à dix heures trente parce que le client de Montréal doit prendre son avion plus tôt. Tu peux me confirmer par message ?',
+    prompt: 'Quel changement annonce Nadia ?',
+    options: [
+      'La réunion est annulée jusqu’à la semaine prochaine.',
+      'La réunion aura lieu jeudi plus tôt, à 10h30 au lieu de 14h00.',
+      'La réunion est repoussée à 16h30.',
+      'Thomas doit aller chercher le client à l’aéroport.',
+    ],
+    correctIndex: 1,
+    explanation: '« avancée à dix heures trente » means moved earlier from 14:00 to 10:30.',
+  },
+  {
+    id: 'pre-fr-b2-write',
+    languageId: 'french',
+    level: 'B2',
+    skill: 'writing',
+    prompt: 'Choisissez la phrase correcte employant le subjonctif après une expression de nécessité :',
+    options: [
+      'Il faut que les municipalités investissent davantage dans les pistes cyclables.',
+      'Il faut que les municipalités investient davantage dans les pistes cyclables.',
+      'Il faut que les municipalités investiront davantage dans les pistes cyclables.',
+      'Il faut les municipalités investissent davantage dans les pistes cyclables.',
+    ],
+    correctIndex: 0,
+    explanation: '« Il faut que » triggers the present subjunctive: « investir » → « qu’elles investissent ».',
+  },
+  {
+    id: 'pre-fr-b2-speak',
+    languageId: 'french',
+    level: 'B2',
+    skill: 'speaking',
+    prompt: 'Lors d’un débat DELF B2, comment nuancer un argument de manière élégante ?',
+    options: [
+      'Tu as complètement tort, c’est nul.',
+      'Je comprends votre point de vue ; toutefois, il convient de nuancer cet aspect en tenant compte du coût social.',
+      'Peut-être oui, peut-être non, je sais pas.',
+      'C’est pas possible du tout.',
+    ],
+    correctIndex: 1,
+    explanation: 'Acknowledging the interlocutor + « toutefois, il convient de nuancer... » demonstrates authentic B2 rhetorical control.',
+  },
+  {
+    id: 'pre-fr-c1-read',
+    languageId: 'french',
+    level: 'C1',
+    skill: 'reading',
+    passage: 'Loin de se réduire à une simple prouesse technologique, la transition énergétique impose une refonte profonde de nos habitudes de consommation, faute de quoi les gains d’efficacité risquent d’être neutralisés par l’effet rebond.',
+    prompt: 'Quelle mise en garde l’auteur formule-t-il ?',
+    options: [
+      'La technologie seule suffira à résoudre la crise climatique.',
+      'Sans évolution des comportements de consommation, les progrès techniques risquent d’être annulés par un effet rebond.',
+      'L’efficacité énergétique n’a aucun intérêt économique.',
+      'La transition énergétique doit être suspendue.',
+    ],
+    correctIndex: 1,
+    explanation: '« faute de quoi » ("failing which") links lifestyle reform directly to avoiding the rebound effect neutralizing efficiency gains.',
+  },
+  {
+    id: 'pre-fr-c1-listen',
+    languageId: 'french',
+    level: 'C1',
+    skill: 'listening',
+    audioScript: 'Si la semaine de quatre jours séduit indéniablement par ses effets sur le bien-être, plusieurs économistes soulignent qu’elle ne saurait être généralisée sans repenser l’organisation des services publics essentiels.',
+    prompt: 'Quelle est la nuance centrale de l’intervenant ?',
+    options: [
+      'La semaine de quatre jours est universellement applicable dès demain.',
+      'Malgré ses bénéfices sur le bien-être, sa généralisation exige de réorganiser les services publics essentiels.',
+      'Les économistes rejettent totalement l’idée du bien-être au travail.',
+      'Seul le secteur privé refuse ce modèle.',
+    ],
+    correctIndex: 1,
+    explanation: 'Concessive « Si... » ("While...") balances well-being benefits with the structural caveat (« ne saurait être généralisée sans... »).',
+  },
+  {
+    id: 'pre-fr-c2-write',
+    languageId: 'french',
+    level: 'C2',
+    skill: 'writing',
+    prompt: 'Identifiez la phrase de niveau DALF C2 maîtrisant l’inversion après un adverbe en tête de phrase :',
+    options: [
+      'À peine le rapport a été publié que les syndicats ont réagi.',
+      'À peine le rapport eut-il été publié que les syndicats firent part de leurs réserves.',
+      'À peine le rapport publié, donc les syndicats ont dit non.',
+      'À peine que le rapport était publié, les syndicats réagissaient.',
+    ],
+    correctIndex: 1,
+    explanation: '« À peine + inversion (eut-il été publié) ... que » exemplifies polished C2 literary/editorial syntax.',
+  },
+  {
+    id: 'pre-fr-c2-speak',
+    languageId: 'french',
+    level: 'C2',
+    skill: 'speaking',
+    prompt: 'Dans une conférence académique francophone, un modérateur dit : « Votre démonstration est séduisante, mais elle mériterait d’être étayée sur le plan empirique. » Que signifie-t-il ?',
+    options: [
+      'Votre exposé est parfait et ne nécessite aucune modification.',
+      'Votre thèse est intellectuellement attrayante, mais elle manque encore de preuves concrètes ou de données.',
+      'Votre présentation était trop courte.',
+      'Il rejette la langue utilisée.',
+    ],
+    correctIndex: 1,
+    explanation: '« séduisante » + « mériterait d’être étayée sur le plan empirique » is polished C2 academic critique requesting stronger empirical evidence.',
+  },
+
+  // ============================ JAPANESE PLACEMENT PRE-TEST (A1/N5 → C2/N1+, 12 Qs) ============================
+  {
+    id: 'pre-ja-a1-read',
+    languageId: 'japanese',
+    level: 'A1',
+    skill: 'reading',
+    passage: 'さくらカフェ：火曜日〜日曜日 9:00〜18:00。月曜日は休みです。コーヒーは400円です。',
+    prompt: '月曜日にさくらカフェでコーヒーを飲めますか。(Can you drink coffee at Sakura Cafe on Monday?)',
+    options: [
+      'はい、9時から飲めます。',
+      'いいえ、月曜日は休みです。',
+      'はい、18時まで飲めます。',
+      'コーヒーはありません。',
+    ],
+    correctIndex: 1,
+    explanation: '「月曜日は休みです」 means Monday is a closed day (holiday/day off).',
+  },
+  {
+    id: 'pre-ja-a1-listen',
+    languageId: 'japanese',
+    level: 'A1',
+    skill: 'listening',
+    audioScript: 'すみません、おにぎりを二つとお茶を一つください。ぜんぶでいくらですか。はい、五百二十円です。',
+    prompt: 'お客さんは何を注文して、いくら払いますか。',
+    options: [
+      'パンを二つとコーヒーを一つ、420円',
+      'おにぎりを二つとお茶を一つ、520円',
+      'おにぎりを一つとお茶を二つ、520円',
+      'おにぎりを二つ、250円',
+    ],
+    correctIndex: 1,
+    explanation: '「おにぎりを二つとお茶を一つ」 (2 onigiri + 1 tea) totaling 「五百二十円」 (520 yen).',
+  },
+  {
+    id: 'pre-ja-a2-write',
+    languageId: 'japanese',
+    level: 'A2',
+    skill: 'writing',
+    prompt: '正しい助詞（particle）と「て形」の組み合わせを選んでください：「図書館___静かに本を___ください。」',
+    options: [
+      'に / 読んで',
+      'で / 読んで',
+      'を / 読んて',
+      'へ / 読みて',
+    ],
+    correctIndex: 1,
+    explanation: 'Action location uses particle 「で」 (図書館で), and 読む conjugates to 「読んで」 (not 読んて).',
+  },
+  {
+    id: 'pre-ja-a2-speak',
+    languageId: 'japanese',
+    level: 'A2',
+    skill: 'speaking',
+    prompt: '駅員さんに道をていねいに聞くとき、一番自然な言い方はどれですか。',
+    options: [
+      'すみません、美術館はどこにありますか。',
+      '美術館はどこだ！教えろ。',
+      '美術館は行きますか。',
+      'お前、美術館を知っている？',
+    ],
+    correctIndex: 0,
+    explanation: '「すみません、〜はどこにありますか」 is the natural polite N4/A2 way to ask for a location.',
+  },
+  {
+    id: 'pre-ja-b1-read',
+    languageId: 'japanese',
+    level: 'B1',
+    skill: 'reading',
+    passage: '毎日通勤に一時間以上かかりますが、今の職場はチームワークがよく、リモートワークも選べるので、田中さんは転職するつもりはありません。',
+    prompt: '田中さんが今の仕事を続ける主な理由は何ですか。',
+    options: [
+      '家から会社まで歩いて5分だから。',
+      '通勤は長いが、職場のチームワークが良く柔軟に働けるから。',
+      '他の会社が見つからないから。',
+      '毎日出社しなければいけないから。',
+    ],
+    correctIndex: 1,
+    explanation: '「〜ますが」 concedes the long commute while 「〜ので」 states the decisive reason (teamwork + remote work option).',
+  },
+  {
+    id: 'pre-ja-b1-listen',
+    languageId: 'japanese',
+    level: 'B1',
+    skill: 'listening',
+    audioScript: 'もしもし、佐藤です。明日の会議ですが、部長の飛行機が遅れることになったので、午前十時から午後二時に変更になりました。資料は午前中に送りますね。',
+    prompt: '明日の会議はどうなりましたか。',
+    options: [
+      '中止になった。',
+      '午前10時から午後2時に変更になった。',
+      '午後2時から午前10時に早まった。',
+      '佐藤さんが欠席することになった。',
+    ],
+    correctIndex: 1,
+    explanation: '「午前十時から午後二時に変更になりました」 means the meeting moved from 10:00 AM to 2:00 PM.',
+  },
+  {
+    id: 'pre-ja-b2-write',
+    languageId: 'japanese',
+    level: 'B2',
+    skill: 'writing',
+    prompt: 'ビジネスメールで取引先に確認をお願いするときの正しい敬語（Keigo）はどれですか。',
+    options: [
+      '添付の資料を見てください。',
+      '添付の資料をご確認いただけますでしょうか。',
+      '添付の資料を拝見してください。',
+      '添付の資料をお読みになってあげてください。',
+    ],
+    correctIndex: 1,
+    explanation: '「ご確認いただけますでしょうか」 uses polite humble request phrasing; 「拝見する」 is humble (for your own looking, never the client’s!).',
+  },
+  {
+    id: 'pre-ja-b2-speak',
+    languageId: 'japanese',
+    level: 'B2',
+    skill: 'speaking',
+    prompt: '会議で相手の意見を尊重しつつ反対の視点を述べるとき、最も適切なJLPT N2/B2表現はどれですか。',
+    options: [
+      'それは絶対に間違っています。',
+      'おっしゃる通り利点も大きいのですが、一方で長期的な運用コストについても検討が必要だと思います。',
+      'よく分かりませんが、反対です。',
+      'そうかもしれませんけど、やりたくないです。',
+    ],
+    correctIndex: 1,
+    explanation: '「おっしゃる通り〜のですが、一方で〜」 gracefully validates the point before introducing a structured counterpoint.',
+  },
+  {
+    id: 'pre-ja-c1-read',
+    languageId: 'japanese',
+    level: 'C1',
+    skill: 'reading',
+    passage: 'AIによる自動化は業務効率を飛躍的に高める反面、人間の判断力が形骸化する恐れを孕んでおり、技術の導入にあたっては明確な責任体制の構築が不可欠である。',
+    prompt: '筆者の主張として最も適切なものはどれですか。',
+    options: [
+      'AI自動化にはリスクがないため全面導入すべきだ。',
+      '効率化という利点の反面、人間の判断力低下の懸念があるため、明確な責任体制が不可欠だ。',
+      '業務効率より手作業を優先すべきだ。',
+      '技術導入の責任はすべてAI開発者だけにある。',
+    ],
+    correctIndex: 1,
+    explanation: '「〜反面」 contrasts efficiency gains with the risk of eroding human judgment, concluding with 「不可欠である」 (indispensable).',
+  },
+  {
+    id: 'pre-ja-c1-listen',
+    languageId: 'japanese',
+    level: 'C1',
+    skill: 'listening',
+    audioScript: '地方創生の取り組みは一時的な補助金に頼るだけでは持続性に欠け、地域の資源を活かした自立的な仕組みづくりへと転換せざるを得ない段階に来ています。',
+    prompt: '講演者が指摘している課題と方向性は何ですか。',
+    options: [
+      '補助金を増やせばすべての問題が解決する。',
+      '一時的な補助金依存から脱し、地域資源を活かした持続可能な仕組みへ転換する必要がある。',
+      '地方創生はすでに完了した。',
+      '地域資源は活用すべきではない。',
+    ],
+    correctIndex: 1,
+    explanation: '「〜だけでは持続性に欠け」 critiques temporary subsidies and 「〜せざるを得ない」 stresses the unavoidable shift to self-sustaining models.',
+  },
+  {
+    id: 'pre-ja-c2-write',
+    languageId: 'japanese',
+    level: 'C2',
+    skill: 'writing',
+    prompt: 'JLPT N1+/C2レベルの格調高い書面表現として文法・語法ともに最も正確な文はどれですか。',
+    options: [
+      '長年の議論をへて、ようやく合意に至ったと言わざるを得ない。',
+      '幾多の曲折を経た末、関係各所の尽力のたまものとして本協定の締結に至った次第である。',
+      'たくさんの問題があったけど、みんなの努力のたまものだから契約した次第です。',
+      '曲折を経るまでもなく、合意に至るべくして至らなかった。',
+    ],
+    correctIndex: 1,
+    explanation: '「幾多の曲折を経た末」「尽力のたまもの」「〜に至った次第である」 align seamlessly in formal executive/editorial Japanese register.',
+  },
+  {
+    id: 'pre-ja-c2-speak',
+    languageId: 'japanese',
+    level: 'C2',
+    skill: 'speaking',
+    prompt: '日本の商談で相手から「非常に興味深いご提案ですので、社内で前向きに検討させていただきます」と言われた場合、文脈上の含意として最も的確な解釈はどれですか。',
+    options: [
+      'その場で即決・契約成立が確定した。',
+      '好意的な関心は示しつつも、社内稟議が必要であり即答や確約は保留している。',
+      '提案内容をまったく理解していない。',
+      '二度と連絡しないでほしいという明確な拒絶である。',
+    ],
+    correctIndex: 1,
+    explanation: '「前向きに検討させていただきます」 in Japanese business pragmatics signals polite receptiveness while deferring commitment pending internal consensus (稟議).',
+  },
 ];
 
 export function getPreTestQuestions(languageId: string): PreTestQuestion[] {
-  const targetLang = languageId === 'german' ? 'german' : 'english';
+  const targetLang = normalizeLearningLanguageId(languageId);
   return PRETEST_QUESTIONS.filter((q) => q.languageId === targetLang);
 }
 
@@ -402,7 +781,7 @@ export function evaluatePreTest(
   languageId: string,
   answers: Record<string, number>
 ): PreTestResult {
-  const targetLang = languageId === 'german' ? 'german' : 'english';
+  const targetLang = normalizeLearningLanguageId(languageId);
   const questions = getPreTestQuestions(targetLang);
 
   const levelTotals: Record<CEFRLevel, { correct: number; total: number }> = {
@@ -467,8 +846,13 @@ export function evaluatePreTest(
   );
   const prioritySkills = sortedSkills.slice(0, 2);
 
-  const courses: IntensiveCourse[] =
-    targetLang === 'german' ? GERMAN_INTENSIVE_COURSES : ENGLISH_INTENSIVE_COURSES;
+  const courseMap: Record<string, IntensiveCourse[]> = {
+    german: GERMAN_INTENSIVE_COURSES,
+    english: ENGLISH_INTENSIVE_COURSES,
+    french: FRENCH_INTENSIVE_COURSES,
+    japanese: JAPANESE_INTENSIVE_COURSES,
+  };
+  const courses: IntensiveCourse[] = courseMap[targetLang] || ENGLISH_INTENSIVE_COURSES;
 
   const findCourse = (lvl: CEFRLevel) => courses.find((c) => c.level === lvl) || courses[0];
 
@@ -514,8 +898,7 @@ export function evaluatePreTest(
   }
 
   const suggestedCertificate =
-    coreCourse.targetCertificates[0] ||
-    (targetLang === 'german' ? `Goethe-Zertifikat ${verifiedLevel}` : `Cambridge English ${verifiedLevel}`);
+    coreCourse.targetCertificates[0] || getDefaultCertificateForLevel(targetLang, verifiedLevel);
 
   return {
     id: `pre-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

@@ -63,6 +63,13 @@ import {
   buildOfflineExamAssessment,
 } from '../utils/examAssessment';
 import { ExamAIAssessmentPanel } from './ExamAIAssessmentPanel';
+import {
+  countLanguageUnits,
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 
 interface ExamSimulatorViewProps {
   activeLanguageId: string;
@@ -90,9 +97,8 @@ function formatClock(totalSeconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed ? trimmed.split(/\s+/).length : 0;
+function countWords(text: string, languageId?: string): number {
+  return countLanguageUnits(text, languageId);
 }
 
 function getAccentBadge(accentCode?: string): string {
@@ -225,7 +231,8 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   onCompleteExam,
   onLaunchAICoach,
 }) => {
-  const examLang = activeLanguageId === 'german' ? 'german' : 'english';
+  const examLang = normalizeLearningLanguageId(activeLanguageId);
+  const examLangMeta = getLearningLanguageMeta(examLang);
   const availableExams = MOCK_EXAMS.filter((e) => e.languageId === examLang);
 
   const [selectedLevel, setSelectedLevel] = useState<CEFRLevel>(initialLevel || 'B1');
@@ -894,35 +901,27 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                 </p>
               </div>
 
-              <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 self-start">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClickSound();
-                    onSelectLanguage('english');
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                    examLang === 'english'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  🇬🇧 English Exams
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClickSound();
-                    onSelectLanguage('german');
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                    examLang === 'german'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  🇩🇪 German Exams
-                </button>
+              <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 self-start">
+                {LEARNING_LANGUAGE_IDS.map((langId) => {
+                  const m = LEARNING_LANGUAGE_META[langId];
+                  return (
+                    <button
+                      key={langId}
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClickSound();
+                        onSelectLanguage(langId);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                        examLang === langId
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {m.flag} {m.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1052,11 +1051,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                   value={customTopic}
                   onChange={(e) => setCustomTopic(e.target.value)}
                   disabled={isGeneratingExam}
-                  placeholder={
-                    examLang === 'german'
-                      ? 'Optional: eigenes Thema (z. B. Arzttermin, Vorstellungsgespräch, KI)...'
-                      : 'Optional: custom topic (e.g. Medical Visit, Tech Interview, Climate)...'
-                  }
+                  placeholder={`Optional: custom topic (${examLangMeta.topicPlaceholder})`}
                   className="md:col-span-5 px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                 />
 
@@ -1161,7 +1156,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                     {totalReadQs} items · {currentExam.reading.durationMinutes}m budget
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Comprehension + {examLang === 'german' ? 'Richtig/Falsch + Sprachbausteine' : 'TFNG + Use of English'}
+                    Comprehension + {examLangMeta.readingFormatSummary}
                   </div>
                 </div>
 
@@ -1798,6 +1793,10 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                   placeholder={
                     currentExam.languageId === 'german'
                       ? `Schreiben Sie Ihre vollständige Antwort für Teil ${activeWritingIdx + 1} hier auf Deutsch...`
+                      : currentExam.languageId === 'french'
+                      ? `Rédigez votre réponse complète pour la tâche ${activeWritingIdx + 1} en français ici...`
+                      : currentExam.languageId === 'japanese'
+                      ? `タスク ${activeWritingIdx + 1} の回答をここに日本語で入力してください…`
                       : `Write your complete certification response for Task ${activeWritingIdx + 1} in English here...`
                   }
                   className="w-full p-4 rounded-xl text-sm bg-[#FAF9F6] dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 leading-relaxed"

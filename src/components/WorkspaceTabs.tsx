@@ -12,6 +12,7 @@ import {
 import { AIProviderConfig, VoiceSettings, WorkspaceTab } from '../types';
 import { AI_PROVIDER_PRESETS, isAIConfigReady } from '../utils/aiClient';
 import { getAccentOption, soundEngine } from '../utils/audio';
+import { normalizeLearningLanguageId } from '../data/languages';
 
 interface WorkspaceTabsProps {
   activeTab: WorkspaceTab;
@@ -47,7 +48,7 @@ export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({
 }) => {
   const aiReady = isAIConfigReady(aiConfig);
   const preset = AI_PROVIDER_PRESETS[aiConfig.provider];
-  const langKey = activeLanguageId === 'german' ? 'german' : 'english';
+  const langKey = normalizeLearningLanguageId(activeLanguageId);
   const activeAccentCode =
     voiceSettings?.accents[langKey] || soundEngine.getActiveAccentCode(langKey);
   const activeAccent = getAccentOption(activeAccentCode);

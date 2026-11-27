@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 import { CEFRLevel, PreTestResult, SkillType } from '../types';
 import { getPreTestQuestions, evaluatePreTest, CEFR_LEVELS } from '../data';
+import {
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 import { soundEngine } from '../utils/audio';
 
 interface PreTestViewProps {
@@ -42,7 +48,8 @@ export const PreTestView: React.FC<PreTestViewProps> = ({
   onJumpToCourse,
   onLaunchExam,
 }) => {
-  const testLang = activeLanguageId === 'german' ? 'german' : 'english';
+  const testLang = normalizeLearningLanguageId(activeLanguageId);
+  const testLangMeta = getLearningLanguageMeta(testLang);
   const questions = getPreTestQuestions(testLang);
 
   const [started, setStarted] = useState(false);
@@ -122,29 +129,24 @@ export const PreTestView: React.FC<PreTestViewProps> = ({
           </p>
         </div>
 
-        <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 self-start lg:self-center">
-          <button
-            type="button"
-            onClick={() => handleSwitchLanguage('english')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              testLang === 'english'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            🇬🇧 English Pre-Test
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchLanguage('german')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              testLang === 'german'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            🇩🇪 German Pre-Test
-          </button>
+        <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 self-start lg:self-center">
+          {LEARNING_LANGUAGE_IDS.map((langId) => {
+            const m = LEARNING_LANGUAGE_META[langId];
+            return (
+              <button
+                key={langId}
+                type="button"
+                onClick={() => handleSwitchLanguage(langId)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  testLang === langId
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {m.flag} {m.name}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -239,7 +241,7 @@ export const PreTestView: React.FC<PreTestViewProps> = ({
           </div>
           <div className="space-y-2">
             <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-              {testLang === 'german' ? '🇩🇪 German' : '🇬🇧 English'} 4-Skill Placement Pre-Test
+              {testLangMeta.flag} {testLangMeta.name} 4-Skill Placement Pre-Test
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto">
               12 calibrated items climbing from A1 to C2 (~5 minutes). Includes spoken audio items for Listening/Hearing verification. Your result is automatically saved to Progress &amp; History.
@@ -273,7 +275,7 @@ export const PreTestView: React.FC<PreTestViewProps> = ({
                 </div>
                 <div>
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                    Verified Placement Result · {result.languageId === 'german' ? '🇩🇪 German' : '🇬🇧 English'}
+                    Verified Placement Result · {getLearningLanguageMeta(result.languageId).flag} {getLearningLanguageMeta(result.languageId).name}
                   </span>
                   <h2 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-0.5">
                     Verified Level: {result.verifiedLevel} — {verifiedLevelDetail?.stageName}

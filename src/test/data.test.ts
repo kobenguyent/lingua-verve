@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import curriculumJson from '../../macos/Sources/LinguaVerveCore/Resources/curriculum.json';
 import { 
   CEFR_LEVELS, 
-  ENGLISH_TIPS, 
-  GERMAN_TIPS, 
+  ENGLISH_TIPS,
+  GERMAN_TIPS,
+  FRENCH_TIPS,
+  JAPANESE_TIPS,
   ALL_TIPS, 
   FALSE_FRIENDS,
   DIAGNOSTIC_QUESTIONS,
@@ -19,28 +21,24 @@ import {
 import { CEFRLevel } from '../types';
 
 describe('LinguaVerve Knowledge Base & Schema Tests', () => {
-  it('should contain English and German as active languages', () => {
+  it('should contain English, German, French, and Japanese as active languages', () => {
     const english = getLanguage('english');
     const german = getLanguage('german');
+    const french = getLanguage('french');
+    const japanese = getLanguage('japanese');
     const meta = getLanguage('meta');
 
-    expect(english).toBeDefined();
     expect(english?.status).toBe('active');
-    expect(german).toBeDefined();
     expect(german?.status).toBe('active');
-    expect(meta).toBeDefined();
+    expect(french?.status).toBe('active');
+    expect(japanese?.status).toBe('active');
     expect(meta?.status).toBe('active');
   });
 
-  it('should include staged preview languages for future extension', () => {
+  it('should keep Spanish staged as a preview language for future extension', () => {
     const spanish = getLanguage('spanish');
-    const french = getLanguage('french');
-    const japanese = getLanguage('japanese');
-
     expect(spanish).toBeDefined();
     expect(spanish?.status).toBe('preview');
-    expect(french).toBeDefined();
-    expect(japanese).toBeDefined();
   });
 
   it('should cover all 6 CEFR levels (A1 to C2) in the progression pipeline', () => {
@@ -61,13 +59,14 @@ describe('LinguaVerve Knowledge Base & Schema Tests', () => {
     });
   });
 
-  it('should ensure German tips cover all CEFR levels from A1 to C2', () => {
+  it('should ensure German, French, and Japanese tips cover all CEFR levels from A1 to C2', () => {
     const expectedLevels: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-    const germanLevels = new Set(GERMAN_TIPS.map((t) => t.level));
-
-    expectedLevels.forEach((lvl) => {
-      expect(germanLevels.has(lvl)).toBe(true);
-    });
+    for (const tipSet of [GERMAN_TIPS, FRENCH_TIPS, JAPANESE_TIPS]) {
+      const levels = new Set(tipSet.map((t) => t.level));
+      expectedLevels.forEach((lvl) => {
+        expect(levels.has(lvl)).toBe(true);
+      });
+    }
   });
 
   it('should validate every tip adheres to strict quality guidelines', () => {

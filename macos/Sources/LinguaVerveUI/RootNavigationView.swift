@@ -47,7 +47,7 @@ public struct RootNavigationView: View {
         section: WorkspaceSection? = nil
     ) -> String {
         let target = section ?? store.activeWorkspace
-        let languageName = store.courseLanguageId == "german" ? "German" : "English"
+        let languageName = LearningLanguage.from(store.courseLanguageId).name
         switch target {
         case .courses:
             return "\(languageName) · \(store.courseLevel.rawValue) Mastery"

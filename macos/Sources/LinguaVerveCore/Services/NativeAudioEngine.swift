@@ -197,7 +197,8 @@ public struct VoiceSettings: Codable, Equatable, Sendable {
             "english": "en-GB",
             "german": "de-DE",
             "spanish": "es-ES",
-            "french": "fr-FR"
+            "french": "fr-FR",
+            "japanese": "ja-JP"
         ],
         preferredSystemVoices: [String: String] = [:],
         rateMultiplier: Double = 1.0,
@@ -225,12 +226,11 @@ public struct VoiceSettings: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.provider = try container.decodeIfPresent(VoiceProviderType.self, forKey: .provider) ?? .system
-        self.accents = try container.decodeIfPresent([String: String].self, forKey: .accents) ?? [
-            "english": "en-GB",
-            "german": "de-DE",
-            "spanish": "es-ES",
-            "french": "fr-FR"
-        ]
+        var decodedAccents = try container.decodeIfPresent([String: String].self, forKey: .accents) ?? [:]
+        for (k, v) in ["english": "en-GB", "german": "de-DE", "spanish": "es-ES", "french": "fr-FR", "japanese": "ja-JP"] where decodedAccents[k] == nil {
+            decodedAccents[k] = v
+        }
+        self.accents = decodedAccents
         self.preferredSystemVoices = try container.decodeIfPresent([String: String].self, forKey: .preferredSystemVoices) ?? [:]
         self.rateMultiplier = try container.decodeIfPresent(Double.self, forKey: .rateMultiplier) ?? 1.0
         self.speakingStyle = try container.decodeIfPresent(VoiceSpeakingStyle.self, forKey: .speakingStyle) ?? .natural
@@ -470,6 +470,24 @@ public final class NativeAudioEngine {
             region: "Québécois · Montreal",
             sampleText: "Bonjour ! Découvrons la cadence chaleureuse du français québécois.",
             neuralHint: "Speak in natural, warm Canadian French (Montreal)."
+        ),
+        AccentOption(
+            code: "fr-CH",
+            languageId: "french",
+            flag: "🇨🇭",
+            label: "Switzerland (CH)",
+            region: "Suisse romande · Geneva",
+            sampleText: "Bonjour ! Entraînons notre écoute avec le français clair et posé de Suisse romande.",
+            neuralHint: "Speak in warm, articulate Swiss French (Suisse romande, Geneva) with clear cadence."
+        ),
+        AccentOption(
+            code: "ja-JP",
+            languageId: "japanese",
+            flag: "🇯🇵",
+            label: "Japan (JP)",
+            region: "Standard Tokyo · 標準語",
+            sampleText: "こんにちは！今日は自然な日本語の発音とリズムを一緒に練習しましょう。",
+            neuralHint: "Speak in warm, natural Standard Tokyo Japanese (Hyōjungo) with authentic pitch accent and mora timing."
         )
     ]
 
@@ -543,7 +561,10 @@ public final class NativeAudioEngine {
         NeuralVoicePreset(id: "af_heart", label: "Kokoro Heart (American F)", note: "Top-rated warm US neural voice"),
         NeuralVoicePreset(id: "am_michael", label: "Kokoro Michael (American M)", note: "Natural US male neural voice"),
         NeuralVoicePreset(id: "af_bella", label: "Kokoro Bella (American F)", note: "Expressive conversational US voice"),
-        NeuralVoicePreset(id: "chatterbox-multilingual", label: "Chatterbox Multilingual (EN & DE)", note: "Expressive local multilingual voice via MLX-Audio")
+        NeuralVoicePreset(id: "ff_siwis", label: "Kokoro Siwis (French F)", note: "Natural Parisian French neural voice (Kokoro / MLX-Audio)"),
+        NeuralVoicePreset(id: "jf_alpha", label: "Kokoro Alpha (Japanese F)", note: "Clear Standard Tokyo Japanese female neural voice (Kokoro / MLX-Audio)"),
+        NeuralVoicePreset(id: "jm_kumo", label: "Kokoro Kumo (Japanese M)", note: "Natural Tokyo Japanese male neural voice (Kokoro / MLX-Audio)"),
+        NeuralVoicePreset(id: "chatterbox-multilingual", label: "Chatterbox Multilingual (EN/DE/FR/JA)", note: "Expressive local multilingual voice via MLX-Audio")
     ]
 
     private static let roboticVoiceNames: Set<String> = [
@@ -559,7 +580,8 @@ public final class NativeAudioEngine {
         "anna", "markus", "petra", "viktor", "yannick", "martin", "helena", "quinn",
         "simone", "ava", "allison", "zoe", "serena", "kate", "oliver", "arthur",
         "martha", "tom", "evan", "aaron", "nicky", "amélie", "thomas", "mónica",
-        "paulina"
+        "paulina", "audrey", "aurélie", "nicolas", "chloé", "denise", "henri",
+        "kyoko", "otoya", "hattori", "o-ren", "nanami", "keita", "haruka", "ayumi"
     ]
 
     private static let settingsKey = "linguaverve_voice_settings_v1"
@@ -569,7 +591,7 @@ public final class NativeAudioEngine {
     private static var cachedVoiceCatalog: (voices: [AVSpeechSynthesisVoice], descriptors: [VoiceCandidateDescriptor])?
     private static var cachedDescriptorOnly: [VoiceCandidateDescriptor]?
     private static let dialogueTurnRegex: NSRegularExpression? = try? NSRegularExpression(
-        pattern: #"(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+"#,
+        pattern: #"(?:^|\n|(?<=[.!?。！？—–]\s))([A-ZÄÖÜÀÂÆÇÉÈÊËÎÏÔŒÙÛÜŸ][A-Za-zÄÖÜäöüßÀ-ÿ.\- ]{0,22})[:：]\s*"#,
         options: []
     )
 
@@ -1143,15 +1165,19 @@ public final class NativeAudioEngine {
     private static let femaleNameHints: Set<String> = [
         "frau", "anna", "hannah", "lena", "clara", "mia", "sara", "sarah", "emma", "maya",
         "sophie", "julia", "petra", "helena", "nina", "laura", "lisa", "katharina", "elena",
-        "priya", "chloe", "rachel", "amira", "moderatorin", "kritikerin", "ärztin", "verkäuferin",
-        "rezeptionistin", "studentin", "autorin", "professorin", "novak", "berger", "keller", "meier"
+        "priya", "chloe", "chloé", "rachel", "amira", "moderatorin", "kritikerin", "ärztin", "verkäuferin",
+        "rezeptionistin", "studentin", "autorin", "professorin", "novak", "berger", "keller", "meier",
+        "camille", "claire", "élodie", "elodie", "manon", "léa", "lea", "nadia", "marie", "céline", "celine",
+        "madame", "mme", "yuki", "haruka", "sakura", "yumi", "aiko", "hina", "akiko", "keiko", "mai", "rin"
     ]
 
     private static let maleNameHints: Set<String> = [
-        "herr", "lukas", "markus", "viktor", "martin", "yannick", "tobias", "jonas", "max",
+        "herr", "lukas", "lucas", "markus", "viktor", "martin", "yannick", "tobias", "jonas", "max",
         "paul", "david", "tom", "ben", "liam", "leo", "daniel", "oliver", "james", "noah",
         "stefan", "felix", "alex", "moderator", "interviewer", "schaffner", "arzt", "verkäufer",
-        "kellner", "becker", "steiner", "lindner", "gruber", "weber", "vance", "tutor", "host", "guest"
+        "kellner", "becker", "steiner", "lindner", "gruber", "weber", "vance", "tutor", "host", "guest",
+        "thomas", "julien", "antoine", "hugo", "marc", "nicolas", "pierre", "monsieur", "m",
+        "kenji", "takashi", "hiroshi", "ren", "daiki", "kenta", "taro", "sato", "tanaka", "suzuki"
     ]
 
     /// Parses multi-speaker dialogue scripts (both newline-separated and inline `Name: ...` turns).
@@ -1581,6 +1607,7 @@ public final class NativeAudioEngine {
             return primary == maleId ? femaleId : maleId
 
         case .localOpenAI:
+            let lowerBcp = bcp47.lowercased()
             if isGerman {
                 let male = "de_DE-thorsten-high"
                 let female = "de_DE-eva_k-x_low"
@@ -1588,6 +1615,13 @@ public final class NativeAudioEngine {
                     return inferred == .female ? female : (inferred == .male ? male : primary)
                 }
                 return primary == male ? female : male
+            } else if lowerBcp.hasPrefix("ja") {
+                let female = "jf_alpha"
+                let male = "jm_kumo"
+                if speakerIndex == 0 { return inferred == .male ? male : female }
+                return primary == male ? female : male
+            } else if lowerBcp.hasPrefix("fr") {
+                return "ff_siwis"
             } else {
                 let female = "bf_emma"
                 let male = "bm_george"
@@ -1607,7 +1641,7 @@ public final class NativeAudioEngine {
         var current = ""
         for ch in cleaned {
             current.append(ch)
-            if ".!?".contains(ch) && current.trimmingCharacters(in: .whitespaces).count >= 24 {
+            if ".!?。！？".contains(ch) && current.trimmingCharacters(in: .whitespaces).count >= 16 {
                 chunks.append(current.trimmingCharacters(in: .whitespaces))
                 current = ""
             }

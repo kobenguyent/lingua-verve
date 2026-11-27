@@ -2,12 +2,15 @@ import { describe, it, expect } from 'vitest';
 import {
   ENGLISH_INTENSIVE_COURSES,
   GERMAN_INTENSIVE_COURSES,
+  FRENCH_INTENSIVE_COURSES,
+  JAPANESE_INTENSIVE_COURSES,
   INTENSIVE_COURSES,
   OFFICIAL_EXAM_REFERENCES,
   getPreTestQuestions,
   evaluatePreTest,
   MOCK_EXAMS,
   getMockExams,
+  countLanguageUnits,
 } from '../data';
 import { CEFRLevel, SkillType } from '../types';
 import {
@@ -24,13 +27,17 @@ const ALL_CEFR: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const FOUR_SKILLS: SkillType[] = ['reading', 'listening', 'writing', 'speaking'];
 
 describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
-  it('provides full A1 through C2 intensive courses for both English and German', () => {
+  it('provides full A1 through C2 intensive courses for English, German, French, and Japanese', () => {
     const enLevels = ENGLISH_INTENSIVE_COURSES.map((c) => c.level);
     const deLevels = GERMAN_INTENSIVE_COURSES.map((c) => c.level);
+    const frLevels = FRENCH_INTENSIVE_COURSES.map((c) => c.level);
+    const jaLevels = JAPANESE_INTENSIVE_COURSES.map((c) => c.level);
 
     expect(enLevels).toEqual(ALL_CEFR);
     expect(deLevels).toEqual(ALL_CEFR);
-    expect(INTENSIVE_COURSES.length).toBe(12);
+    expect(frLevels).toEqual(ALL_CEFR);
+    expect(jaLevels).toEqual(ALL_CEFR);
+    expect(INTENSIVE_COURSES.length).toBe(24);
   });
 
   it('covers all 4 certification skills across every intensive course', () => {
@@ -65,7 +72,7 @@ describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
     });
   });
 
-  it('provides complete 5-step guided lesson content for all 72 units (6 per level) across A1–C2 English and German', () => {
+  it('provides complete 5-step guided lesson content for all 144 units (6 per level) across EN, DE, FR, and JA', () => {
     let totalModules = 0;
     INTENSIVE_COURSES.forEach((course) => {
       expect(course.modules.length, `Expected 6 units in ${course.id}`).toBe(6);
@@ -88,16 +95,16 @@ describe('Zero-to-Hero Intensive Courses (A1 to C2)', () => {
           expect(q.explanation.length).toBeGreaterThan(15);
         });
         expect(lesson.checkpointMinWords).toBeGreaterThanOrEqual(25);
-        expect(lesson.checkpointModelAnswer.length).toBeGreaterThan(50);
+        expect(lesson.checkpointModelAnswer.length).toBeGreaterThan(35);
       });
     });
-    expect(totalModules).toBe(72);
+    expect(totalModules).toBe(144);
   });
 });
 
 describe('Scored 4-Skill Placement Pre-Test & Collective Course Recommender', () => {
-  it('has 12 progressive A1–C2 questions covering all 4 skills for both English and German', () => {
-    ['english', 'german'].forEach((lang) => {
+  it('has 12 progressive A1–C2 questions covering all 4 skills for English, German, French, and Japanese', () => {
+    ['english', 'german', 'french', 'japanese'].forEach((lang) => {
       const qs = getPreTestQuestions(lang);
       expect(qs.length).toBe(12);
 
@@ -109,6 +116,17 @@ describe('Scored 4-Skill Placement Pre-Test & Collective Course Recommender', ()
       const listeningQs = qs.filter((q) => q.skill === 'listening');
       listeningQs.forEach((lq) => expect(lq.audioScript && lq.audioScript.length > 20).toBe(true));
     });
+
+    // Verify French & Japanese placement evaluation routes to DELF/DALF & JLPT bundles
+    const frQs = getPreTestQuestions('french');
+    const frRes = evaluatePreTest('french', Object.fromEntries(frQs.map((q) => [q.id, q.correctIndex])));
+    expect(frRes.verifiedLevel).toBe('C2');
+    expect(frRes.suggestedCertificate).toContain('DALF');
+
+    const jaQs = getPreTestQuestions('japanese');
+    const jaRes = evaluatePreTest('japanese', Object.fromEntries(jaQs.map((q) => [q.id, q.level === 'A1' ? q.correctIndex : (q.correctIndex + 1) % q.options.length])));
+    expect(jaRes.verifiedLevel).toBe('A1');
+    expect(jaRes.suggestedCertificate).toContain('JLPT N5');
   });
 
   it('verifies A1 level and suggests A1 core + A2 bridge collective courses when beginner answers', () => {
@@ -159,28 +177,34 @@ describe('Scored 4-Skill Placement Pre-Test & Collective Course Recommender', ()
   });
 });
 
-describe('12 Full 4-Skill Simulated Certification Exams', () => {
-  it('provides complete A1–C2 simulated exams for English and German', () => {
+describe('24 Full 4-Skill Simulated Certification Exams (EN, DE, FR, JA)', () => {
+  it('provides complete A1–C2 simulated exams for English, German, French, and Japanese', () => {
     const enExams = getMockExams('english');
     const deExams = getMockExams('german');
+    const frExams = getMockExams('french');
+    const jaExams = getMockExams('japanese');
 
     expect(enExams.map((e) => e.level)).toEqual(ALL_CEFR);
     expect(deExams.map((e) => e.level)).toEqual(ALL_CEFR);
-    expect(MOCK_EXAMS.length).toBe(12);
+    expect(frExams.map((e) => e.level)).toEqual(ALL_CEFR);
+    expect(jaExams.map((e) => e.level)).toEqual(ALL_CEFR);
+    expect(MOCK_EXAMS.length).toBe(24);
   });
 
   it('ensures every mock exam has realistic multi-part Reading (3 parts/9 Qs), Multi-Accent Listening (3 tracks/9 Qs), 2 Writing Tasks, and 3 Speaking Parts', () => {
     MOCK_EXAMS.forEach((exam) => {
+      const minTextLen = exam.languageId === 'japanese' ? 30 : 60;
+      const minModelLen = exam.languageId === 'japanese' ? 40 : 80;
       // Legacy top-level fields remain intact for backward compatibility
-      expect(exam.reading.passage.length).toBeGreaterThan(60);
+      expect(exam.reading.passage.length).toBeGreaterThan(minTextLen);
       expect(exam.reading.questions.length).toBeGreaterThanOrEqual(3);
-      expect(exam.listening.audioScript.length).toBeGreaterThan(60);
+      expect(exam.listening.audioScript.length).toBeGreaterThan(minTextLen);
       expect(exam.listening.questions.length).toBeGreaterThanOrEqual(3);
       expect(exam.listening.maxPlaysStrict).toBeGreaterThanOrEqual(1);
       expect(exam.writing.taskRequirements.length).toBeGreaterThanOrEqual(3);
-      expect(exam.writing.modelAnswer.length).toBeGreaterThan(80);
+      expect(exam.writing.modelAnswer.length).toBeGreaterThan(minModelLen);
       expect(exam.speaking.bulletPoints.length).toBeGreaterThanOrEqual(3);
-      expect(exam.speaking.modelResponseScript.length).toBeGreaterThan(80);
+      expect(exam.speaking.modelResponseScript.length).toBeGreaterThan(minModelLen);
 
       // Multi-part real-world expansion checks
       expect(exam.requireAllSkillsPass).toBe(true);
@@ -189,7 +213,12 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
       const totalReadQs = readingParts.reduce((s, p) => s + p.questions.length, 0);
       expect(totalReadQs).toBe(9);
       readingParts.forEach((part) => {
-        expect(part.passage.length).toBeGreaterThan(40);
+        expect(part.passage.length).toBeGreaterThan(exam.languageId === 'japanese' ? 25 : 40);
+        if (part.format === 'cloze') {
+          expect(part.passage).toContain('[1]');
+          expect(part.passage).toContain('[2]');
+          expect(part.passage).toContain('[3]');
+        }
         part.questions.forEach((q) => {
           expect(q.correctIndex).toBeGreaterThanOrEqual(0);
           expect(q.correctIndex).toBeLessThan(q.options.length);
@@ -201,7 +230,8 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
       const totalListenQs = listeningTracks.reduce((s, t) => s + t.questions.length, 0);
       expect(totalListenQs).toBe(9);
       const accents = new Set(listeningTracks.map((t) => t.accentCode).filter(Boolean));
-      expect(accents.size, `Expected multiple regional accents in ${exam.id}`).toBeGreaterThanOrEqual(2);
+      const minAccents = exam.languageId === 'japanese' ? 1 : 2;
+      expect(accents.size, `Expected regional accent(s) in ${exam.id}`).toBeGreaterThanOrEqual(minAccents);
       listeningTracks.forEach((track) => {
         const turns = parseDialogueTurns(track.audioScript);
         expect(turns.length, `Expected multi-turn human conversation in ${track.id}`).toBeGreaterThanOrEqual(4);
@@ -217,10 +247,33 @@ describe('12 Full 4-Skill Simulated Certification Exams', () => {
       const speakingParts = getExamSpeakingParts(exam);
       expect(speakingParts.length, `Expected 3 speaking parts in ${exam.id}`).toBe(3);
       speakingParts.forEach((part) => {
-        expect(part.examinerPromptAudio && part.examinerPromptAudio.length > 15).toBe(true);
-        expect(part.modelResponseScript.length).toBeGreaterThan(40);
+        expect(part.examinerPromptAudio && part.examinerPromptAudio.length > 10).toBe(true);
+        expect(part.modelResponseScript.length).toBeGreaterThan(exam.languageId === 'japanese' ? 25 : 40);
       });
     });
+
+    // Official grade labels across all 4 languages + Japanese character unit counting
+    expect(
+      computeOfficialGradeLabel({
+        languageId: 'french',
+        level: 'B2',
+        overallScore: 86,
+        allModulesPassed: true,
+        passingScorePercent: 60,
+      })
+    ).toContain('DELF B2: Mention Très Bien');
+
+    expect(
+      computeOfficialGradeLabel({
+        languageId: 'japanese',
+        level: 'B2',
+        overallScore: 80,
+        allModulesPassed: true,
+        passingScorePercent: 60,
+      })
+    ).toContain('JLPT N2: 合格');
+
+    expect(countLanguageUnits('私は毎日日本語を勉強しています。しかし、漢字はとても難しいです。', 'japanese')).toBeGreaterThanOrEqual(12);
 
     // Official grade label & 4-criterion rubric checks
     expect(

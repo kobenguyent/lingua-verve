@@ -33,10 +33,11 @@ import {
   buildCoachSeedFromReadinessReport,
   buildOfflineReadinessReport,
 } from '../utils/examAssessment';
+import { LearningLanguageId, normalizeLearningLanguageId } from '../data/languages';
 
 interface ExamReadinessAdvisorCardProps {
   attempts: ExamAttemptRecord[];
-  filterLang: 'all' | 'english' | 'german';
+  filterLang: 'all' | LearningLanguageId;
   savedReport?: ExamHistoryReadinessReport;
   aiConfig?: AIProviderConfig;
   onOpenAISettings?: () => void;
@@ -248,7 +249,9 @@ export const ExamReadinessAdvisorCard: React.FC<ExamReadinessAdvisorCardProps> =
           {onLaunchExam && (
             <button
               type="button"
-              onClick={() => onLaunchExam(filterLang === 'german' ? 'german' : 'english', 'B1')}
+              onClick={() =>
+                onLaunchExam(filterLang === 'all' ? 'english' : normalizeLearningLanguageId(filterLang), 'B1')
+              }
               className="px-3.5 py-2 rounded-xl font-bold bg-sky-600 hover:bg-sky-500 text-white shrink-0"
             >
               Open Exam Arena

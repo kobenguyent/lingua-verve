@@ -31,12 +31,18 @@ describe('SoundEngine Audio, Multi-Accent & Human Voice Selection Tests', () => 
     soundEngine.toggleMute();
   });
 
-  it('provides 6 global English accents and 3 pluricentric German DACH accents', () => {
+  it('provides global English, German DACH, Francophone French, and Tokyo Japanese accents', () => {
     const enCodes = getAccentsForLanguage('english').map((a) => a.code);
     const deCodes = getAccentsForLanguage('german').map((a) => a.code);
+    const frCodes = getAccentsForLanguage('french').map((a) => a.code);
+    const jaCodes = getAccentsForLanguage('japanese').map((a) => a.code);
 
     expect(enCodes).toEqual(['en-GB', 'en-US', 'en-AU', 'en-IE', 'en-IN', 'en-ZA']);
     expect(deCodes).toEqual(['de-DE', 'de-AT', 'de-CH']);
+    expect(frCodes).toEqual(['fr-FR', 'fr-CA', 'fr-CH']);
+    expect(jaCodes).toEqual(['ja-JP']);
+    expect(soundEngine.getActiveAccentCode('french')).toBe('fr-FR');
+    expect(soundEngine.getActiveAccentCode('japanese')).toBe('ja-JP');
   });
 
   it('filters out legacy robotic/novelty/Eloquence voices and prioritizes Siri/Neural/Enhanced human voices', () => {

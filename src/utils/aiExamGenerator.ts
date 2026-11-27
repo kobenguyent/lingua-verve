@@ -10,6 +10,11 @@ import {
 } from '../types';
 import { AI_PROVIDER_PRESETS, callAIProvider, isAIConfigReady } from './aiClient';
 import { resolveAIConfigForLanguage } from './aiModelAdvisor';
+import {
+  getLearningLanguageMeta,
+  LearningLanguageId,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 
 export const GENERATED_EXAMS_STORAGE_KEY = 'linguaverve_ai_generated_exams_v1';
 
@@ -17,7 +22,7 @@ export type SkillGenStatus = 'pending' | 'loading' | 'done' | 'fallback';
 
 export type ExamGenerationProgress = Record<SkillType, SkillGenStatus>;
 
-export const AI_EXAM_THEMES: Record<'german' | 'english', string[]> = {
+export const AI_EXAM_THEMES: Record<LearningLanguageId, string[]> = {
   german: [
     'Alltag, Wohnen & Nachbarschaft in der Stadt',
     'Bahn, Nahverkehr & nachhaltige Mobilität',
@@ -46,10 +51,34 @@ export const AI_EXAM_THEMES: Record<'german' | 'english', string[]> = {
     'Food Systems, Hospitality & Regional Traditions',
     'Science Communication & Space Exploration',
   ],
+  french: [
+    'Mobilité durable, transports et vie urbaine',
+    'Télétravail, carrière et vie professionnelle en France',
+    'Santé, bien-être et prévention au quotidien',
+    'Études supérieures, culture et patrimoine francophone',
+    'Intelligence artificielle, médias et vie privée numérique',
+    'Transition écologique, énergie et logement',
+    'Gastronomie, alimentation durable et consommation',
+    'Voyages, tourisme responsable et hôtellerie',
+    'Engagement citoyen, associations et solidarité',
+    'Innovation, entrepreneuriat et économie locale',
+  ],
+  japanese: [
+    '日本の公共交通・旅行とマナー',
+    'リモートワークと現代の働き方改革',
+    '健康管理・医療と食文化の知恵',
+    '大学生活・生涯学習とキャリア形成',
+    'AI・デジタル社会とプライバシー保護',
+    '環境問題・防災と持続可能な街づくり',
+    '日本の伝統文化・メディアと地域創生',
+    '買い物・消費者サービスと暮らしの工夫',
+    '地域ボランティア・多文化共生社会',
+    '起業・イノベーションと経済動向',
+  ],
 };
 
 export function pickRandomExamTheme(languageId: string, avoidThemes: string[] = []): string {
-  const key = languageId === 'german' ? 'german' : 'english';
+  const key = normalizeLearningLanguageId(languageId);
   const pool = AI_EXAM_THEMES[key];
   const avoidLower = new Set(avoidThemes.map((t) => t.toLowerCase().trim()));
   const fresh = pool.filter((t) => !avoidLower.has(t.toLowerCase()));
@@ -297,8 +326,15 @@ export function repairExamClozeParts(exam: MockExam, fallbackBase?: MockExam): M
 }
 
 function getTargetAccents(languageId: string, seed: number): [string, string, string] {
-  if (languageId === 'german') {
+  const id = normalizeLearningLanguageId(languageId);
+  if (id === 'german') {
     return ['de-DE', 'de-AT', 'de-CH'];
+  }
+  if (id === 'french') {
+    return ['fr-FR', 'fr-CA', 'fr-CH'];
+  }
+  if (id === 'japanese') {
+    return ['ja-JP', 'ja-JP', 'ja-JP'];
   }
   const rotating: Array<[string, string, string]> = [
     ['en-GB', 'en-AU', 'en-US'],
@@ -374,11 +410,11 @@ export async function generateFreshMockExamWithAI(params: {
     (params.theme && params.theme.trim()) ||
     pickRandomExamTheme(baseExam.languageId, avoidThemes);
 
-  const isGerman = baseExam.languageId === 'german';
-  const langName = isGerman ? 'German' : 'English';
+  const langId = normalizeLearningLanguageId(baseExam.languageId);
+  const langName = getLearningLanguageMeta(langId).name;
   const seed = Math.floor(Math.random() * 9000) + 1000;
   const stamp = `${Date.now().toString(36)}-${seed}`;
-  const accents = getTargetAccents(baseExam.languageId, seed);
+  const accents = getTargetAccents(langId, seed);
 
   const avoidNote =
     avoidThemes.length > 0
@@ -399,10 +435,48 @@ export async function generateFreshMockExamWithAI(params: {
   // --- 1. READING PROMPT (3 Parts · 9 Questions) ---
   const generateReading = async (): Promise<{ ok: boolean; parts: ReadingExamPart[] }> => {
     emitProgress('reading', 'loading');
-    const clozeExample = isGerman
-      ? 'Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe.'
-      : 'I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget.';
-    const gapWord = isGerman ? 'Lücke' : 'Gap';
+    const clozeExample =
+      langId === 'german'
+        ? 'Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe.'
+        : langId === 'french'
+        ? 'Bonjour, je vous écris [1] confirmer notre rendez-vous [2] mardi, [3] nous devons finaliser le projet.'
+        : langId === 'japanese'
+        ? '明日の会議[1]午前10時[2]始まります[3]、10分前までに会議室へお越しください。'
+        : 'I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget.';
+    const gapWord =
+      langId === 'german' ? 'Lücke' : langId === 'french' ? 'Trou' : langId === 'japanese' ? '空欄' : 'Gap';
+    const tfTitle =
+      langId === 'german'
+        ? 'Richtig/Falsch'
+        : langId === 'french'
+        ? 'Vrai/Faux/Non mentionné'
+        : langId === 'japanese'
+        ? '正誤判定 (正しい/誤り/本文にない)'
+        : 'True/False/Not Given';
+    const tfOptionsJson =
+      langId === 'german'
+        ? '["Richtig","Falsch","Steht nicht im Text"]'
+        : langId === 'french'
+        ? '["Vrai","Faux","Non mentionné"]'
+        : langId === 'japanese'
+        ? '["正しい (True)","誤り (False)","本文にない (Not Given)"]'
+        : '["True","False","Not Given"]';
+    const clozeTitle =
+      langId === 'german'
+        ? 'Sprachbausteine / Lückentext'
+        : langId === 'french'
+        ? 'Grammaire en contexte / Texte à trous'
+        : langId === 'japanese'
+        ? '文法・語彙 穴埋め問題'
+        : 'Use of English / Cloze';
+    const defaultReadInstr =
+      langId === 'german'
+        ? 'Lesen Sie den Text und wählen Sie die beste Antwort.'
+        : langId === 'french'
+        ? 'Lisez le texte attentivement et choisissez la meilleure réponse.'
+        : langId === 'japanese'
+        ? '文章をよく読んで、最も適切な答えを選んでください。'
+        : 'Read the passage and choose the best answer.';
     const sys = `You are a certified ${baseExam.alignedCertificate} exam author creating brand-new CEFR ${baseExam.level} ${langName} Reading exam content.
 CRITICAL FOR PART 3 (format: "cloze"): The passage MUST contain the literal numbered blank markers [1], [2], and [3] IN PLACE OF the missing answer words — NEVER write the answer words inside the passage! Example Part 3 passage: "${clozeExample}".
 Return ONLY valid JSON with this exact shape:
@@ -421,19 +495,19 @@ Return ONLY valid JSON with this exact shape:
       ]
     },
     {
-      "partLabel": "<Part 2 title (${isGerman ? 'Richtig/Falsch' : 'True/False/Not Given'})>",
+      "partLabel": "<Part 2 title (${tfTitle})>",
       "format": "true-false",
       "instruction": "<instruction in ${langName}>",
       "passageTitle": "<title in ${langName}>",
       "passage": "<authentic notice/article in ${langName}, 80-150 words>",
       "questions": [
-        {"prompt":"<statement in ${langName}>","options":${isGerman ? '["Richtig","Falsch","Steht nicht im Text"]' : '["True","False","Not Given"]'},"correctIndex":0,"explanation":"..."},
-        {"prompt":"...","options":${isGerman ? '["Richtig","Falsch","Steht nicht im Text"]' : '["True","False","Not Given"]'},"correctIndex":1,"explanation":"..."},
-        {"prompt":"...","options":${isGerman ? '["Richtig","Falsch","Steht nicht im Text"]' : '["True","False","Not Given"]'},"correctIndex":2,"explanation":"..."}
+        {"prompt":"<statement in ${langName}>","options":${tfOptionsJson},"correctIndex":0,"explanation":"..."},
+        {"prompt":"...","options":${tfOptionsJson},"correctIndex":1,"explanation":"..."},
+        {"prompt":"...","options":${tfOptionsJson},"correctIndex":2,"explanation":"..."}
       ]
     },
     {
-      "partLabel": "<Part 3 title (${isGerman ? 'Sprachbausteine / Lückentext' : 'Use of English / Cloze'})>",
+      "partLabel": "<Part 3 title (${clozeTitle})>",
       "format": "cloze",
       "instruction": "<instruction in ${langName}>",
       "passageTitle": "<title in ${langName}>",
@@ -483,7 +557,7 @@ Return ONLY valid JSON with this exact shape:
         id: `ai-${stamp}-read-p${i + 1}`,
         partLabel: pickString(rp.partLabel, `Reading · Part ${i + 1}`),
         format: fmt,
-        instruction: pickString(rp.instruction, isGerman ? 'Lesen Sie den Text und wählen Sie die beste Antwort.' : 'Read the passage and choose the best answer.'),
+        instruction: pickString(rp.instruction, defaultReadInstr),
         passageTitle: pickString(rp.passageTitle, chosenTheme),
         passage,
         questions: qs,
@@ -505,9 +579,14 @@ Return ONLY valid JSON with this exact shape:
   // --- 2. LISTENING PROMPT (3 Multi-Accent Conversational Dialogue Tracks · 9 Questions) ---
   const generateListening = async (): Promise<{ ok: boolean; tracks: ListeningExamTrack[] }> => {
     emitProgress('listening', 'loading');
-    const exampleDialogue = isGerman
-      ? 'Clara: Entschuldigung, fährt der Zug heute von Gleis sechs?\\nMarkus: Moment mal — nein, der wurde gerade auf Gleis neun verlegt!\\nClara: Ach wirklich? Danke, das hätte ich fast verpasst!\\nMarkus: Gern, er hat übrigens auch zehn Minuten Verspätung.'
-      : 'Emma: Wait, did the workshop move to Room 204?\\nLiam: Hang on, let me check my email—oh! It was 204 yesterday, but they switched it to Room 310 this morning.\\nEmma: Good thing I asked! Does it still start at nine thirty?\\nLiam: Yep, nine thirty sharp.';
+    const exampleDialogue =
+      langId === 'german'
+        ? 'Clara: Entschuldigung, fährt der Zug heute von Gleis sechs?\\nMarkus: Moment mal — nein, der wurde gerade auf Gleis neun verlegt!\\nClara: Ach wirklich? Danke, das hätte ich fast verpasst!\\nMarkus: Gern, er hat übrigens auch zehn Minuten Verspätung.'
+        : langId === 'french'
+        ? 'Camille: Excusez-moi, le train pour Lyon part bien du quai six ?\\nLucas: Attendez — non, il vient juste de passer au quai neuf !\\nCamille: Ah vraiment ? Merci beaucoup, j’allais le rater !\\nLucas: Je vous en prie, il a d’ailleurs dix minutes de retard.'
+        : langId === 'japanese'
+        ? 'Yuki: すみません、大阪行きの新幹線は6番線ですか。\\nKenji: あ、さっきアナウンスがあって、今日は9番線に変わりましたよ。\\nYuki: えっ、そうなんですね！教えてくれてありがとうございます。\\nKenji: いえいえ、あと10分ほど遅れているみたいです。'
+        : 'Emma: Wait, did the workshop move to Room 204?\\nLiam: Hang on, let me check my email—oh! It was 204 yesterday, but they switched it to Room 310 this morning.\\nEmma: Good thing I asked! Does it still start at nine thirty?\\nLiam: Yep, nine thirty sharp.';
     const sys = `You are a certified ${baseExam.alignedCertificate} Listening exam author creating 3 brand-new CEFR ${baseExam.level} ${langName} NATURAL TWO-PERSON HUMAN CONVERSATIONS (NOT stiff monologues or robot announcements).
 CRITICAL: Format EVERY audioScript as a realistic 4–6 turn back-and-forth dialogue between two named humans (one female name, one male name) separated by newline \\n, using natural spoken reactions, gentle interruptions, and realistic self-corrections. Example format: "${exampleDialogue}". Do NOT include stage directions in brackets.
 Return ONLY valid JSON with this exact shape:
@@ -706,8 +785,12 @@ Return ONLY valid JSON with this exact shape:
         prompts,
         examinerPromptAudio: pickString(
           rp.examinerPromptAudio,
-          isGerman
+          langId === 'german'
             ? `Willkommen zu Teil ${i + 1}. Bitte sprechen Sie kurz zum Thema ${chosenTheme}.`
+            : langId === 'french'
+            ? `Bienvenue dans la partie ${i + 1}. Veuillez vous exprimer sur le thème ${chosenTheme}.`
+            : langId === 'japanese'
+            ? `パート${i + 1}を始めます。「${chosenTheme}」について、ご意見を聞かせてください。`
             : `Welcome to Part ${i + 1}. Please share your thoughts on ${chosenTheme}.`
         ),
         keyRubricKeywords: pickStringArray(rp.keyRubricKeywords, 2, baseExam.speaking.keyRubricKeywords),

@@ -21,7 +21,7 @@ public struct VoiceStudioSheetView: View {
     public init(store: CurriculumStore) {
         self.store = store
         self._draft = State(initialValue: NativeAudioEngine.shared.voiceSettings)
-        self._accentLanguageTab = State(initialValue: store.courseLanguageId == "german" ? "german" : "english")
+        self._accentLanguageTab = State(initialValue: LearningLanguage.normalize(store.courseLanguageId))
         self._cacheStats = State(initialValue: NativeAudioEngine.shared.audioCacheStats())
     }
 
@@ -30,7 +30,7 @@ public struct VoiceStudioSheetView: View {
     }
 
     private var selectedAccentCode: String {
-        draft.accents[accentLanguageTab] ?? (accentLanguageTab == "german" ? "de-DE" : "en-GB")
+        draft.accents[accentLanguageTab] ?? LearningLanguage.from(accentLanguageTab).defaultAccentCode
     }
 
     private var selectedAccent: AccentOption? {
@@ -52,10 +52,12 @@ public struct VoiceStudioSheetView: View {
 
         NavigationStack {
             Form {
-                Section("1. Target Accents (English · German DACH)") {
+                Section("1. Target Accents (EN · DE · FR · JA)") {
                     Picker("Language", selection: $accentLanguageTab) {
-                        Text("🇬🇧 English (6 Accents)").tag("english")
-                        Text("🇩🇪 German DACH (3 Accents)").tag("german")
+                        Text("🇬🇧 EN (6)").tag("english")
+                        Text("🇩🇪 DE (3)").tag("german")
+                        Text("🇫🇷 FR (3)").tag("french")
+                        Text("🇯🇵 JA").tag("japanese")
                     }
                     .pickerStyle(.segmented)
 
@@ -149,15 +151,21 @@ public struct VoiceStudioSheetView: View {
                             }
 
                             if diag.highQualityCountForLanguage <= 1 {
-                                if accentLanguageTab == "german" {
-                                    Text("How to install free Apple Premium German voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"German\" → download Petra (Premium), Anna (Premium), or Markus (Enhanced) → click Refresh above.")
-                                        .scaledFont(.caption)
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    Text("How to install free Apple Premium English voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"English\" → download Zoe (Premium), Daniel (Enhanced), Jamie (Premium), or Matilda (Premium) → click Refresh above.")
-                                        .scaledFont(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                let voiceInstallHint: String = {
+                                    switch LearningLanguage.from(accentLanguageTab) {
+                                    case .german:
+                                        return "How to install free Apple Premium German voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"German\" → download Petra (Premium), Anna (Premium), or Markus (Enhanced) → click Refresh above."
+                                    case .french:
+                                        return "How to install free Apple Premium French voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"French\" → download Audrey (Premium), Aurélie (Enhanced), Amélie (Enhanced), or Thomas (Enhanced) → click Refresh above."
+                                    case .japanese:
+                                        return "How to install free Apple Premium Japanese voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"Japanese\" → download Kyoko (Enhanced), Otoya (Enhanced), or Hattori → click Refresh above."
+                                    case .english:
+                                        return "How to install free Apple Premium English voices: Open Read & Speak → click the ⓘ button next to System Voice (or System Voice → Manage Voices…) → search \"English\" → download Zoe (Premium), Daniel (Enhanced), Jamie (Premium), or Matilda (Premium) → click Refresh above."
+                                    }
+                                }()
+                                Text(voiceInstallHint)
+                                    .scaledFont(.caption)
+                                    .foregroundStyle(.secondary)
                             }
 
                             #if os(macOS)

@@ -1,6 +1,8 @@
 import { CEFRLevel, MockExam } from '../types';
 import { MOCK_EXAM_EXTENSIONS } from './mockExamExtensions';
 import { CONVERSATIONAL_LISTENING_SCRIPTS } from './conversationalListeningScripts';
+import { FRENCH_MOCK_EXAMS } from './mockExamsFrench';
+import { JAPANESE_MOCK_EXAMS } from './mockExamsJapanese';
 
 /**
  * 12 Full 4-Skill Simulated Certification Exams (English A1–C2 + German A1–C2)
@@ -1488,7 +1490,7 @@ const RAW_MOCK_EXAMS: MockExam[] = [
   },
 ];
 
-export const MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
+const EN_DE_MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
   const ext = MOCK_EXAM_EXTENSIONS[exam.id];
   if (!ext) return exam;
 
@@ -1583,6 +1585,12 @@ export const MOCK_EXAMS: MockExam[] = RAW_MOCK_EXAMS.map((exam) => {
     },
   };
 });
+
+export const MOCK_EXAMS: MockExam[] = [
+  ...EN_DE_MOCK_EXAMS,
+  ...FRENCH_MOCK_EXAMS,
+  ...JAPANESE_MOCK_EXAMS,
+];
 
 export function getMockExams(languageId?: string, level?: CEFRLevel | 'ALL'): MockExam[] {
   return MOCK_EXAMS.filter((exam) => {

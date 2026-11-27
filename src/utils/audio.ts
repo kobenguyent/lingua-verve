@@ -147,6 +147,24 @@ export const ACCENT_CATALOG: AccentOption[] = [
     sampleText: 'Bonjour ! Découvrons la cadence chaleureuse du français québécois.',
     neuralHint: 'Speak in natural, warm Canadian French (Montreal).',
   },
+  {
+    code: 'fr-CH',
+    languageId: 'french',
+    flag: '🇨🇭',
+    label: 'Switzerland (CH)',
+    region: 'Suisse romande · Geneva',
+    sampleText: 'Bonjour ! Entraînons notre écoute avec le français clair et posé de Suisse romande.',
+    neuralHint: 'Speak in warm, articulate Swiss French (Suisse romande, Geneva) with clear cadence.',
+  },
+  {
+    code: 'ja-JP',
+    languageId: 'japanese',
+    flag: '🇯🇵',
+    label: 'Japan (JP)',
+    region: 'Standard Tokyo · 標準語',
+    sampleText: 'こんにちは！今日は自然な日本語の発音とリズムを一緒に練習しましょう。',
+    neuralHint: 'Speak in warm, natural Standard Tokyo Japanese (Hyōjungo) with authentic pitch accent and mora timing.',
+  },
 ];
 
 export interface NeuralVoicePreset {
@@ -234,7 +252,10 @@ export const LOCAL_NEURAL_VOICES: NeuralVoicePreset[] = [
   { id: 'af_heart', label: 'Kokoro Heart (American F)', note: 'Top-rated warm US neural voice' },
   { id: 'am_michael', label: 'Kokoro Michael (American M)', note: 'Natural US male neural voice' },
   { id: 'af_bella', label: 'Kokoro Bella (American F)', note: 'Expressive conversational US voice' },
-  { id: 'chatterbox-multilingual', label: 'Chatterbox Multilingual (EN & DE)', note: 'Expressive local multilingual voice via MLX-Audio' },
+  { id: 'ff_siwis', label: 'Kokoro Siwis (French F)', note: 'Natural Parisian French neural voice (Kokoro / MLX-Audio)' },
+  { id: 'jf_alpha', label: 'Kokoro Alpha (Japanese F)', note: 'Clear Standard Tokyo Japanese female neural voice (Kokoro / MLX-Audio)' },
+  { id: 'jm_kumo', label: 'Kokoro Kumo (Japanese M)', note: 'Natural Tokyo Japanese male neural voice (Kokoro / MLX-Audio)' },
+  { id: 'chatterbox-multilingual', label: 'Chatterbox Multilingual (EN/DE/FR/JA)', note: 'Expressive local multilingual voice via MLX-Audio' },
 ];
 
 export interface VoiceProviderPresetMeta {
@@ -392,6 +413,21 @@ const KNOWN_HUMAN_VOICE_NAMES = [
   'jonas',
   'leni',
   'jan',
+  'audrey',
+  'aurélie',
+  'nicolas',
+  'chloé',
+  'denise',
+  'henri',
+  'sylvie',
+  'kyoko',
+  'otoya',
+  'hattori',
+  'o-ren',
+  'nanami',
+  'keita',
+  'haruka',
+  'ayumi',
 ];
 
 export function normalizeLanguageKey(languageId: string): string {
@@ -399,6 +435,7 @@ export function normalizeLanguageKey(languageId: string): string {
   if (lower === 'german' || lower === 'de' || lower.startsWith('de-')) return 'german';
   if (lower === 'spanish' || lower === 'es' || lower.startsWith('es-')) return 'spanish';
   if (lower === 'french' || lower === 'fr' || lower.startsWith('fr-')) return 'french';
+  if (lower === 'japanese' || lower === 'ja' || lower.startsWith('ja-')) return 'japanese';
   return 'english';
 }
 
@@ -420,6 +457,7 @@ export function getDefaultVoiceSettings(): VoiceSettings {
       german: 'de-DE',
       spanish: 'es-ES',
       french: 'fr-FR',
+      japanese: 'ja-JP',
     },
     preferredSystemVoices: {},
     rateMultiplier: 1.0,
@@ -926,15 +964,19 @@ const NON_SPEAKER_LABELS = new Set([
 const FEMALE_SPEAKER_HINTS = new Set([
   'frau', 'anna', 'hannah', 'lena', 'clara', 'mia', 'sara', 'sarah', 'emma', 'maya',
   'sophie', 'julia', 'petra', 'helena', 'nina', 'laura', 'lisa', 'katharina', 'elena',
-  'priya', 'chloe', 'rachel', 'amira', 'moderatorin', 'kritikerin', 'ärztin', 'verkäuferin',
+  'priya', 'chloe', 'chloé', 'rachel', 'amira', 'moderatorin', 'kritikerin', 'ärztin', 'verkäuferin',
   'rezeptionistin', 'studentin', 'autorin', 'professorin', 'novak', 'berger', 'keller', 'meier',
+  'camille', 'claire', 'élodie', 'elodie', 'manon', 'léa', 'lea', 'nadia', 'marie', 'céline', 'celine',
+  'madame', 'mme', 'yuki', 'haruka', 'sakura', 'yumi', 'aiko', 'hina', 'akiko', 'keiko', 'mai', 'rin',
 ]);
 
 const MALE_SPEAKER_HINTS = new Set([
-  'herr', 'lukas', 'markus', 'viktor', 'martin', 'yannick', 'tobias', 'jonas', 'max',
+  'herr', 'lukas', 'lucas', 'markus', 'viktor', 'martin', 'yannick', 'tobias', 'jonas', 'max',
   'paul', 'david', 'tom', 'ben', 'liam', 'leo', 'daniel', 'oliver', 'james', 'noah',
   'stefan', 'felix', 'alex', 'moderator', 'interviewer', 'schaffner', 'arzt', 'verkäufer',
   'kellner', 'becker', 'steiner', 'lindner', 'gruber', 'weber', 'vance', 'tutor', 'host', 'guest',
+  'thomas', 'julien', 'antoine', 'hugo', 'marc', 'nicolas', 'pierre', 'monsieur', 'm',
+  'kenji', 'takashi', 'hiroshi', 'ren', 'daiki', 'kenta', 'taro', 'sato', 'tanaka', 'suzuki',
 ]);
 
 /**
@@ -945,7 +987,7 @@ export function parseDialogueTurns(text: string): DialogueTurn[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  const regex = /(?:^|\n|(?<=[.!?—–]\s))([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\- ]{0,22}):\s+/g;
+  const regex = /(?:^|\n|(?<=[.!?。！？—–]\s*))([A-ZÄÖÜÀÂÆÇÉÈÊËÎÏÔŒÙÛÜŸ][A-Za-zÄÖÜäöüßÀ-ÿ.\- ]{0,22})[:：]\s*/g;
   const matches: Array<{ speaker: string; start: number; textStart: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = regex.exec(trimmed)) !== null) {
@@ -1046,11 +1088,21 @@ function pickNeuralVoiceForSpeaker(
   }
 
   if (cfg.provider === 'local-openai') {
+    const lowerAccent = accentCode.toLowerCase();
     if (isGerman) {
       const male = 'de_DE-thorsten-high';
       const female = 'de_DE-eva_k-x_low';
       if (speakerIndex === 0) return gender === 'female' ? female : gender === 'male' ? male : primary;
       return primary === male ? female : male;
+    }
+    if (lowerAccent.startsWith('ja')) {
+      const female = 'jf_alpha';
+      const male = 'jm_kumo';
+      if (speakerIndex === 0) return gender === 'male' ? male : female;
+      return primary === male ? female : male;
+    }
+    if (lowerAccent.startsWith('fr')) {
+      return 'ff_siwis';
     }
     return speakerIndex === 0 ? primary : primary === 'bm_george' ? 'bf_emma' : 'bm_george';
   }
@@ -1155,6 +1207,7 @@ class SoundEngine {
     if (key === 'german') return 'de-DE';
     if (key === 'spanish') return 'es-ES';
     if (key === 'french') return 'fr-FR';
+    if (key === 'japanese') return 'ja-JP';
     return 'en-GB';
   }
 

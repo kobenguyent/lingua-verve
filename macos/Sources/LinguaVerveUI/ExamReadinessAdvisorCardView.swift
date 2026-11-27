@@ -429,7 +429,7 @@ public struct ExamReadinessAdvisorCardView: View {
             Spacer()
             Button("Open Exam Arena") {
                 NativeAudioEngine.shared.playClickSound()
-                store.openExamSimulator(languageId: filterLang == "german" ? "german" : "english", level: .B1)
+                store.openExamSimulator(languageId: filterLang == "all" ? "english" : LearningLanguage.normalize(filterLang), level: .B1)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)

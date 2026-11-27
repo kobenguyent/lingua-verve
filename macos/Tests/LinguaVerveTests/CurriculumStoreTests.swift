@@ -22,7 +22,7 @@ final class CurriculumStoreTests: XCTestCase {
         let store = makeTestStore()
         let expectedLevels = Set(CEFRLevel.allCases.map(\.rawValue))
 
-        for lang in ["english", "german"] {
+        for lang in ["english", "german", "french", "japanese"] {
             let levelsPresent = Set(
                 store.bundle.tips
                     .filter { $0.languageId == lang }

@@ -31,6 +31,13 @@ import {
   VOICE_PROVIDER_PRESETS,
 } from '../utils/audio';
 import { ModalDialog } from './ModalDialog';
+import {
+  getLearningLanguageMeta,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  LearningLanguageId,
+  normalizeLearningLanguageId,
+} from '../data/languages';
 
 interface VoiceSettingsModalProps {
   isOpen: boolean;
@@ -57,8 +64,8 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
   activeLanguageId,
 }) => {
   const [draft, setDraft] = useState<VoiceSettings>(settings);
-  const [accentTab, setAccentTab] = useState<'english' | 'german'>(
-    activeLanguageId === 'german' ? 'german' : 'english'
+  const [accentTab, setAccentTab] = useState<LearningLanguageId>(
+    normalizeLearningLanguageId(activeLanguageId)
   );
   const [previewingCode, setPreviewingCode] = useState<string | null>(null);
   const [previewStatus, setPreviewStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -71,7 +78,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
     let cancelled = false;
     if (isOpen) {
       setDraft(settings);
-      setAccentTab(activeLanguageId === 'german' ? 'german' : 'english');
+      setAccentTab(normalizeLearningLanguageId(activeLanguageId));
       setPreviewStatus(null);
       setLocalHealth(null);
       setVoiceRefreshTick((t) => t + 1);
@@ -90,7 +97,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
   }, [isOpen]);
 
   const accentsForTab = useMemo(() => getAccentsForLanguage(accentTab), [accentTab]);
-  const selectedAccentCode = draft.accents[accentTab] || (accentTab === 'german' ? 'de-DE' : 'en-GB');
+  const selectedAccentCode = draft.accents[accentTab] || getLearningLanguageMeta(accentTab).defaultAccentCode;
   const selectedAccent = getAccentOption(selectedAccentCode) ?? accentsForTab[0];
 
   const humanSystemVoices = useMemo(() => {
@@ -180,7 +187,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
                 Human Voice &amp; Accent Studio
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Choose natural accents across English &amp; German DACH, filter out robotic voices, or connect neural human TTS.
+                Choose natural accents across English, German DACH, French &amp; Japanese, filter out robotic voices, or connect neural human TTS.
               </p>
             </div>
           </div>
@@ -201,32 +208,35 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <Globe2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                <span>1. Target Accents (English · German DACH)</span>
+                <span>1. Target Accents (EN · DE · FR · JA)</span>
               </div>
 
-              <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => setAccentTab('english')}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    accentTab === 'english'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  🇬🇧 English (6 Accents)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccentTab('german')}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    accentTab === 'german'
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  🇩🇪 German DACH (3 Accents)
-                </button>
+              <div className="inline-flex flex-wrap p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                {LEARNING_LANGUAGE_IDS.map((langId) => {
+                  const m = LEARNING_LANGUAGE_META[langId];
+                  const label =
+                    langId === 'english'
+                      ? '🇬🇧 English (6 Accents)'
+                      : langId === 'german'
+                      ? '🇩🇪 German DACH (3 Accents)'
+                      : langId === 'french'
+                      ? '🇫🇷 French (3 Accents)'
+                      : `${m.flag} Japanese (Tokyo)`;
+                  return (
+                    <button
+                      key={langId}
+                      type="button"
+                      onClick={() => setAccentTab(langId)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                        accentTab === langId
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

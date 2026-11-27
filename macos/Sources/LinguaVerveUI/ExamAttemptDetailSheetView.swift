@@ -210,7 +210,7 @@ public struct ExamAttemptDetailSheetView: View {
                     .foregroundStyle(.indigo)
             }
 
-            Text("\(attempt.languageId == "german" ? "🇩🇪" : "🇬🇧") \(attempt.examTitle)")
+            Text("\(LearningLanguage.from(attempt.languageId).flag) \(attempt.examTitle)")
                 .scaledFont(.title2, weight: .bold)
         }
     }

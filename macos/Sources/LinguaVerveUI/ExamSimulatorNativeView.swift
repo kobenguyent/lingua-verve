@@ -61,7 +61,7 @@ public struct ExamSimulatorNativeView: View {
     }
 
     public var body: some View {
-        let lang = store.courseLanguageId == "german" ? "german" : "english"
+        let lang = LearningLanguage.normalize(store.courseLanguageId)
         let baseExam = store.mockExam(for: lang, level: store.examTargetLevel)
         let savedAIExams = store.generatedExams(for: lang, level: store.examTargetLevel)
         let exam = savedAIExams.first(where: { $0.id == selectedExamId }) ?? baseExam
@@ -174,19 +174,21 @@ public struct ExamSimulatorNativeView: View {
                     }
                     Spacer()
                     Picker("Language", selection: $store.courseLanguageId) {
-                        Text("🇬🇧 English").tag("english")
-                        Text("🇩🇪 German").tag("german")
+                        ForEach(LearningLanguage.allCases) { lang in
+                            Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
+                        }
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(maxWidth: AppTypography.scaledControlWidth(235, scale: fontScale, maxCap: 310))
+                    .frame(maxWidth: AppTypography.scaledControlWidth(290, scale: fontScale, maxCap: 370))
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Simulate Official Certification Pressure")
                         .scaledFont(size: 21, weight: .bold, design: .serif)
                     Picker("Language", selection: $store.courseLanguageId) {
-                        Text("🇬🇧 English").tag("english")
-                        Text("🇩🇪 German").tag("german")
+                        ForEach(LearningLanguage.allCases) { lang in
+                            Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
+                        }
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
@@ -253,9 +255,7 @@ public struct ExamSimulatorNativeView: View {
                     blueprintCard(
                         title: "1. Reading",
                         badge: "\(readingParts.count) Parts · \(totalReadQs) Qs",
-                        detail: exam.languageId == "german"
-                            ? "Lesen + Richtig/Falsch + Sprachbausteine"
-                            : "Comprehension + TFNG + Use of English",
+                        detail: "Comprehension + \(LearningLanguage.from(exam.languageId).readingFormatSummary)",
                         tint: BrandTheme.celestialSky
                     )
                     blueprintCard(
@@ -447,9 +447,7 @@ public struct ExamSimulatorNativeView: View {
     @ViewBuilder
     private func aiExamControlsRow(baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
         let themes = AIExamGeneratorService.themes(for: baseExam.languageId)
-        let placeholder = baseExam.languageId == "german"
-            ? "Optional: eigenes Thema (z. B. Arzttermin, KI)…"
-            : "Optional: custom topic (e.g. Job Interview, Climate)…"
+        let placeholder = "Optional: \(LearningLanguage.from(baseExam.languageId).topicPlaceholder)"
 
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
@@ -1760,7 +1758,7 @@ public struct ExamSimulatorNativeView: View {
     }
 
     private func wordCount(_ text: String) -> Int {
-        text.split(whereSeparator: \.isWhitespace).count
+        LearningLanguage.countUnits(in: text)
     }
 
     private func accentBadge(_ code: String?, languageId: String) -> String {

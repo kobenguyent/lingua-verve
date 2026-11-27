@@ -1,32 +1,56 @@
 import { TipItem, CEFRLevel, Category, IntensiveCourse } from '../types';
 import { ENGLISH_TIPS } from './tips/english';
 import { GERMAN_TIPS } from './tips/german';
+import { FRENCH_TIPS } from './tips/french';
+import { JAPANESE_TIPS } from './tips/japanese';
 import { META_TIPS } from './tips/polyglotMeta';
-import { LANGUAGES, getLanguage, getActiveLanguages } from './languages';
+import {
+  LANGUAGES,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
+  getLanguage,
+  getActiveLanguages,
+  normalizeLearningLanguageId,
+  getLearningLanguageMeta,
+  getDefaultCertificateForLevel,
+  countLanguageUnits,
+} from './languages';
 import { CEFR_LEVELS, getLevelDetail } from './levels';
 import { FALSE_FRIENDS } from './falseFriends';
 import { DIAGNOSTIC_QUESTIONS } from './diagnostic';
 import { OFFICIAL_EXAM_REFERENCES, getExamReferences } from './examReferences';
 import { GERMAN_INTENSIVE_COURSES } from './courses/germanCourses';
 import { ENGLISH_INTENSIVE_COURSES } from './courses/englishCourses';
+import { FRENCH_INTENSIVE_COURSES } from './courses/frenchCourses';
+import { JAPANESE_INTENSIVE_COURSES } from './courses/japaneseCourses';
 import { PRETEST_QUESTIONS, getPreTestQuestions, evaluatePreTest } from './pretests';
 import { MOCK_EXAMS, getMockExams, getMockExamById } from './mockExams';
 
 export {
   LANGUAGES,
+  LEARNING_LANGUAGE_IDS,
+  LEARNING_LANGUAGE_META,
   getLanguage,
   getActiveLanguages,
+  normalizeLearningLanguageId,
+  getLearningLanguageMeta,
+  getDefaultCertificateForLevel,
+  countLanguageUnits,
   CEFR_LEVELS,
   getLevelDetail,
   FALSE_FRIENDS,
   DIAGNOSTIC_QUESTIONS,
   ENGLISH_TIPS,
   GERMAN_TIPS,
+  FRENCH_TIPS,
+  JAPANESE_TIPS,
   META_TIPS,
   OFFICIAL_EXAM_REFERENCES,
   getExamReferences,
   GERMAN_INTENSIVE_COURSES,
   ENGLISH_INTENSIVE_COURSES,
+  FRENCH_INTENSIVE_COURSES,
+  JAPANESE_INTENSIVE_COURSES,
   PRETEST_QUESTIONS,
   getPreTestQuestions,
   evaluatePreTest,
@@ -38,12 +62,16 @@ export {
 export const ALL_TIPS: TipItem[] = [
   ...ENGLISH_TIPS,
   ...GERMAN_TIPS,
+  ...FRENCH_TIPS,
+  ...JAPANESE_TIPS,
   ...META_TIPS,
 ];
 
 export const INTENSIVE_COURSES: IntensiveCourse[] = [
   ...ENGLISH_INTENSIVE_COURSES,
   ...GERMAN_INTENSIVE_COURSES,
+  ...FRENCH_INTENSIVE_COURSES,
+  ...JAPANESE_INTENSIVE_COURSES,
 ];
 
 export function getCoursesByLanguage(languageId: string): IntensiveCourse[] {

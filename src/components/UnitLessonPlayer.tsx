@@ -33,6 +33,7 @@ import {
   UnitStudyProgress,
 } from '../types';
 import { getAccentsForLanguage, soundEngine } from '../utils/audio';
+import { countLanguageUnits } from '../data/languages';
 import { evaluateWithAIOrFallback, getDefaultAIConfig } from '../utils/aiClient';
 import {
   isSpeechRecognitionSupported,
@@ -410,8 +411,8 @@ export const UnitLessonPlayer: React.FC<UnitLessonPlayerProps> = ({
 
   // Checkpoint handlers
   const checkpointWordCount = useMemo(
-    () => checkpointText.trim().split(/\s+/).filter(Boolean).length,
-    [checkpointText]
+    () => countLanguageUnits(checkpointText, course.languageId),
+    [checkpointText, course.languageId]
   );
 
   const handleToggleCheckpointMic = () => {

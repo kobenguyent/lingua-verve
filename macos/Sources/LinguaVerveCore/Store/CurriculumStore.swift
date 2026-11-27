@@ -323,12 +323,12 @@ public final class CurriculumStore {
     // MARK: - Intensive Courses & Exam References
 
     public func courses(for languageId: String) -> [IntensiveCourse] {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         return coursesByLanguage[target] ?? []
     }
 
     public func course(for languageId: String, level: CEFRLevel) -> IntensiveCourse? {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         return courseByKey[Self.courseIndexKey(languageId: target, level: level)]
     }
 
@@ -431,12 +431,12 @@ public final class CurriculumStore {
     // MARK: - Scored Placement Pre-Test & Collective Course Recommender
 
     public func preTestQuestions(for languageId: String) -> [PreTestQuestion] {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         return bundle.preTestQuestions.filter { $0.languageId == target }
     }
 
     public func evaluateAndRecordPreTest(languageId: String, answers: [String: Int]) -> PreTestResult {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         let questions = preTestQuestions(for: target)
 
         var levelCorrect: [CEFRLevel: Int] = [:]
@@ -530,7 +530,7 @@ public final class CurriculumStore {
         }
 
         let cert = findCourse(verifiedLevel)?.targetCertificates.first
-            ?? (target == "german" ? "Goethe-Zertifikat \(verifiedLevel.rawValue)" : "Cambridge English \(verifiedLevel.rawValue)")
+            ?? LearningLanguage.from(target).defaultCertificate(for: verifiedLevel)
 
         let result = PreTestResult(
             id: "pre-\(UUID().uuidString.prefix(8))",
@@ -571,7 +571,7 @@ public final class CurriculumStore {
     // MARK: - Simulated 4-Skill Exams & AI Sessions
 
     public func mockExam(for languageId: String, level: CEFRLevel) -> MockExam? {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         return bundle.mockExams.first { $0.languageId == target && $0.level == level }
             ?? bundle.mockExams.first { $0.languageId == target }
     }
@@ -594,7 +594,7 @@ public final class CurriculumStore {
     }
 
     public func generatedExams(for languageId: String, level: CEFRLevel) -> [MockExam] {
-        let target = languageId == "german" ? "german" : "english"
+        let target = LearningLanguage.normalize(languageId)
         return generatedExams.filter { $0.languageId == target && $0.level == level }
     }
 
@@ -801,14 +801,14 @@ public final class CurriculumStore {
     // MARK: - Cross-Workspace Navigation Shortcuts
 
     public func openCourse(languageId: String, level: CEFRLevel) {
-        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLanguageId = LearningLanguage.normalize(languageId)
         self.courseLevel = level
         self.activeLessonModuleId = nil
         self.activeWorkspace = .courses
     }
 
     public func openUnitLesson(moduleId: String, languageId: String, level: CEFRLevel) {
-        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLanguageId = LearningLanguage.normalize(languageId)
         self.courseLevel = level
         self.activeLessonModuleId = moduleId
         self.activeWorkspace = .courses
@@ -819,13 +819,13 @@ public final class CurriculumStore {
     }
 
     public func openExamSimulator(languageId: String, level: CEFRLevel) {
-        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLanguageId = LearningLanguage.normalize(languageId)
         self.examTargetLevel = level
         self.activeWorkspace = .simulator
     }
 
     public func openAICoach(languageId: String, level: CEFRLevel, skill: SkillType, seedPrompt: String = "") {
-        self.courseLanguageId = languageId == "german" ? "german" : "english"
+        self.courseLanguageId = LearningLanguage.normalize(languageId)
         self.aiCoachLevel = level
         self.aiCoachSkill = skill
         self.aiCoachSeedPrompt = seedPrompt

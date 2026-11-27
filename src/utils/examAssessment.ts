@@ -25,6 +25,11 @@ import {
 } from './aiClient';
 import { resolveAIConfigForLanguage } from './aiModelAdvisor';
 import {
+  getDefaultCertificateForLevel,
+  getLearningLanguageMeta,
+  normalizeLearningLanguageId,
+} from '../data/languages';
+import {
   getExamListeningTracks,
   getExamReadingParts,
   getExamSpeakingParts,
@@ -144,7 +149,8 @@ export function buildOfflineExamAssessment(params: {
 }): ExamAIAssessment {
   const { exam, attempt, writingEvals = [], speakingEval = null } = params;
   const reviews = attempt.questionReviews || [];
-  const langName = attempt.languageId === 'german' ? 'German' : 'English';
+  const langId = normalizeLearningLanguageId(attempt.languageId);
+  const langName = getLearningLanguageMeta(langId).name;
 
   const scoresBySkill: Record<SkillType, number> = {
     reading: attempt.skills.reading?.score ?? 0,
@@ -187,11 +193,15 @@ export function buildOfflineExamAssessment(params: {
         : [],
     corrections: extractMissedReviewCorrections(reviews, 'reading'),
     suggestions: [
-      attempt.languageId === 'german'
+      langId === 'german'
         ? `Underline key qualifiers (nicht, nur, erst, kaum, obwohl) in ${attempt.level} Lesen passages before choosing Richtig/Falsch.`
+        : langId === 'french'
+        ? `Watch subtle qualifiers (ne…que, à peine, bien que, sauf) in ${attempt.level} French reading passages before choosing Vrai/Faux.`
+        : langId === 'japanese'
+        ? `Check sentence-final negations, particles (しか〜ない, わけではない, とは限らない), and kanji compounds in ${attempt.level} Japanese passages.`
         : `Verify exact qualifiers (only, rarely, despite, whereas) in ${attempt.level} Reading passages before locking answers.`,
       readMissedParts.includes('Reading P3')
-        ? 'Drill Sprachbausteine / Use of English prepositions, verb-case pairings, and conjunctions for 10 mins daily.'
+        ? `Drill ${attempt.level} ${langName} contextual grammar & cloze connectors for 10 mins daily.`
         : 'Practice timed skimming for gist first, then scanning paragraph-by-paragraph for evidence.',
     ],
     aiAnalyzed: false,
@@ -286,10 +296,14 @@ export function buildOfflineExamAssessment(params: {
       writingSuggestions.length > 0
         ? writingSuggestions
         : [
-            attempt.languageId === 'german'
+            langId === 'german'
               ? `Check every bullet requirement, keep formal/informal register consistent (Sie vs. du), and double-check verb-final order after weil/obwohl/dass.`
+              : langId === 'french'
+              ? `Check every bullet requirement, keep vouvoiement/tutoiement register consistent, and review gender agreement & subjonctif triggers.`
+              : langId === 'japanese'
+              ? `Keep です/ます or だ/である register consistent throughout, verify particles (は/が/に/で/を), and include discourse connectors (しかし, そのため, 一方で).`
               : `Address every prompt bullet explicitly, organize into clear paragraphs, and upgrade repeated basic verbs with ${attempt.level} collocations.`,
-            'Leave 3 minutes at the end to proofread verb tense agreement, articles/cases, and punctuation.',
+            'Leave 3 minutes at the end to proofread grammar, register consistency, and punctuation.',
           ],
     upgradedVersion: writingUpgraded || undefined,
     aiAnalyzed: writingAIAnalyzed,
@@ -548,11 +562,9 @@ export async function assessFullExamWithAIOrFallback(params: {
     return base;
   }
 
-  const langName = attempt.languageId === 'german' ? 'German' : 'English';
-  const examBoard =
-    attempt.languageId === 'german'
-      ? 'Goethe-Zertifikat / telc / TestDaF'
-      : 'Cambridge English / IELTS / TOEFL';
+  const langMeta = getLearningLanguageMeta(attempt.languageId);
+  const langName = langMeta.name;
+  const examBoard = langMeta.examBoard;
 
   const systemPrompt = `You are a senior certified ${examBoard} Chief Examiner analyzing a candidate's full 4-skill ${langName} ${attempt.level} simulated exam.
 Give concrete, encouraging, evidence-based diagnostics grounded ONLY in the candidate's actual submitted results below.
@@ -763,10 +775,7 @@ export function buildOfflineReadinessReport(params: {
 
   const latestAttempt = analyzed[0];
   const targetCertificate =
-    latestAttempt.alignedCertificate ||
-    (chosenLang === 'german'
-      ? `Goethe-Zertifikat ${chosenLevel}`
-      : `Cambridge English ${chosenLevel}`);
+    latestAttempt.alignedCertificate || getDefaultCertificateForLevel(chosenLang, chosenLevel);
 
   const passCount = analyzed.filter((a) => a.passed).length;
   const passRatePercent = Math.round((passCount / analyzed.length) * 100);
@@ -1051,11 +1060,9 @@ export async function analyzeExamHistoryReadinessWithAIOrFallback(params: {
     return baseline;
   }
 
-  const langName = baseline.languageId === 'german' ? 'German' : 'English';
-  const examBoard =
-    baseline.languageId === 'german'
-      ? 'Goethe-Zertifikat / telc / TestDaF'
-      : 'Cambridge English / IELTS / TOEFL';
+  const langMeta = getLearningLanguageMeta(baseline.languageId);
+  const langName = langMeta.name;
+  const examBoard = langMeta.examBoard;
 
   const systemPrompt = `You are a candid, data-driven Senior ${examBoard} Certification Advisor evaluating a learner's simulated ${langName} ${baseline.targetLevel} exam history.
 Your job: Tell the learner clearly whether they are READY to book and pass the REAL official exam now, ALMOST READY (needs short targeted polish), or NEED MORE PRACTICE before spending money on official registration.

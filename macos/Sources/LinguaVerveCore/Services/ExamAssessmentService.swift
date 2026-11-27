@@ -75,10 +75,9 @@ public struct ExamAssessmentService: Sendable {
             return base
         }
 
-        let langName = attempt.languageId == "german" ? "German" : "English"
-        let examBoard = attempt.languageId == "german"
-            ? "Goethe-Zertifikat / telc / TestDaF"
-            : "Cambridge English / IELTS / TOEFL"
+        let lang = LearningLanguage.from(attempt.languageId)
+        let langName = lang.name
+        let examBoard = lang.examBoard
 
         let systemPrompt = """
         You are a senior certified \(examBoard) Chief Examiner analyzing a candidate's full 4-skill \(langName) \(attempt.level.rawValue) simulated exam.
@@ -274,7 +273,8 @@ public struct ExamAssessmentService: Sendable {
         speakingEval: AIEvaluationResult? = nil
     ) -> ExamAIAssessment {
         let reviews = attempt.questionReviews ?? []
-        let langName = attempt.languageId == "german" ? "German" : "English"
+        let lang = LearningLanguage.from(attempt.languageId)
+        let langName = lang.name
 
         func score(_ sk: SkillType) -> Int { attempt.skills[sk.rawValue]?.score ?? 0 }
         let sorted = SkillType.allCases.sorted { score($0) > score($1) }
@@ -345,11 +345,20 @@ public struct ExamAssessmentService: Sendable {
                 : (score(.reading) < 75 ? ["Watch for subtle qualifiers in True/False/Not Given and Cloze grammar items."] : []),
             corrections: missedCorrections(for: .reading),
             suggestions: [
-                attempt.languageId == "german"
-                    ? "Underline key qualifiers (nicht, nur, erst, kaum, obwohl) in \(attempt.level.rawValue) Lesen passages before selecting Richtig/Falsch."
-                    : "Verify exact qualifiers (only, rarely, despite, whereas) in \(attempt.level.rawValue) Reading passages before locking answers.",
+                {
+                    switch lang {
+                    case .german:
+                        return "Underline key qualifiers (nicht, nur, erst, kaum, obwohl) in \(attempt.level.rawValue) Lesen passages before selecting Richtig/Falsch."
+                    case .french:
+                        return "Watch subtle qualifiers (ne…que, à peine, bien que, sauf) in \(attempt.level.rawValue) French reading passages before choosing Vrai/Faux."
+                    case .japanese:
+                        return "Verify sentence-final negations, particles (しか〜ない, わけではない, とは限らない), and kanji compounds in \(attempt.level.rawValue) Japanese passages."
+                    case .english:
+                        return "Verify exact qualifiers (only, rarely, despite, whereas) in \(attempt.level.rawValue) Reading passages before locking answers."
+                    }
+                }(),
                 readMissedTags.contains("Reading P3")
-                    ? "Drill Sprachbausteine / Use of English prepositions, verb-case pairings, and conjunctions for 10 mins daily."
+                    ? "Drill \(attempt.level.rawValue) \(langName) contextual grammar & cloze connectors for 10 mins daily."
                     : "Skim for main idea first, then scan paragraph-by-paragraph to verify exact text evidence."
             ],
             aiAnalyzed: false
@@ -422,10 +431,19 @@ public struct ExamAssessmentService: Sendable {
             weaknesses: rubricWeaknesses(for: .writing),
             corrections: Array(wCorrections.prefix(6)),
             suggestions: !wSuggestions.isEmpty ? wSuggestions : [
-                attempt.languageId == "german"
-                    ? "Check every prompt bullet, keep Sie/du register consistent, and verify verb-final order after weil/obwohl/dass."
-                    : "Address every prompt bullet explicitly, organize into clear paragraphs, and elevate vocabulary with \(attempt.level.rawValue) collocations.",
-                "Reserve 3 minutes at the end to proofread verb agreement, articles/cases, and punctuation."
+                {
+                    switch lang {
+                    case .german:
+                        return "Check every prompt bullet, keep Sie/du register consistent, and verify verb-final order after weil/obwohl/dass."
+                    case .french:
+                        return "Check every prompt bullet, keep vouvoiement/tutoiement consistent, and verify gender agreement & subjonctif triggers."
+                    case .japanese:
+                        return "Keep です/ます or だ/である register consistent, check particles (は/が/に/で/を), and use connectors (しかし, そのため, 一方で)."
+                    case .english:
+                        return "Address every prompt bullet explicitly, organize into clear paragraphs, and elevate vocabulary with \(attempt.level.rawValue) collocations."
+                    }
+                }(),
+                "Reserve 3 minutes at the end to proofread grammar, register consistency, and punctuation."
             ],
             upgradedVersion: wUpgraded.isEmpty ? nil : wUpgraded,
             aiAnalyzed: wAI
@@ -656,7 +674,7 @@ public struct ExamAssessmentService: Sendable {
 
         let latestAttempt = analyzed[0]
         let targetCertificate = latestAttempt.alignedCertificate.isEmpty
-            ? (chosenLang == "german" ? "Goethe-Zertifikat \(chosenLevel.rawValue)" : "Cambridge English \(chosenLevel.rawValue)")
+            ? LearningLanguage.from(chosenLang).defaultCertificate(for: chosenLevel)
             : latestAttempt.alignedCertificate
 
         let passCount = analyzed.filter(\.passed).count
@@ -902,10 +920,9 @@ public struct ExamAssessmentService: Sendable {
             return baseline
         }
 
-        let langName = baseline.languageId == "german" ? "German" : "English"
-        let examBoard = baseline.languageId == "german"
-            ? "Goethe-Zertifikat / telc / TestDaF"
-            : "Cambridge English / IELTS / TOEFL"
+        let lang = LearningLanguage.from(baseline.languageId)
+        let langName = lang.name
+        let examBoard = lang.examBoard
 
         let systemPrompt = """
         You are a candid, data-driven Senior \(examBoard) Certification Advisor evaluating a learner's simulated \(langName) \(baseline.targetLevel.rawValue) exam history.

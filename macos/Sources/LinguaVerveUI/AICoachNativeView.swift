@@ -20,8 +20,9 @@ public struct AICoachNativeView: View {
     }
 
     public var body: some View {
-        let lang = store.courseLanguageId == "german" ? "german" : "english"
-        let langName = lang == "german" ? "German" : "English"
+        let langEnum = LearningLanguage.from(store.courseLanguageId)
+        let lang = langEnum.rawValue
+        let langName = langEnum.name
         let effectiveConfig = store.aiConfig.resolved(for: lang)
 
         VStack(spacing: 0) {
@@ -50,11 +51,12 @@ public struct AICoachNativeView: View {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
                         Picker("Lang", selection: $store.courseLanguageId) {
-                            Text("🇬🇧 EN").tag("english")
-                            Text("🇩🇪 DE").tag("german")
+                            ForEach(LearningLanguage.allCases) { item in
+                                Text("\(item.flag) \(item.shortCode)").tag(item.rawValue)
+                            }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: AppTypography.scaledControlWidth(160, scale: fontScale, maxCap: 220))
+                        .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
 
                         Picker("Level", selection: $store.aiCoachLevel) {
                             ForEach(CEFRLevel.allCases) { lvl in
@@ -73,11 +75,12 @@ public struct AICoachNativeView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Picker("Lang", selection: $store.courseLanguageId) {
-                                Text("🇬🇧 EN").tag("english")
-                                Text("🇩🇪 DE").tag("german")
+                                ForEach(LearningLanguage.allCases) { item in
+                                    Text("\(item.flag) \(item.shortCode)").tag(item.rawValue)
+                                }
                             }
                             .pickerStyle(.segmented)
-                            .frame(maxWidth: AppTypography.scaledControlWidth(160, scale: fontScale, maxCap: 220))
+                            .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
 
                             Picker("Level", selection: $store.aiCoachLevel) {
                                 ForEach(CEFRLevel.allCases) { lvl in
@@ -350,7 +353,7 @@ public struct AICoachNativeView: View {
         let prompt = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isLoading else { return }
 
-        let lang = store.courseLanguageId == "german" ? "german" : "english"
+        let lang = LearningLanguage.normalize(store.courseLanguageId)
         errorMessage = nil
         offlineEval = nil
         NativeAudioEngine.shared.playClickSound()

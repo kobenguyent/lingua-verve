@@ -919,7 +919,8 @@ public struct MockExam: Codable, Identifiable, Equatable, Sendable {
         allModulesPassed: Bool,
         passingScorePercent: Int
     ) -> String {
-        if languageId == "german" {
+        switch LearningLanguage.from(languageId) {
+        case .german:
             if !allModulesPassed || overallScore < passingScorePercent {
                 return "Goethe/telc: nicht bestanden (\(overallScore)/100)"
             }
@@ -927,25 +928,220 @@ public struct MockExam: Codable, Identifiable, Equatable, Sendable {
             if overallScore >= 80 { return "Goethe/telc: gut (\(overallScore)/100)" }
             if overallScore >= 70 { return "Goethe/telc: befriedigend (\(overallScore)/100)" }
             return "Goethe/telc: ausreichend (\(overallScore)/100)"
-        }
 
-        let baseBand: Double
-        switch level {
-        case .A1: baseBand = 2.5
-        case .A2: baseBand = 3.5
-        case .B1: baseBand = 5.0
-        case .B2: baseBand = 6.5
-        case .C1: baseBand = 7.5
-        case .C2: baseBand = 8.5
+        case .french:
+            let diploma = (level == .C1 || level == .C2) ? "DALF \(level.rawValue)" : "DELF \(level.rawValue)"
+            if !allModulesPassed || overallScore < passingScorePercent {
+                return "\(diploma): Non admis (\(overallScore)/100)"
+            }
+            if overallScore >= 85 { return "\(diploma): Mention Très Bien (\(overallScore)/100)" }
+            if overallScore >= 75 { return "\(diploma): Mention Bien (\(overallScore)/100)" }
+            if overallScore >= 65 { return "\(diploma): Mention Assez Bien (\(overallScore)/100)" }
+            return "\(diploma): Admis (\(overallScore)/100)"
+
+        case .japanese:
+            let tier: String
+            switch level {
+            case .A1: tier = "JLPT N5"
+            case .A2: tier = "JLPT N4"
+            case .B1: tier = "JLPT N3"
+            case .B2: tier = "JLPT N2"
+            case .C1: tier = "JLPT N1"
+            case .C2: tier = "JLPT N1+ Mastery"
+            }
+            let scaled180 = Int((Double(overallScore) / 100.0 * 180.0).rounded())
+            if !allModulesPassed || overallScore < passingScorePercent {
+                return "\(tier): 不合格 Below Pass (\(scaled180)/180)"
+            }
+            return "\(tier): 合格 Pass (\(scaled180)/180)"
+
+        case .english:
+            let baseBand: Double
+            switch level {
+            case .A1: baseBand = 2.5
+            case .A2: baseBand = 3.5
+            case .B1: baseBand = 5.0
+            case .B2: baseBand = 6.5
+            case .C1: baseBand = 7.5
+            case .C2: baseBand = 8.5
+            }
+            let delta = (Double(overallScore - 65) / 35.0) * 1.0
+            let band = max(1.0, min(9.0, ((baseBand + delta) * 2.0).rounded() / 2.0))
+            let bandStr = String(format: "%.1f", band)
+            if !allModulesPassed || overallScore < passingScorePercent {
+                return "Below Pass Threshold · Est. IELTS \(bandStr)"
+            }
+            let grade = overallScore >= 85 ? "Grade A (Distinction)" : overallScore >= 75 ? "Grade B (Merit)" : "Grade C (Pass)"
+            return "Cambridge \(grade) · Est. IELTS \(bandStr)"
         }
-        let delta = (Double(overallScore - 65) / 35.0) * 1.0
-        let band = max(1.0, min(9.0, ((baseBand + delta) * 2.0).rounded() / 2.0))
-        let bandStr = String(format: "%.1f", band)
-        if !allModulesPassed || overallScore < passingScorePercent {
-            return "Below Pass Threshold · Est. IELTS \(bandStr)"
+    }
+}
+
+public enum LearningLanguage: String, CaseIterable, Identifiable, Codable, Sendable {
+    case english
+    case german
+    case french
+    case japanese
+
+    public var id: String { rawValue }
+
+    public var name: String {
+        switch self {
+        case .english: return "English"
+        case .german: return "German"
+        case .french: return "French"
+        case .japanese: return "Japanese"
         }
-        let grade = overallScore >= 85 ? "Grade A (Distinction)" : overallScore >= 75 ? "Grade B (Merit)" : "Grade C (Pass)"
-        return "Cambridge \(grade) · Est. IELTS \(bandStr)"
+    }
+
+    public var nativeName: String {
+        switch self {
+        case .english: return "English"
+        case .german: return "Deutsch"
+        case .french: return "Français"
+        case .japanese: return "日本語"
+        }
+    }
+
+    public var shortCode: String {
+        switch self {
+        case .english: return "EN"
+        case .german: return "DE"
+        case .french: return "FR"
+        case .japanese: return "JA"
+        }
+    }
+
+    public var flag: String {
+        switch self {
+        case .english: return "🇬🇧"
+        case .german: return "🇩🇪"
+        case .french: return "🇫🇷"
+        case .japanese: return "🇯🇵"
+        }
+    }
+
+    public var examBoard: String {
+        switch self {
+        case .english: return "Cambridge English, IELTS, and TOEFL iBT"
+        case .german: return "Goethe-Zertifikat, telc, and TestDaF"
+        case .french: return "DELF, DALF, and TCF"
+        case .japanese: return "JLPT (N5–N1), JF Standard, and BJT"
+        }
+    }
+
+    public var defaultAccentCode: String {
+        switch self {
+        case .english: return "en-GB"
+        case .german: return "de-DE"
+        case .french: return "fr-FR"
+        case .japanese: return "ja-JP"
+        }
+    }
+
+    public var readingFormatSummary: String {
+        switch self {
+        case .english: return "TFNG + Use of English"
+        case .german: return "Richtig/Falsch + Sprachbausteine"
+        case .french: return "Vrai/Faux + Texte à trous"
+        case .japanese: return "正誤判定 + 文法穴埋め"
+        }
+    }
+
+    public var topicPlaceholder: String {
+        switch self {
+        case .english: return "e.g. Medical Visit, Tech Interview, Climate..."
+        case .german: return "z. B. Arzttermin, Vorstellungsgespräch, KI..."
+        case .french: return "ex. Mobilité durable, Télétravail, Gastronomie..."
+        case .japanese: return "例：日本の交通と旅行、リモートワーク、食文化…"
+        }
+    }
+
+    public var connectors: [String] {
+        switch self {
+        case .english:
+            return ["because", "although", "however", "moreover", "furthermore", "therefore", "nevertheless", "whereas", "consequently"]
+        case .german:
+            return ["weil", "obwohl", "deshalb", "außerdem", "jedoch", "allerdings", "einerseits", "andererseits", "dennoch", "angesichts"]
+        case .french:
+            return ["parce que", "cependant", "pourtant", "donc", "en outre", "néanmoins", "bien que", "afin de", "en revanche", "tandis que"]
+        case .japanese:
+            return ["から", "ので", "しかし", "けれど", "また", "さらに", "そのため", "一方で", "なぜなら", "したがって", "つまり"]
+        }
+    }
+
+    public var connectorHint: String {
+        switch self {
+        case .english:
+            return "Add discourse connectors (however, although, furthermore, consequently) to boost coherence."
+        case .german:
+            return "Add subordinating connectors (weil, obwohl, außerdem, deshalb) to raise coherence."
+        case .french:
+            return "Add French discourse connectors (cependant, néanmoins, bien que, en revanche) to elevate coherence."
+        case .japanese:
+            return "Add Japanese connectors (しかし, そのため, 一方で, さらに, なぜなら) to strengthen discourse flow."
+        }
+    }
+
+    public var usesCJKCharacters: Bool {
+        self == .japanese
+    }
+
+    public func defaultCertificate(for level: CEFRLevel) -> String {
+        switch self {
+        case .english:
+            return "Cambridge English \(level.rawValue)"
+        case .german:
+            return "Goethe-Zertifikat \(level.rawValue)"
+        case .french:
+            return (level == .C1 || level == .C2) ? "DALF \(level.rawValue)" : "DELF \(level.rawValue)"
+        case .japanese:
+            switch level {
+            case .A1: return "JLPT N5 (CEFR A1)"
+            case .A2: return "JLPT N4 (CEFR A2)"
+            case .B1: return "JLPT N3 (CEFR B1)"
+            case .B2: return "JLPT N2 (CEFR B2)"
+            case .C1: return "JLPT N1 (CEFR C1)"
+            case .C2: return "JLPT N1+ Mastery (CEFR C2)"
+            }
+        }
+    }
+
+    public static func from(_ languageId: String) -> LearningLanguage {
+        let lower = languageId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if lower == "german" || lower == "de" || lower.hasPrefix("de-") { return .german }
+        if lower == "french" || lower == "fr" || lower.hasPrefix("fr-") { return .french }
+        if lower == "japanese" || lower == "ja" || lower.hasPrefix("ja-") { return .japanese }
+        return .english
+    }
+
+    public static func normalize(_ languageId: String) -> String {
+        from(languageId).rawValue
+    }
+
+    public static func containsJapaneseScript(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            if (0x3040...0x30FF).contains(v) || (0x3400...0x9FFF).contains(v) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Counts word-equivalents cleanly for both space-delimited languages (EN/DE/FR)
+    /// and character-based Japanese (~2.2 non-punctuation characters ≈ 1 word).
+    public static func countUnits(in text: String, languageId: String? = nil) -> Int {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return 0 }
+        let whitespaceWords = cleaned.split(whereSeparator: \.isWhitespace).count
+        let isJapanese = (languageId.map { from($0) == .japanese } ?? false) || containsJapaneseScript(cleaned)
+        if isJapanese {
+            let ignored = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+            let charCount = cleaned.unicodeScalars.filter { !ignored.contains($0) }.count
+            return max(whitespaceWords, Int(ceil(Double(charCount) / 2.2)))
+        }
+        return whitespaceWords
     }
 }
 
@@ -968,11 +1164,18 @@ public struct OfficialRubricBreakdown: Codable, Equatable, Sendable {
             return OfficialRubricBreakdown(taskFulfillment: 0, coherenceCohesion: 0, lexicalRange: 0, grammaticalAccuracy: 0)
         }
         let words = cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
-        let wordCount = words.count
+        let wordCount = LearningLanguage.countUnits(in: cleaned)
         let lower = cleaned.lowercased()
-        let sentences = cleaned.split(whereSeparator: { ".!?".contains($0) }).filter { $0.trimmingCharacters(in: .whitespaces).count > 2 }.count
-        let uniqueCount = Set(words.map { $0.lowercased().filter(\.isLetter) }.filter { !$0.isEmpty }).count
-        let diversity = Double(uniqueCount) / Double(max(1, wordCount))
+        let sentences = cleaned.split(whereSeparator: { ".!?。！？".contains($0) }).filter { $0.trimmingCharacters(in: .whitespaces).count > 2 }.count
+        let uniqueCount: Int
+        if LearningLanguage.containsJapaneseScript(cleaned) {
+            let chars = Array(cleaned.filter { !$0.isWhitespace && !$0.isPunctuation })
+            let bigrams = chars.count >= 2 ? Set((0..<(chars.count - 1)).map { String([chars[$0], chars[$0 + 1]]) }) : Set(chars.map(String.init))
+            uniqueCount = bigrams.count
+        } else {
+            uniqueCount = Set(words.map { $0.lowercased().filter(\.isLetter) }.filter { !$0.isEmpty }).count
+        }
+        let diversity = min(1.0, Double(uniqueCount) / Double(max(1, wordCount)))
         let kwHits = expectedKeywords.filter { lower.contains($0.lowercased()) }.count
         let kwRatio = expectedKeywords.isEmpty ? 0.6 : Double(kwHits) / Double(min(5, expectedKeywords.count))
         let lengthRatio = min(1.0, Double(wordCount) / Double(max(15, minWords)))

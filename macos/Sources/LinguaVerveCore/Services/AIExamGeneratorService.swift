@@ -67,8 +67,39 @@ public struct AIExamGeneratorService: Sendable {
         "Science Communication & Space Exploration"
     ]
 
+    public static let frenchThemes: [String] = [
+        "Mobilité durable, transports et vie urbaine",
+        "Télétravail, carrière et vie professionnelle en France",
+        "Santé, bien-être et prévention au quotidien",
+        "Études supérieures, culture et patrimoine francophone",
+        "Intelligence artificielle, médias et vie privée numérique",
+        "Transition écologique, énergie et logement",
+        "Gastronomie, alimentation durable et consommation",
+        "Voyages, tourisme responsable et hôtellerie",
+        "Engagement citoyen, associations et solidarité",
+        "Innovation, entrepreneuriat et économie locale"
+    ]
+
+    public static let japaneseThemes: [String] = [
+        "日本の公共交通・旅行とマナー",
+        "リモートワークと現代の働き方改革",
+        "健康管理・医療と食文化の知恵",
+        "大学生活・生涯学習とキャリア形成",
+        "AI・デジタル社会とプライバシー保護",
+        "環境問題・防災と持続可能な街づくり",
+        "日本の伝統文化・メディアと地域創生",
+        "買い物・消費者サービスと暮らしの工夫",
+        "地域ボランティア・多文化共生社会",
+        "起業・イノベーションと経済動向"
+    ]
+
     public static func themes(for languageId: String) -> [String] {
-        languageId == "german" ? germanThemes : englishThemes
+        switch LearningLanguage.from(languageId) {
+        case .german: return germanThemes
+        case .french: return frenchThemes
+        case .japanese: return japaneseThemes
+        case .english: return englishThemes
+        }
     }
 
     public static func pickRandomTheme(for languageId: String, avoid: [String] = []) -> String {
@@ -104,11 +135,11 @@ public struct AIExamGeneratorService: Sendable {
             ? trimmedCustom
             : (!trimmedTheme.isEmpty ? trimmedTheme : Self.pickRandomTheme(for: baseExam.languageId, avoid: avoidThemes))
 
-        let isGerman = baseExam.languageId == "german"
-        let langName = isGerman ? "German" : "English"
+        let lang = LearningLanguage.from(baseExam.languageId)
+        let langName = lang.name
         let seed = Int.random(in: 1000...9999)
         let stamp = "\(Int(Date().timeIntervalSince1970))-\(seed)"
-        let accents = Self.targetAccents(for: baseExam.languageId, seed: seed)
+        let accents = Self.targetAccents(for: lang.rawValue, seed: seed)
         let avoidNote = avoidThemes.isEmpty
             ? ""
             : "Avoid repeating scenarios from these previous themes: \(avoidThemes.prefix(5).joined(separator: "; "))."
@@ -125,15 +156,15 @@ public struct AIExamGeneratorService: Sendable {
         let speakRes: (ok: Bool, parts: [SpeakingExamPart])
 
         if runSequentially {
-            readRes = await generateReading(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, isGerman: isGerman, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
-            listenRes = await generateListening(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, accents: accents, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            readRes = await generateReading(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            listenRes = await generateListening(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, accents: accents, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
             writeRes = await generateWriting(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
-            speakRes = await generateSpeaking(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, isGerman: isGerman, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            speakRes = await generateSpeaking(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
         } else {
-            async let r = generateReading(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, isGerman: isGerman, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
-            async let l = generateListening(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, accents: accents, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            async let r = generateReading(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            async let l = generateListening(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, accents: accents, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
             async let w = generateWriting(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
-            async let s = generateSpeaking(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, langName: langName, isGerman: isGerman, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
+            async let s = generateSpeaking(config: creativeConfig, baseExam: baseExam, theme: chosenTheme, lang: lang, seed: seed, stamp: stamp, avoidNote: avoidNote, onProgress: onProgress)
             readRes = await r
             listenRes = await l
             writeRes = await w
@@ -281,19 +312,40 @@ public struct AIExamGeneratorService: Sendable {
         config: AIProviderConfig,
         baseExam: MockExam,
         theme: String,
-        langName: String,
-        isGerman: Bool,
+        lang: LearningLanguage,
         seed: Int,
         stamp: String,
         avoidNote: String,
         onProgress: (@Sendable (SkillType, SkillGenerationStatus) -> Void)?
     ) async -> (ok: Bool, parts: [ReadingExamPart]) {
         onProgress?(.reading, .loading)
-        let tfOptions = isGerman ? #"["Richtig","Falsch","Steht nicht im Text"]"# : #"["True","False","Not Given"]"#
-        let clozeExample = isGerman
-            ? #"Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe."#
-            : #"I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget."#
-        let gapWord = isGerman ? "Lücke" : "Gap"
+        let langName = lang.name
+        let tfOptions: String
+        let clozeExample: String
+        let gapWord: String
+        let defaultInstruction: String
+        switch lang {
+        case .german:
+            tfOptions = #"["Richtig","Falsch","Steht nicht im Text"]"#
+            clozeExample = #"Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe."#
+            gapWord = "Lücke"
+            defaultInstruction = "Lesen Sie den Text und wählen Sie die beste Antwort."
+        case .french:
+            tfOptions = #"["Vrai","Faux","Non mentionné"]"#
+            clozeExample = #"Bonjour, je vous écris [1] confirmer notre rendez-vous [2] mardi, [3] nous devons finaliser le dossier."#
+            gapWord = "Trou"
+            defaultInstruction = "Lisez le texte attentivement et choisissez la meilleure réponse."
+        case .japanese:
+            tfOptions = #"["正しい (True)","誤り (False)","本文にない (Not Given)"]"#
+            clozeExample = #"明日の会議[1]午前10時[2]始まります[3]、10分前までに会議室へお越しください。"#
+            gapWord = "空欄"
+            defaultInstruction = "文章をよく読んで、最も適切な答えを選んでください。"
+        case .english:
+            tfOptions = #"["True","False","Not Given"]"#
+            clozeExample = #"I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget."#
+            gapWord = "Gap"
+            defaultInstruction = "Read the passage carefully and choose the best answer."
+        }
         let sys = """
         You are a certified \(baseExam.alignedCertificate) Reading exam author creating brand-new CEFR \(baseExam.level.rawValue) \(langName) content.
         CRITICAL FOR PART 3 (format: "cloze"): The passage MUST contain the literal numbered blank markers [1], [2], and [3] IN PLACE OF the missing answer words — NEVER leave the answer word inside the passage! Example Part 3 passage: "\(clozeExample)".
@@ -332,7 +384,7 @@ public struct AIExamGeneratorService: Sendable {
                         id: "ai-\(stamp)-read-p\(idx + 1)",
                         partLabel: nonEmpty(rp.partLabel, fallback: "Reading · Part \(idx + 1)"),
                         format: fmt,
-                        instruction: nonEmpty(rp.instruction, fallback: isGerman ? "Lesen Sie den Text und wählen Sie die beste Antwort." : "Read the passage carefully and choose the best answer."),
+                        instruction: nonEmpty(rp.instruction, fallback: defaultInstruction),
                         passageTitle: nonEmpty(rp.passageTitle, fallback: theme),
                         passage: passage,
                         questions: qs
@@ -355,7 +407,7 @@ public struct AIExamGeneratorService: Sendable {
         config: AIProviderConfig,
         baseExam: MockExam,
         theme: String,
-        langName: String,
+        lang: LearningLanguage,
         accents: [String],
         seed: Int,
         stamp: String,
@@ -363,10 +415,18 @@ public struct AIExamGeneratorService: Sendable {
         onProgress: (@Sendable (SkillType, SkillGenerationStatus) -> Void)?
     ) async -> (ok: Bool, tracks: [ListeningExamTrack]) {
         onProgress?(.listening, .loading)
-        let isGerman = baseExam.languageId == "german"
-        let exampleDialogue = isGerman
-            ? "Clara: Entschuldigung, fährt der Zug von Gleis sechs?\\nMarkus: Moment — nein, der wurde auf Gleis neun verlegt!\\nClara: Ach wirklich? Danke, das hätte ich fast verpasst!\\nMarkus: Gern, er hat auch zehn Minuten Verspätung."
-            : "Emma: Wait, did the workshop move to Room 204?\\nLiam: Hang on, let me check—oh! It was 204 yesterday, but they moved it to Room 310 today.\\nEmma: Good thing I asked! Still at nine thirty?\\nLiam: Yep, nine thirty sharp."
+        let langName = lang.name
+        let exampleDialogue: String
+        switch lang {
+        case .german:
+            exampleDialogue = "Clara: Entschuldigung, fährt der Zug von Gleis sechs?\\nMarkus: Moment — nein, der wurde auf Gleis neun verlegt!\\nClara: Ach wirklich? Danke, das hätte ich fast verpasst!\\nMarkus: Gern, er hat auch zehn Minuten Verspätung."
+        case .french:
+            exampleDialogue = "Camille: Excusez-moi, le train pour Lyon part bien du quai six ?\\nLucas: Attendez — non, il vient de passer au quai neuf !\\nCamille: Ah vraiment ? Merci beaucoup, j’allais le rater !\\nLucas: Je vous en prie, il a aussi dix minutes de retard."
+        case .japanese:
+            exampleDialogue = "Yuki: すみません、大阪行きの新幹線は6番線ですか。\\nKenji: あ、さっきアナウンスがあって、今日は9番線に変わりましたよ。\\nYuki: えっ、そうなんですね！教えてくれてありがとうございます。\\nKenji: いえいえ、あと10分ほど遅れているみたいです。"
+        case .english:
+            exampleDialogue = "Emma: Wait, did the workshop move to Room 204?\\nLiam: Hang on, let me check—oh! It was 204 yesterday, but they moved it to Room 310 today.\\nEmma: Good thing I asked! Still at nine thirty?\\nLiam: Yep, nine thirty sharp."
+        }
         let sys = """
         You are a certified \(baseExam.alignedCertificate) Listening exam author creating 3 fresh CEFR \(baseExam.level.rawValue) \(langName) NATURAL TWO-PERSON HUMAN CONVERSATIONS (NOT robotic announcements).
         CRITICAL: Format EVERY audioScript as a realistic 4-6 turn back-and-forth dialogue between two named humans (one female name, one male name) separated by \\n, with natural spoken reactions and realistic self-corrections. Example: "\(exampleDialogue)". No bracketed stage directions.
@@ -499,14 +559,14 @@ public struct AIExamGeneratorService: Sendable {
         config: AIProviderConfig,
         baseExam: MockExam,
         theme: String,
-        langName: String,
-        isGerman: Bool,
+        lang: LearningLanguage,
         seed: Int,
         stamp: String,
         avoidNote: String,
         onProgress: (@Sendable (SkillType, SkillGenerationStatus) -> Void)?
     ) async -> (ok: Bool, parts: [SpeakingExamPart]) {
         onProgress?(.speaking, .loading)
+        let langName = lang.name
         let sys = """
         You are a certified \(baseExam.alignedCertificate) Speaking examiner creating a 3-part CEFR \(baseExam.level.rawValue) \(langName) oral exam.
         Return ONLY valid JSON matching:
@@ -524,9 +584,17 @@ public struct AIExamGeneratorService: Sendable {
                 let prompts = (rp.prompts ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
                 guard model.count >= 25, prompts.count >= 2 else { continue }
                 let kws = (rp.keyRubricKeywords ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-                let defaultAudio = isGerman
-                    ? "Willkommen zu Teil \(idx + 1). Bitte sprechen Sie kurz zum Thema \(theme)."
-                    : "Welcome to Part \(idx + 1). Please share your thoughts on \(theme)."
+                let defaultAudio: String
+                switch lang {
+                case .german:
+                    defaultAudio = "Willkommen zu Teil \(idx + 1). Bitte sprechen Sie kurz zum Thema \(theme)."
+                case .french:
+                    defaultAudio = "Bienvenue dans la partie \(idx + 1). Veuillez vous exprimer sur le thème \(theme)."
+                case .japanese:
+                    defaultAudio = "パート\(idx + 1)を始めます。「\(theme)」について、ご意見を聞かせてください。"
+                case .english:
+                    defaultAudio = "Welcome to Part \(idx + 1). Please share your thoughts on \(theme)."
+                }
                 validated.append(
                     SpeakingExamPart(
                         id: "ai-\(stamp)-speak-p\(idx + 1)",
@@ -637,16 +705,22 @@ public struct AIExamGeneratorService: Sendable {
     }
 
     private static func targetAccents(for languageId: String, seed: Int) -> [String] {
-        if languageId == "german" {
+        switch LearningLanguage.from(languageId) {
+        case .german:
             return ["de-DE", "de-AT", "de-CH"]
+        case .french:
+            return ["fr-FR", "fr-CA", "fr-CH"]
+        case .japanese:
+            return ["ja-JP", "ja-JP", "ja-JP"]
+        case .english:
+            let sets: [[String]] = [
+                ["en-GB", "en-AU", "en-US"],
+                ["en-GB", "en-IE", "en-IN"],
+                ["en-US", "en-GB", "en-ZA"],
+                ["en-GB", "en-US", "en-AU"]
+            ]
+            return sets[seed % sets.count]
         }
-        let sets: [[String]] = [
-            ["en-GB", "en-AU", "en-US"],
-            ["en-GB", "en-IE", "en-IN"],
-            ["en-US", "en-GB", "en-ZA"],
-            ["en-GB", "en-US", "en-AU"]
-        ]
-        return sets[seed % sets.count]
     }
 
     // MARK: - Cloze Gap Validation & Auto-Repair
