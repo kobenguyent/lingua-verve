@@ -825,6 +825,125 @@ describe('ProgressDashboardView Component', () => {
       fetchSpy.mockRestore();
     }
   });
+
+  it('analyzes multi-exam history with configured AI provider to advise whether to take the real exam or practice more', async () => {
+    const onSaveReadinessReport = vi.fn();
+    const onLaunchAICoach = vi.fn();
+
+    const readinessAIResponse = JSON.stringify({
+      verdict: 'almost-ready',
+      readinessScore: 76,
+      confidence: 'medium',
+      headline: 'Hold Off 1–2 Weeks on Booking Goethe B1 — Stabilize Listening First',
+      rationale:
+        'Your Reading (88%) and Writing (82%) are consistently exam-ready across 2 strict simulations, and your overall trend improved from 68% to 78%. However, Listening dipped to 58% on Track 2 accents, which risks modular failure.',
+      estimatedPrepTime: '1–2 weeks of targeted Listening drills',
+      strengths: ['Consistent Reading & Writing above 80%', 'Strong upward trajectory (+10 points)'],
+      blockingRisks: ['Listening averaging 61% risks missing the 60% modular pass floor on exam day.'],
+      nextSteps: [
+        'Complete 3 Austrian/Swiss multi-speaker listening drills in AI Coach.',
+        'Pass 1 more Strict unseen B1 mock exam with ≥72% in Listening before booking.',
+      ],
+      skillNotes: {
+        reading: 'Reliable 88% average — fully exam-ready.',
+        listening: 'Primary bottleneck at 61% avg — focus on Track 2 self-corrections.',
+        writing: 'Strong B1 formal structure at 82% average.',
+        speaking: 'Solid 78% average — maintain with 2 timed cue-card runs.',
+      },
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: readinessAIResponse } }] }),
+    } as unknown as Response);
+
+    try {
+      const state = {
+        ...createEmptyLearnerState(),
+        examHistory: [
+          {
+            id: 'att-new',
+            timestamp: '2026-11-27T10:00:00.000Z',
+            examId: 'exam-de-b1',
+            examTitle: 'Goethe-Zertifikat B1 Simulation',
+            alignedCertificate: 'Goethe-Zertifikat B1',
+            languageId: 'german',
+            level: 'B1' as const,
+            mode: 'strict' as const,
+            durationUsedSeconds: 1700,
+            overallScore: 78,
+            passed: false,
+            skills: {
+              reading: { score: 90, passed: true, feedback: '8/9' },
+              listening: { score: 58, passed: false, feedback: '5/9' },
+              writing: { score: 84, passed: true, feedback: 'Strong' },
+              speaking: { score: 80, passed: true, feedback: 'Fluent' },
+            },
+          },
+          {
+            id: 'att-old',
+            timestamp: '2026-11-20T10:00:00.000Z',
+            examId: 'exam-de-b1',
+            examTitle: 'Goethe-Zertifikat B1 Simulation',
+            alignedCertificate: 'Goethe-Zertifikat B1',
+            languageId: 'german',
+            level: 'B1' as const,
+            mode: 'strict' as const,
+            durationUsedSeconds: 1800,
+            overallScore: 68,
+            passed: true,
+            skills: {
+              reading: { score: 86, passed: true, feedback: '8/9' },
+              listening: { score: 64, passed: true, feedback: '6/9' },
+              writing: { score: 80, passed: true, feedback: 'Clear' },
+              speaking: { score: 76, passed: true, feedback: 'Good' },
+            },
+          },
+        ],
+      };
+
+      const activeAI = { ...getDefaultAIConfig('openai'), enabled: true, apiKey: 'sk-readiness-test' };
+
+      render(
+        <ProgressDashboardView
+          learnerState={state}
+          masteredTipsCount={3}
+          onImportState={vi.fn()}
+          onResetProgress={vi.fn()}
+          onJumpToCourse={vi.fn()}
+          aiConfig={activeAI}
+          onSaveReadinessReport={onSaveReadinessReport}
+          onLaunchAICoach={onLaunchAICoach}
+        />
+      );
+
+      // Baseline readiness card appears automatically
+      expect(screen.getByText(/Real Exam Readiness Advisor/i)).toBeInTheDocument();
+
+      // Trigger AI history readiness analysis
+      fireEvent.click(screen.getByRole('button', { name: /Analyze History with AI/i }));
+
+      await waitFor(() => {
+        expect(onSaveReadinessReport).toHaveBeenCalledTimes(1);
+        expect(
+          screen.getByText(/Hold Off 1–2 Weeks on Booking Goethe B1 — Stabilize Listening First/i)
+        ).toBeInTheDocument();
+        expect(screen.getByText(/ALMOST READY · SHORT POLISH/i)).toBeInTheDocument();
+        expect(screen.getByText(/Primary bottleneck at 61% avg/i)).toBeInTheDocument();
+      });
+
+      // Drill weakest skill in AI Coach from readiness card
+      fireEvent.click(screen.getByRole('button', { name: /Drill Listening in AI Coach/i }));
+      expect(onLaunchAICoach).toHaveBeenCalledWith(
+        'german',
+        'B1',
+        'listening',
+        expect.stringContaining('Hold Off 1–2 Weeks on Booking Goethe B1')
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
 describe('VoiceSettingsModal Component', () => {

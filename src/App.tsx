@@ -29,6 +29,7 @@ import {
   recordExamAttempt,
   recordPreTestResult,
   saveLearnerState,
+  saveReadinessReport,
   saveUnitProgressInState,
   toggleModuleCompletionInState,
   updateExamAttemptAssessment,
@@ -470,6 +471,9 @@ export const App: React.FC = () => {
             onOpenAISettings={() => setIsAISettingsOpen(true)}
             onUpdateExamAssessment={(attemptId, assessment) =>
               setLearnerState((prev) => updateExamAttemptAssessment(prev, attemptId, assessment))
+            }
+            onSaveReadinessReport={(report) =>
+              setLearnerState((prev) => saveReadinessReport(prev, report))
             }
             onLaunchAICoach={handleLaunchAICoach}
           />

@@ -458,6 +458,45 @@ export interface ExamAIAssessment {
   studyPlan: ExamStudyPlanItem[];
 }
 
+export type ExamReadinessVerdict = 'ready' | 'almost-ready' | 'needs-practice';
+export type ReadinessConfidence = 'high' | 'medium' | 'low';
+export type ScoreTrendDirection = 'improving' | 'steady' | 'declining' | 'insufficient-data';
+export type SkillReadinessStatus = 'ready' | 'borderline' | 'needs-work';
+
+export interface HistorySkillReadiness {
+  skill: SkillType;
+  averageScore: number;
+  latestScore: number;
+  trend: ScoreTrendDirection;
+  status: SkillReadinessStatus;
+  note: string;
+}
+
+export interface ExamHistoryReadinessReport {
+  id: string;
+  generatedAt: string;
+  source: 'ai' | 'offline-rubric';
+  providerLabel: string;
+  languageId: string;
+  targetLevel: CEFRLevel;
+  targetCertificate: string;
+  attemptsAnalyzed: number;
+  strictAttemptsCount: number;
+  passRatePercent: number;
+  recentTrend: ScoreTrendDirection;
+  verdict: ExamReadinessVerdict;
+  readinessScore: number; // 0-100
+  confidence: ReadinessConfidence;
+  headline: string;
+  rationale: string;
+  estimatedPrepTime: string;
+  prioritySkill: SkillType;
+  strengths: string[];
+  blockingRisks: string[];
+  nextSteps: string[];
+  skillReadiness: Record<SkillType, HistorySkillReadiness>;
+}
+
 export interface ExamAttemptRecord {
   id: string;
   timestamp: string;
@@ -607,4 +646,5 @@ export interface LearnerProgressState {
   activityLog: StudyActivityEntry[];
   studyDays: string[]; // YYYY-MM-DD unique active days for streak tracking
   unitProgress?: Record<string, UnitStudyProgress>;
+  latestReadinessReport?: ExamHistoryReadinessReport;
 }

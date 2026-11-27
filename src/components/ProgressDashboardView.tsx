@@ -21,6 +21,7 @@ import {
   CEFRLevel,
   ExamAIAssessment,
   ExamAttemptRecord,
+  ExamHistoryReadinessReport,
   LearnerProgressState,
   SkillType,
 } from '../types';
@@ -37,6 +38,7 @@ import {
   formatExamClock,
   resolveOfficialGradeLabel,
 } from './ExamAttemptDetailModal';
+import { ExamReadinessAdvisorCard } from './ExamReadinessAdvisorCard';
 
 interface ProgressDashboardViewProps {
   learnerState: LearnerProgressState;
@@ -49,6 +51,7 @@ interface ProgressDashboardViewProps {
   aiConfig?: AIProviderConfig;
   onOpenAISettings?: () => void;
   onUpdateExamAssessment?: (attemptId: string, assessment: ExamAIAssessment) => void;
+  onSaveReadinessReport?: (report: ExamHistoryReadinessReport) => void;
   onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
 }
 
@@ -70,6 +73,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
   aiConfig,
   onOpenAISettings,
   onUpdateExamAssessment,
+  onSaveReadinessReport,
   onLaunchAICoach,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -332,6 +336,18 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
           );
         })}
       </section>
+
+      {/* AI Real-Exam Readiness Advisor (Book Real Exam vs Practice More) */}
+      <ExamReadinessAdvisorCard
+        attempts={learnerState.examHistory}
+        filterLang={filterLang}
+        savedReport={learnerState.latestReadinessReport}
+        aiConfig={aiConfig}
+        onOpenAISettings={onOpenAISettings}
+        onSaveReadinessReport={onSaveReadinessReport}
+        onLaunchExam={onLaunchExam}
+        onLaunchAICoach={onLaunchAICoach}
+      />
 
       {/* Simulated Exam Results & Pre-Test History */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">

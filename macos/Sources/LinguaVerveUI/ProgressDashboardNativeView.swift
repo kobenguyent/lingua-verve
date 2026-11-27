@@ -95,6 +95,9 @@ public struct ProgressDashboardNativeView: View {
                     zeroToHeroCard(languageId: "german", title: "🇩🇪 German Zero-to-Hero (A1–C2)")
                 }
 
+                // AI Real-Exam Readiness Advisor (Analyze Exam History -> Ready vs More Practice)
+                ExamReadinessAdvisorCardView(store: store, filterLang: filterLang)
+
                 // Exam History
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {

@@ -688,6 +688,11 @@ public final class CurriculumStore {
         return updated
     }
 
+    public func saveReadinessReport(_ report: ExamHistoryReadinessReport) {
+        learnerState.latestReadinessReport = report
+        persistLearnerState()
+    }
+
     public func recordAISession(_ session: AISessionRecord) {
         learnerState.aiSessionHistory.insert(session, at: 0)
         if learnerState.aiSessionHistory.count > 60 {

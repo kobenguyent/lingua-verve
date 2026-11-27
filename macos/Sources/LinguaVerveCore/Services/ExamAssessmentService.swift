@@ -609,4 +609,427 @@ public struct ExamAssessmentService: Sendable {
         parts.append("Please give me a focused 10-minute targeted practice drill and check my responses step by step.")
         return parts.joined(separator: " ")
     }
+
+    // MARK: - Multi-Exam History Real-Exam Readiness Advisor
+
+    private static func computeTrend(_ chronologicalScores: [Int]) -> String {
+        guard chronologicalScores.count >= 2,
+              let first = chronologicalScores.first,
+              let latest = chronologicalScores.last else {
+            return "insufficient-data"
+        }
+        let delta = latest - first
+        if delta >= 5 { return "improving" }
+        if delta <= -5 { return "declining" }
+        return "steady"
+    }
+
+    private static func classifySkillStatus(avg: Int, latest: Int) -> String {
+        if avg >= 72 && latest >= 68 { return "ready" }
+        if avg >= 60 || latest >= 65 { return "borderline" }
+        return "needs-work"
+    }
+
+    /// Deterministic readiness advisor computed from recorded multi-attempt exam history.
+    public static func buildOfflineReadinessReport(
+        attempts: [ExamAttemptRecord],
+        languageId: String? = nil,
+        targetLevel: CEFRLevel? = nil
+    ) -> ExamHistoryReadinessReport? {
+        guard !attempts.isEmpty else { return nil }
+
+        let sortedNewestFirst = attempts.sorted { $0.timestamp > $1.timestamp }
+        let chosenLang: String = {
+            if let lang = languageId, lang != "all", !lang.isEmpty {
+                return lang
+            }
+            return sortedNewestFirst[0].languageId
+        }()
+
+        let langPool = sortedNewestFirst.filter { $0.languageId == chosenLang }
+        let effectivePool = langPool.isEmpty ? sortedNewestFirst : langPool
+        let chosenLevel = targetLevel ?? effectivePool[0].level
+        let levelPool = effectivePool.filter { $0.level == chosenLevel }
+        let analyzed = Array((levelPool.isEmpty ? effectivePool : levelPool).prefix(12))
+        let chronological = Array(analyzed.reversed())
+
+        let latestAttempt = analyzed[0]
+        let targetCertificate = latestAttempt.alignedCertificate.isEmpty
+            ? (chosenLang == "german" ? "Goethe-Zertifikat \(chosenLevel.rawValue)" : "Cambridge English \(chosenLevel.rawValue)")
+            : latestAttempt.alignedCertificate
+
+        let passCount = analyzed.filter(\.passed).count
+        let passRatePercent = Int((Double(passCount) / Double(analyzed.count) * 100.0).rounded())
+        let strictAttempts = analyzed.filter { $0.mode == "strict" }
+        let strictPassCount = strictAttempts.filter(\.passed).count
+        let overallAvg = Int((Double(analyzed.reduce(0) { $0 + $1.overallScore }) / Double(analyzed.count)).rounded())
+        let latestOverall = latestAttempt.overallScore
+        let recentTrend = computeTrend(chronological.map(\.overallScore))
+
+        var skillMap: [String: HistorySkillReadiness] = [:]
+        for sk in SkillType.allCases {
+            let scores = chronological.compactMap { $0.skills[sk.rawValue]?.score }
+            let avg = scores.isEmpty ? 0 : Int((Double(scores.reduce(0, +)) / Double(scores.count)).rounded())
+            let latest = scores.last ?? 0
+            let trend = computeTrend(scores)
+            let status = classifySkillStatus(avg: avg, latest: latest)
+            let note: String
+            switch status {
+            case "ready":
+                note = "Averaging \(avg)% (latest \(latest)%) — consistently clear of exam pass mark."
+            case "borderline":
+                note = "Averaging \(avg)% (latest \(latest)%) — close to threshold; add 2–3 drills for safety margin."
+            default:
+                note = "Averaging \(avg)% (latest \(latest)%) — below safe certification threshold; prioritize remediation before booking."
+            }
+            skillMap[sk.rawValue] = HistorySkillReadiness(
+                skill: sk,
+                averageScore: avg,
+                latestScore: latest,
+                trend: trend,
+                status: status,
+                note: note
+            )
+        }
+
+        let sortedByAvg = SkillType.allCases.sorted {
+            (skillMap[$0.rawValue]?.averageScore ?? 0) < (skillMap[$1.rawValue]?.averageScore ?? 0)
+        }
+        let prioritySkill = sortedByAvg.first ?? .listening
+        let strongestSkill = sortedByAvg.last ?? .reading
+
+        let allSkillsReady = SkillType.allCases.allSatisfy { skillMap[$0.rawValue]?.status == "ready" }
+        let anySkillNeedsWork = SkillType.allCases.contains { skillMap[$0.rawValue]?.status == "needs-work" }
+        let allSkillsPassingLatest = SkillType.allCases.allSatisfy { latestAttempt.skills[$0.rawValue]?.passed == true }
+
+        let consistencyBonus = (analyzed.count >= 2 && passRatePercent >= 67) ? 6.0 : 0.0
+        let strictBonus = strictPassCount >= 1 ? 5.0 : -4.0
+        let trendAdj: Double = recentTrend == "improving" ? 4.0 : (recentTrend == "declining" ? -5.0 : 0.0)
+        let minSkillAvg = Double(skillMap[prioritySkill.rawValue]?.averageScore ?? 0)
+        let rawReadiness = Double(overallAvg) * 0.55 + minSkillAvg * 0.35 + Double(passRatePercent) * 0.10 + consistencyBonus + strictBonus + trendAdj
+        let readinessScore = max(5, min(99, Int(rawReadiness.rounded())))
+
+        let verdict: ExamReadinessVerdict
+        if latestAttempt.passed && allSkillsPassingLatest && allSkillsReady && overallAvg >= 74 && strictPassCount >= 1 {
+            verdict = .ready
+        } else if !anySkillNeedsWork && overallAvg >= 64 && (passCount >= 1 || latestOverall >= 66) {
+            verdict = .almostReady
+        } else {
+            verdict = .needsPractice
+        }
+
+        let confidence: String
+        if analyzed.count >= 3 && strictAttempts.count >= 2 {
+            confidence = "high"
+        } else if analyzed.count >= 2 || strictAttempts.count >= 1 {
+            confidence = "medium"
+        } else {
+            confidence = "low"
+        }
+
+        let strongestAvg = skillMap[strongestSkill.rawValue]?.averageScore ?? 0
+        let strongestLatest = skillMap[strongestSkill.rawValue]?.latestScore ?? 0
+        let priorityAvg = skillMap[prioritySkill.rawValue]?.averageScore ?? 0
+
+        var strengths: [String] = [
+            "Strongest skill across history: \(strongestSkill.shortName) averaging \(strongestAvg)% (latest \(strongestLatest)%)."
+        ]
+        if passCount > 0 {
+            strengths.append("Passed \(passCount) of \(analyzed.count) simulated \(chosenLevel.rawValue) exam\(analyzed.count == 1 ? "" : "s") (\(passRatePercent)% pass rate).")
+        }
+        if recentTrend == "improving", let firstOverall = chronological.first?.overallScore {
+            strengths.append("Upward momentum: overall score climbed from \(firstOverall)% to \(latestOverall)%.")
+        }
+        if strictPassCount >= 1 {
+            strengths.append("Proven performance under official Strict timed pressure (\(strictPassCount) strict pass\(strictPassCount == 1 ? "" : "es")).")
+        }
+
+        var blockingRisks: [String] = []
+        for sk in SkillType.allCases {
+            guard let stat = skillMap[sk.rawValue] else { continue }
+            if stat.status == "needs-work" {
+                blockingRisks.append("\(sk.shortName) averages \(stat.averageScore)% (latest \(stat.latestScore)%), creating modular exam fail risk.")
+            } else if stat.status == "borderline" {
+                blockingRisks.append("\(sk.shortName) is borderline (\(stat.averageScore)% avg) — test-day pressure could dip it below pass mark.")
+            }
+        }
+        if strictAttempts.isEmpty {
+            blockingRisks.append("No Strict-mode timed attempts recorded yet — complete at least 1 Strict simulation before paying official registration fees.")
+        }
+        if analyzed.count < 2 {
+            blockingRisks.append("Only 1 attempt recorded at this level — run at least 1 fresh unseen AI exam to verify score consistency.")
+        }
+        if recentTrend == "declining", let firstOverall = chronological.first?.overallScore {
+            blockingRisks.append("Recent score dipped from \(firstOverall)% to \(latestOverall)% — stabilize before booking.")
+        }
+
+        let headline: String
+        let rationale: String
+        let estimatedPrepTime: String
+        let nextSteps: [String]
+
+        switch verdict {
+        case .ready:
+            headline = "Ready to Take the Real \(targetCertificate) Exam"
+            rationale = "Across \(analyzed.count) \(chosenLevel.rawValue) simulation\(analyzed.count == 1 ? "" : "s") (avg \(overallAvg)%, latest \(latestOverall)%), all 4 skills are safely above the pass margin with Strict timed proof. You are ready to register for the official \(targetCertificate)."
+            estimatedPrepTime = "Ready to book now (1 light Strict dress rehearsal recommended)"
+            nextSteps = [
+                "Book your official \(targetCertificate) exam date while your momentum is strong.",
+                "Do one final Strict-mode unseen AI exam 48 hours before test day to keep \(prioritySkill.shortName) sharp.",
+                "Review your saved Past Exam Dossiers for recurring small grammar or timing habits."
+            ]
+        case .almostReady:
+            headline = "Almost Ready for \(targetCertificate) — Short Targeted Polish Needed"
+            rationale = "You are close to official \(chosenLevel.rawValue) readiness (\(overallAvg)% average across \(analyzed.count) attempt\(analyzed.count == 1 ? "" : "s")), but \(prioritySkill.shortName) (\(priorityAvg)% avg) or limited Strict-mode proof still leaves narrow margin for exam-day nerves."
+            estimatedPrepTime = "1–2 weeks of targeted daily practice (20–30 min/day)"
+            nextSteps = [
+                "Focus 60% of your next week on \(prioritySkill.shortName) (\(priorityAvg)% avg) using targeted AI Coach drills.",
+                strictAttempts.isEmpty
+                    ? "Complete a full Strict-mode \(chosenLevel.rawValue) simulation (official clock & locked transcripts) to test stamina."
+                    : "Generate a fresh unseen \(chosenLevel.rawValue) AI exam and aim for ≥ 75% across all 4 skills before booking.",
+                "Review every missed question and inline correction in your recent \(chosenLevel.rawValue) exam dossiers."
+            ]
+        case .needsPractice:
+            headline = "More Practice Recommended Before Booking \(targetCertificate)"
+            rationale = "Across \(analyzed.count) \(chosenLevel.rawValue) attempt\(analyzed.count == 1 ? "" : "s") (\(overallAvg)% average, \(passRatePercent)% pass rate), \(prioritySkill.shortName) (\(priorityAvg)% avg) needs focused skill-building before risking official exam registration fees."
+            estimatedPrepTime = "3–4 weeks of structured 4-skill practice before booking"
+            nextSteps = [
+                "Focus 60% of your next week on \(prioritySkill.shortName) (\(priorityAvg)% avg) using targeted AI Coach drills.",
+                strictAttempts.isEmpty
+                    ? "Complete a full Strict-mode \(chosenLevel.rawValue) simulation to benchmark your timing under pressure."
+                    : "Generate a fresh unseen \(chosenLevel.rawValue) AI exam after 1 week of drills and aim for ≥ 70% in every skill.",
+                "Review every missed question and inline correction in your recent \(chosenLevel.rawValue) exam dossiers."
+            ]
+        }
+
+        return ExamHistoryReadinessReport(
+            source: "offline-rubric",
+            providerLabel: "Built-in Exam Readiness Analyzer",
+            languageId: chosenLang,
+            targetLevel: chosenLevel,
+            targetCertificate: targetCertificate,
+            attemptsAnalyzed: analyzed.count,
+            strictAttemptsCount: strictAttempts.count,
+            passRatePercent: passRatePercent,
+            recentTrend: recentTrend,
+            verdict: verdict,
+            readinessScore: readinessScore,
+            confidence: confidence,
+            headline: headline,
+            rationale: rationale,
+            estimatedPrepTime: estimatedPrepTime,
+            prioritySkill: prioritySkill,
+            strengths: strengths,
+            blockingRisks: blockingRisks,
+            nextSteps: nextSteps,
+            skillReadiness: skillMap
+        )
+    }
+
+    private static func buildCompactHistoryDigest(
+        attempts: [ExamAttemptRecord],
+        baseline: ExamHistoryReadinessReport
+    ) -> String {
+        let matching = attempts
+            .filter { $0.languageId == baseline.languageId && $0.level == baseline.targetLevel }
+            .sorted { $0.timestamp < $1.timestamp }
+            .suffix(10)
+        let used = matching.isEmpty ? Array(attempts.prefix(10).reversed()) : Array(matching)
+
+        var lines: [String] = [
+            "Target Official Exam: \(baseline.targetCertificate) (\(baseline.languageId.uppercased()) CEFR \(baseline.targetLevel.rawValue))",
+            "Aggregate Stats: \(baseline.attemptsAnalyzed) attempts (\(baseline.strictAttemptsCount) Strict mode), Pass Rate=\(baseline.passRatePercent)%, Overall Trend=\(baseline.recentTrend), Baseline Readiness=\(baseline.readinessScore)/100",
+            "Per-Skill Averages: Reading=\(baseline.readiness(for: .reading)?.averageScore ?? 0)% (latest \(baseline.readiness(for: .reading)?.latestScore ?? 0)%), Listening=\(baseline.readiness(for: .listening)?.averageScore ?? 0)% (latest \(baseline.readiness(for: .listening)?.latestScore ?? 0)%), Writing=\(baseline.readiness(for: .writing)?.averageScore ?? 0)% (latest \(baseline.readiness(for: .writing)?.latestScore ?? 0)%), Speaking=\(baseline.readiness(for: .speaking)?.averageScore ?? 0)% (latest \(baseline.readiness(for: .speaking)?.latestScore ?? 0)%)",
+            "\nCHRONOLOGICAL ATTEMPTS (oldest -> newest):"
+        ]
+
+        var missedTagCounts: [String: Int] = [:]
+        var recurringNotes: [String] = []
+
+        for (idx, a) in used.enumerated() {
+            let dateShort = String(a.timestamp.prefix(10))
+            let r = a.skills["reading"]?.score ?? 0
+            let l = a.skills["listening"]?.score ?? 0
+            let w = a.skills["writing"]?.score ?? 0
+            let s = a.skills["speaking"]?.score ?? 0
+            lines.append("\(idx + 1). [\(dateShort)] \(a.mode.uppercased()) | Overall \(a.overallScore)% (\(a.passed ? "PASS" : "FAIL")) | R:\(r)% L:\(l)% W:\(w)% S:\(s)% | Time:\(Int((Double(a.durationUsedSeconds) / 60.0).rounded()))m | \(a.officialGradeLabel ?? "")")
+
+            for q in (a.questionReviews ?? []) where !q.isCorrect {
+                missedTagCounts[q.sectionTag, default: 0] += 1
+            }
+            if let ai = a.aiAssessment {
+                for sk in SkillType.allCases {
+                    if let firstW = ai.insight(for: sk)?.weaknesses.first {
+                        recurringNotes.append("[\(sk.rawValue)] \(firstW)")
+                    }
+                }
+            } else {
+                if let wn = a.writingNotes?.first { recurringNotes.append("[writing] \(wn)") }
+                if let sn = a.speakingNotes?.first { recurringNotes.append("[speaking] \(sn)") }
+            }
+        }
+
+        let topTags = missedTagCounts.sorted { $0.value > $1.value }.prefix(5).map { "\($0.key) (\($0.value) missed)" }
+        if !topTags.isEmpty {
+            lines.append("\nMOST FREQUENT MISSED SECTIONS: \(topTags.joined(separator: ", "))")
+        }
+        if !recurringNotes.isEmpty {
+            lines.append("\nRECORDED WEAKNESSES & EXAMINER NOTES:\n- \(recurringNotes.prefix(8).joined(separator: "\n- "))")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    /// Analyzes the learner's entire simulated exam history via the configured AI provider
+    /// to advise whether to book the real official certification exam now or keep practicing.
+    public func analyzeExamHistoryReadiness(
+        config: AIProviderConfig,
+        attempts: [ExamAttemptRecord],
+        languageId: String? = nil,
+        targetLevel: CEFRLevel? = nil
+    ) async -> ExamHistoryReadinessReport? {
+        guard let baseline = Self.buildOfflineReadinessReport(
+            attempts: attempts,
+            languageId: languageId,
+            targetLevel: targetLevel
+        ) else {
+            return nil
+        }
+
+        guard config.isReady else {
+            return baseline
+        }
+
+        let langName = baseline.languageId == "german" ? "German" : "English"
+        let examBoard = baseline.languageId == "german"
+            ? "Goethe-Zertifikat / telc / TestDaF"
+            : "Cambridge English / IELTS / TOEFL"
+
+        let systemPrompt = """
+        You are a candid, data-driven Senior \(examBoard) Certification Advisor evaluating a learner's simulated \(langName) \(baseline.targetLevel.rawValue) exam history.
+        Tell the learner clearly whether they are READY to book and pass the REAL official exam now, ALMOST READY (needs short targeted polish), or NEED MORE PRACTICE before spending money on official registration.
+        Consider consistency across attempts, score trend, modular pass risk (all 4 skills must pass reliably), and Strict timed exam proof vs Practice mode.
+        Return ONLY valid JSON (no markdown fences):
+        {
+          "verdict": "ready|almost-ready|needs-practice",
+          "readinessScore": 0-100,
+          "confidence": "high|medium|low",
+          "headline": "crisp 1-line decision telling them whether to book the real exam or keep practicing",
+          "rationale": "2-3 sentences grounded in their exact exam history numbers, trend, and modular risks",
+          "estimatedPrepTime": "e.g. Ready to book now | 1-2 weeks focused polish | 3-4 weeks structured practice",
+          "strengths": ["concrete proof of readiness 1", "strength 2"],
+          "blockingRisks": ["exact gap or risk before booking 1"],
+          "nextSteps": ["prioritized concrete action 1", "action 2", "action 3"],
+          "skillNotes": {
+            "reading": "1 concise sentence diagnosing reading history",
+            "listening": "1 concise sentence diagnosing listening history",
+            "writing": "1 concise sentence diagnosing writing history",
+            "speaking": "1 concise sentence diagnosing speaking history"
+          }
+        }
+        """
+
+        let digest = Self.buildCompactHistoryDigest(attempts: attempts, baseline: baseline)
+
+        do {
+            let raw = try await aiClient.chat(
+                config: config,
+                messages: [
+                    AIChatMessage(role: "system", content: systemPrompt),
+                    AIChatMessage(role: "user", content: digest)
+                ]
+            )
+            guard let start = raw.firstIndex(of: "{"),
+                  let end = raw.lastIndex(of: "}"),
+                  start <= end,
+                  let data = String(raw[start...end]).data(using: .utf8) else {
+                return baseline
+            }
+
+            struct PartialReadiness: Decodable {
+                let verdict: String?
+                let readinessScore: Int?
+                let confidence: String?
+                let headline: String?
+                let rationale: String?
+                let estimatedPrepTime: String?
+                let strengths: [String]?
+                let blockingRisks: [String]?
+                let nextSteps: [String]?
+                let skillNotes: [String: String]?
+            }
+
+            guard let parsed = try? JSONDecoder().decode(PartialReadiness.self, from: data) else {
+                return baseline
+            }
+
+            let verdict = parsed.verdict.flatMap { ExamReadinessVerdict(rawValue: $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)) } ?? baseline.verdict
+            let validConf = ["high", "medium", "low"]
+            let confRaw = parsed.confidence?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let confidence = validConf.contains(confRaw) ? confRaw : baseline.confidence
+            let readinessScore = parsed.readinessScore.map { max(5, min(99, $0)) } ?? baseline.readinessScore
+
+            var mergedSkills = baseline.skillReadiness
+            if let notes = parsed.skillNotes {
+                for sk in SkillType.allCases {
+                    if let note = notes[sk.rawValue]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !note.isEmpty,
+                       let existing = mergedSkills[sk.rawValue] {
+                        mergedSkills[sk.rawValue] = HistorySkillReadiness(
+                            skill: existing.skill,
+                            averageScore: existing.averageScore,
+                            latestScore: existing.latestScore,
+                            trend: existing.trend,
+                            status: existing.status,
+                            note: note
+                        )
+                    }
+                }
+            }
+
+            func clean(_ arr: [String]?, limit: Int, fallback: [String]) -> [String] {
+                let out = Array((arr ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(limit))
+                return out.isEmpty ? fallback : out
+            }
+
+            let headline = (parsed.headline ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let rationale = (parsed.rationale ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let prep = (parsed.estimatedPrepTime ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+            return ExamHistoryReadinessReport(
+                source: "ai",
+                providerLabel: "\(config.provider.label) (\(config.model))",
+                languageId: baseline.languageId,
+                targetLevel: baseline.targetLevel,
+                targetCertificate: baseline.targetCertificate,
+                attemptsAnalyzed: baseline.attemptsAnalyzed,
+                strictAttemptsCount: baseline.strictAttemptsCount,
+                passRatePercent: baseline.passRatePercent,
+                recentTrend: baseline.recentTrend,
+                verdict: verdict,
+                readinessScore: readinessScore,
+                confidence: confidence,
+                headline: headline.isEmpty ? baseline.headline : headline,
+                rationale: rationale.isEmpty ? baseline.rationale : rationale,
+                estimatedPrepTime: prep.isEmpty ? baseline.estimatedPrepTime : prep,
+                prioritySkill: baseline.prioritySkill,
+                strengths: clean(parsed.strengths, limit: 4, fallback: baseline.strengths),
+                blockingRisks: clean(parsed.blockingRisks, limit: 4, fallback: baseline.blockingRisks),
+                nextSteps: clean(parsed.nextSteps, limit: 5, fallback: baseline.nextSteps),
+                skillReadiness: mergedSkills
+            )
+        } catch {
+            return baseline
+        }
+    }
+
+    public static func buildCoachSeedPrompt(from report: ExamHistoryReadinessReport, skill: SkillType? = nil) -> String {
+        let targetSkill = skill ?? report.prioritySkill
+        let stat = report.readiness(for: targetSkill)
+        let avg = stat?.averageScore ?? 0
+        let latest = stat?.latestScore ?? 0
+        let risks = report.blockingRisks.prefix(2).joined(separator: "; ")
+        let riskClause = risks.isEmpty ? (stat?.note ?? "") : risks
+        return "I'm preparing for the real \(report.targetCertificate) (\(report.targetLevel.rawValue)) exam. Across \(report.attemptsAnalyzed) simulated exam(s), my \(targetSkill.displayName) average is \(avg)% (latest \(latest)%). Readiness status: \(report.headline). Key risks: \(riskClause). Please build a targeted \(report.targetLevel.rawValue) \(targetSkill.displayName) practice session to get me exam-ready."
+    }
 }

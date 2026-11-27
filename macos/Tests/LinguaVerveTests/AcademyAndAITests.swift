@@ -873,4 +873,88 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertEqual(fixedPart3.id, baseExam.reading.resolvedParts[2].id)
         XCTAssertTrue(fixedPart3.passage.contains("[1]"))
     }
+
+    func testExamHistoryRealExamReadinessAdvisorOfflineAIAndPersistence() async throws {
+        func makeAttempt(id: String, date: String, mode: String, r: Int, l: Int, w: Int, s: Int) -> ExamAttemptRecord {
+            let overall = Int((Double(r + l + w + s) / 4.0).rounded())
+            let passed = overall >= 60 && r >= 60 && l >= 60 && w >= 60 && s >= 60
+            return ExamAttemptRecord(
+                id: id,
+                timestamp: date,
+                examId: "exam-de-b1",
+                examTitle: "Goethe-Zertifikat B1 Simulation",
+                alignedCertificate: "Goethe-Zertifikat B1",
+                languageId: "german",
+                level: .B1,
+                mode: mode,
+                durationUsedSeconds: 1680,
+                overallScore: overall,
+                passed: passed,
+                skills: [
+                    SkillType.reading.rawValue: SkillExamScore(score: r, passed: r >= 60, feedback: "\(r)%"),
+                    SkillType.listening.rawValue: SkillExamScore(score: l, passed: l >= 60, feedback: "\(l)%"),
+                    SkillType.writing.rawValue: SkillExamScore(score: w, passed: w >= 60, feedback: "\(w)%"),
+                    SkillType.speaking.rawValue: SkillExamScore(score: s, passed: s >= 60, feedback: "\(s)%")
+                ]
+            )
+        }
+
+        // 1. Offline: consistent high strict passes -> READY FOR REAL EXAM
+        let strongHistory = [
+            makeAttempt(id: "s2", date: "2026-11-26T10:00:00Z", mode: "strict", r: 89, l: 82, w: 84, s: 81),
+            makeAttempt(id: "s1", date: "2026-11-20T10:00:00Z", mode: "strict", r: 84, l: 78, w: 79, s: 76)
+        ]
+        let readyOffline = try XCTUnwrap(
+            ExamAssessmentService.buildOfflineReadinessReport(attempts: strongHistory, languageId: "german", targetLevel: .B1)
+        )
+        XCTAssertEqual(readyOffline.verdict, .ready)
+        XCTAssertEqual(readyOffline.recentTrend, "improving")
+        XCTAssertEqual(readyOffline.strictAttemptsCount, 2)
+
+        // 2. Offline: weak Listening drags modular pass -> NEEDS PRACTICE
+        let weakHistory = [
+            makeAttempt(id: "w2", date: "2026-11-26T10:00:00Z", mode: "practice", r: 78, l: 48, w: 72, s: 70),
+            makeAttempt(id: "w1", date: "2026-11-20T10:00:00Z", mode: "practice", r: 74, l: 52, w: 70, s: 68)
+        ]
+        let needsPracticeOffline = try XCTUnwrap(
+            ExamAssessmentService.buildOfflineReadinessReport(attempts: weakHistory, languageId: "german", targetLevel: .B1)
+        )
+        XCTAssertEqual(needsPracticeOffline.verdict, .needsPractice)
+        XCTAssertEqual(needsPracticeOffline.prioritySkill, .listening)
+        XCTAssertTrue(needsPracticeOffline.blockingRisks.contains { $0.contains("Strict-mode") })
+
+        // 3. Configured AI Provider readiness analysis + CurriculumStore persistence
+        let aiJSON = """
+        {"verdict":"ready","readinessScore":89,"confidence":"high","headline":"Book Your Official Goethe-Zertifikat B1 Exam With Confidence","rationale":"You passed 2 consecutive Strict simulations with rising scores from 79% to 84% and zero skills below 76%.","estimatedPrepTime":"Ready to book now","strengths":["Consistent strict passes across all 4 modules"],"blockingRisks":["Keep practicing Swiss/Austrian accents for Track 3"],"nextSteps":["Register for the next Goethe-Zertifikat B1 date","Do one light strict dress rehearsal 48 hours prior"],"skillNotes":{"reading":"Rock-solid 87% average.","listening":"Improved cleanly to 82%.","writing":"Confident B1 structure.","speaking":"Steady fluency across all 3 parts."}}
+        """
+        let transport = MockAITransport { request in
+            let reqBody = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+            XCTAssertTrue(reqBody.contains("Certification Advisor"))
+            XCTAssertTrue(reqBody.contains("CHRONOLOGICAL ATTEMPTS"))
+            let escaped = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": aiJSON]]]])
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (escaped, resp)
+        }
+
+        let service = ExamAssessmentService(aiClient: AIClientService(transport: transport))
+        let cfg = AIProviderConfig(provider: .openai, apiKey: "sk-readiness-unit", enabled: true)
+        let rawAIReport = await service.analyzeExamHistoryReadiness(config: cfg, attempts: strongHistory, languageId: "german", targetLevel: .B1)
+        let aiReport = try XCTUnwrap(rawAIReport)
+        XCTAssertEqual(aiReport.source, "ai")
+        XCTAssertEqual(aiReport.verdict, .ready)
+        XCTAssertEqual(aiReport.readinessScore, 89)
+        XCTAssertEqual(aiReport.headline, "Book Your Official Goethe-Zertifikat B1 Exam With Confidence")
+        XCTAssertEqual(aiReport.readiness(for: .listening)?.note, "Improved cleanly to 82%.")
+
+        let store = makeTestStore()
+        store.saveReadinessReport(aiReport)
+        let backup = store.exportProgressJSON()
+        let restored = makeTestStore()
+        try restored.importProgressJSON(backup)
+        XCTAssertEqual(restored.learnerState.latestReadinessReport?.headline, aiReport.headline)
+        XCTAssertEqual(restored.learnerState.latestReadinessReport?.readinessScore, 89)
+
+        let seed = ExamAssessmentService.buildCoachSeedPrompt(from: aiReport)
+        XCTAssertTrue(seed.contains("Goethe-Zertifikat B1"))
+    }
 }

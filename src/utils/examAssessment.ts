@@ -5,10 +5,16 @@ import {
   ExamAIAssessment,
   ExamAttemptRecord,
   ExamCorrectionItem,
+  ExamHistoryReadinessReport,
   ExamQuestionReview,
+  ExamReadinessVerdict,
   ExamSkillInsight,
   ExamStudyPlanItem,
+  HistorySkillReadiness,
   MockExam,
+  ReadinessConfidence,
+  ScoreTrendDirection,
+  SkillReadinessStatus,
   SkillType,
 } from '../types';
 import {
@@ -703,4 +709,459 @@ export function buildCoachSeedFromAssessment(attempt: ExamAttemptRecord, skill: 
     .join(' ');
 
   return `I just scored ${score}% in ${attempt.level} ${skill} on "${attempt.examTitle}". ${details} Please give me a focused 10-minute targeted practice drill and check my responses step by step.`;
+}
+
+// ============================================================
+// MULTI-EXAM HISTORY READINESS ADVISOR (REAL EXAM vs MORE PRACTICE)
+// ============================================================
+
+function computeTrend(chronologicalScores: number[]): ScoreTrendDirection {
+  if (chronologicalScores.length < 2) return 'insufficient-data';
+  const first = chronologicalScores[0];
+  const latest = chronologicalScores[chronologicalScores.length - 1];
+  const delta = latest - first;
+  if (delta >= 5) return 'improving';
+  if (delta <= -5) return 'declining';
+  return 'steady';
+}
+
+function classifySkillStatus(avg: number, latest: number): SkillReadinessStatus {
+  if (avg >= 72 && latest >= 68) return 'ready';
+  if (avg >= 60 || latest >= 65) return 'borderline';
+  return 'needs-work';
+}
+
+/**
+ * Deterministic multi-attempt exam readiness report computed from the learner's recorded
+ * simulated exam history (averages, trajectory, strict-mode proof, modular 4-skill pass reliability).
+ */
+export function buildOfflineReadinessReport(params: {
+  attempts: ExamAttemptRecord[];
+  languageId?: string;
+  targetLevel?: CEFRLevel;
+}): ExamHistoryReadinessReport | null {
+  const { attempts } = params;
+  if (!attempts || attempts.length === 0) return null;
+
+  // Determine target language & CEFR level (default to most recent attempt in list)
+  const sortedNewestFirst = [...attempts].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  const chosenLang =
+    params.languageId && params.languageId !== 'all'
+      ? params.languageId
+      : sortedNewestFirst[0].languageId;
+
+  const langPool = sortedNewestFirst.filter((a) => a.languageId === chosenLang);
+  const effectivePool = langPool.length > 0 ? langPool : sortedNewestFirst;
+  const chosenLevel = params.targetLevel || effectivePool[0].level;
+  const levelPool = effectivePool.filter((a) => a.level === chosenLevel);
+  const analyzed = (levelPool.length > 0 ? levelPool : effectivePool).slice(0, 12);
+  const chronological = [...analyzed].reverse(); // oldest -> newest
+
+  const latestAttempt = analyzed[0];
+  const targetCertificate =
+    latestAttempt.alignedCertificate ||
+    (chosenLang === 'german'
+      ? `Goethe-Zertifikat ${chosenLevel}`
+      : `Cambridge English ${chosenLevel}`);
+
+  const passCount = analyzed.filter((a) => a.passed).length;
+  const passRatePercent = Math.round((passCount / analyzed.length) * 100);
+  const strictAttempts = analyzed.filter((a) => a.mode === 'strict');
+  const strictPassCount = strictAttempts.filter((a) => a.passed).length;
+  const overallAvg = Math.round(
+    analyzed.reduce((sum, a) => sum + a.overallScore, 0) / analyzed.length
+  );
+  const latestOverall = latestAttempt.overallScore;
+  const recentTrend = computeTrend(chronological.map((a) => a.overallScore));
+
+  // Per-skill readiness stats
+  const skillReadiness = {} as Record<SkillType, HistorySkillReadiness>;
+  for (const sk of ALL_SKILLS) {
+    const scores = chronological
+      .map((a) => a.skills[sk]?.score)
+      .filter((n): n is number => typeof n === 'number');
+    const avg = scores.length > 0 ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : 0;
+    const latest = scores.length > 0 ? scores[scores.length - 1] : 0;
+    const trend = computeTrend(scores);
+    const status = classifySkillStatus(avg, latest);
+    const note =
+      status === 'ready'
+        ? `Averaging ${avg}% (latest ${latest}%) — consistently clear of exam pass threshold.`
+        : status === 'borderline'
+        ? `Averaging ${avg}% (latest ${latest}%) — close to threshold; add 2–3 targeted drills for safety margin.`
+        : `Averaging ${avg}% (latest ${latest}%) — below safe certification threshold; prioritize remediation before booking.`;
+
+    skillReadiness[sk] = {
+      skill: sk,
+      averageScore: avg,
+      latestScore: latest,
+      trend,
+      status,
+      note,
+    };
+  }
+
+  const prioritySkill = [...ALL_SKILLS].sort(
+    (a, b) => skillReadiness[a].averageScore - skillReadiness[b].averageScore
+  )[0];
+  const strongestSkill = [...ALL_SKILLS].sort(
+    (a, b) => skillReadiness[b].averageScore - skillReadiness[a].averageScore
+  )[0];
+
+  const allSkillsReady = ALL_SKILLS.every((sk) => skillReadiness[sk].status === 'ready');
+  const anySkillNeedsWork = ALL_SKILLS.some((sk) => skillReadiness[sk].status === 'needs-work');
+  const allSkillsPassingLatest = ALL_SKILLS.every((sk) => Boolean(latestAttempt.skills[sk]?.passed));
+
+  // Weighted readiness score (0..100)
+  const consistencyBonus = analyzed.length >= 2 && passRatePercent >= 67 ? 6 : 0;
+  const strictProofBonus = strictPassCount >= 1 ? 5 : -4;
+  const trendAdjustment = recentTrend === 'improving' ? 4 : recentTrend === 'declining' ? -5 : 0;
+  const minSkillAvg = Math.min(...ALL_SKILLS.map((sk) => skillReadiness[sk].averageScore));
+  const rawReadiness =
+    overallAvg * 0.55 +
+    minSkillAvg * 0.35 +
+    passRatePercent * 0.1 +
+    consistencyBonus +
+    strictProofBonus +
+    trendAdjustment;
+  const readinessScore = Math.max(5, Math.min(99, Math.round(rawReadiness)));
+
+  // Verdict decision
+  let verdict: ExamReadinessVerdict;
+  if (
+    latestAttempt.passed &&
+    allSkillsPassingLatest &&
+    allSkillsReady &&
+    overallAvg >= 74 &&
+    strictPassCount >= 1
+  ) {
+    verdict = 'ready';
+  } else if (
+    !anySkillNeedsWork &&
+    overallAvg >= 64 &&
+    (passCount >= 1 || latestOverall >= 66)
+  ) {
+    verdict = 'almost-ready';
+  } else {
+    verdict = 'needs-practice';
+  }
+
+  // Confidence rating based on sample size & strict exam exposure
+  const confidence: ReadinessConfidence =
+    analyzed.length >= 3 && strictAttempts.length >= 2
+      ? 'high'
+      : analyzed.length >= 2 || strictAttempts.length >= 1
+      ? 'medium'
+      : 'low';
+
+  const strengths: string[] = [
+    `Strongest skill across history: ${strongestSkill.toUpperCase()} averaging ${skillReadiness[strongestSkill].averageScore}% (latest ${skillReadiness[strongestSkill].latestScore}%).`,
+  ];
+  if (passCount > 0) {
+    strengths.push(
+      `Passed ${passCount} of ${analyzed.length} simulated ${chosenLevel} exam${analyzed.length === 1 ? '' : 's'} (${passRatePercent}% pass rate).`
+    );
+  }
+  if (recentTrend === 'improving') {
+    strengths.push(
+      `Upward momentum: overall score climbed from ${chronological[0].overallScore}% to ${latestOverall}%.`
+    );
+  }
+  if (strictPassCount >= 1) {
+    strengths.push(`Proven performance under official Strict timed exam pressure (${strictPassCount} strict pass${strictPassCount === 1 ? '' : 'es'}).`);
+  }
+
+  const blockingRisks: string[] = [];
+  for (const sk of ALL_SKILLS) {
+    if (skillReadiness[sk].status === 'needs-work') {
+      blockingRisks.push(
+        `${sk.toUpperCase()} averages ${skillReadiness[sk].averageScore}% (latest ${skillReadiness[sk].latestScore}%), creating modular exam fail risk.`
+      );
+    } else if (skillReadiness[sk].status === 'borderline') {
+      blockingRisks.push(
+        `${sk.toUpperCase()} is borderline (${skillReadiness[sk].averageScore}% avg) — test-day pressure could dip it below pass mark.`
+      );
+    }
+  }
+  if (strictAttempts.length === 0) {
+    blockingRisks.push(
+      'No Strict-mode timed attempts recorded yet — complete at least 1 Strict simulation before paying official registration fees.'
+    );
+  }
+  if (analyzed.length < 2) {
+    blockingRisks.push(
+      'Only 1 attempt recorded at this level — run at least 1 fresh unseen AI exam to confirm score consistency.'
+    );
+  }
+  if (recentTrend === 'declining') {
+    blockingRisks.push(
+      `Recent score dipped from ${chronological[0].overallScore}% to ${latestOverall}% — stabilize before booking.`
+    );
+  }
+
+  const headline =
+    verdict === 'ready'
+      ? `Ready to Take the Real ${targetCertificate} Exam`
+      : verdict === 'almost-ready'
+      ? `Almost Ready for ${targetCertificate} — Short Targeted Polish Needed`
+      : `More Practice Recommended Before Booking ${targetCertificate}`;
+
+  const rationale =
+    verdict === 'ready'
+      ? `Across ${analyzed.length} ${chosenLevel} simulation${analyzed.length === 1 ? '' : 's'} (avg ${overallAvg}%, latest ${latestOverall}%), all 4 skills are above the safe exam margin with Strict timed proof. You are ready to register for the official ${targetCertificate}.`
+      : verdict === 'almost-ready'
+      ? `You are close to official ${chosenLevel} readiness (${overallAvg}% average across ${analyzed.length} attempt${analyzed.length === 1 ? '' : 's'}), but ${prioritySkill} (${skillReadiness[prioritySkill].averageScore}% avg) or limited Strict-mode proof still leaves narrow margin for test-day nerves.`
+      : `Across ${analyzed.length} ${chosenLevel} attempt${analyzed.length === 1 ? '' : 's'} (${overallAvg}% average, ${passRatePercent}% pass rate), ${prioritySkill} (${skillReadiness[prioritySkill].averageScore}% avg) needs focused skill-building before risking official exam fees.`;
+
+  const estimatedPrepTime =
+    verdict === 'ready'
+      ? 'Ready to book now (1 light Strict dress rehearsal recommended)'
+      : verdict === 'almost-ready'
+      ? '1–2 weeks of targeted daily practice (20–30 min/day)'
+      : '3–4 weeks of structured 4-skill practice before booking';
+
+  const nextSteps: string[] =
+    verdict === 'ready'
+      ? [
+          `Book your official ${targetCertificate} test slot while your momentum is strong.`,
+          `Do one final Strict-mode unseen AI exam 48 hours before test day to keep ${prioritySkill} sharp.`,
+          'Review your saved Past Exam Dossiers for recurring small grammar or timing habits.',
+        ]
+      : [
+          `Focus 60% of your next week on ${prioritySkill.toUpperCase()} (${skillReadiness[prioritySkill].averageScore}% avg) using targeted AI Coach drills.`,
+          strictAttempts.length === 0
+            ? `Complete a full Strict-mode ${chosenLevel} simulation (official clock & locked transcripts) to test stamina.`
+            : `Generate a fresh unseen ${chosenLevel} AI exam and aim for ≥ 75% in all 4 skills before booking.`,
+          `Review every missed question and inline correction in your recent ${chosenLevel} exam dossiers.`,
+        ];
+
+  return {
+    id: `readiness-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    generatedAt: new Date().toISOString(),
+    source: 'offline-rubric',
+    providerLabel: 'Built-in Exam Readiness Analyzer',
+    languageId: chosenLang,
+    targetLevel: chosenLevel,
+    targetCertificate,
+    attemptsAnalyzed: analyzed.length,
+    strictAttemptsCount: strictAttempts.length,
+    passRatePercent,
+    recentTrend,
+    verdict,
+    readinessScore,
+    confidence,
+    headline,
+    rationale,
+    estimatedPrepTime,
+    prioritySkill,
+    strengths,
+    blockingRisks,
+    nextSteps,
+    skillReadiness,
+  };
+}
+
+function buildCompactHistoryDigest(
+  attempts: ExamAttemptRecord[],
+  baseline: ExamHistoryReadinessReport
+): string {
+  const matching = attempts
+    .filter((a) => a.languageId === baseline.languageId && a.level === baseline.targetLevel)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .slice(-10);
+
+  const used = matching.length > 0 ? matching : attempts.slice(0, 10).reverse();
+
+  const lines: string[] = [
+    `Target Official Exam: ${baseline.targetCertificate} (${baseline.languageId.toUpperCase()} CEFR ${baseline.targetLevel})`,
+    `Aggregate Stats: ${baseline.attemptsAnalyzed} attempts (${baseline.strictAttemptsCount} Strict mode), Pass Rate=${baseline.passRatePercent}%, Overall Trend=${baseline.recentTrend}, Baseline Readiness=${baseline.readinessScore}/100`,
+    `Per-Skill Averages: Reading=${baseline.skillReadiness.reading.averageScore}% (latest ${baseline.skillReadiness.reading.latestScore}%), Listening=${baseline.skillReadiness.listening.averageScore}% (latest ${baseline.skillReadiness.listening.latestScore}%), Writing=${baseline.skillReadiness.writing.averageScore}% (latest ${baseline.skillReadiness.writing.latestScore}%), Speaking=${baseline.skillReadiness.speaking.averageScore}% (latest ${baseline.skillReadiness.speaking.latestScore}%)`,
+    '\nCHRONOLOGICAL ATTEMPTS (oldest -> newest):',
+  ];
+
+  // Collect recurring missed section tags & weaknesses across history
+  const missedTagCounts: Record<string, number> = {};
+  const recurringNotes: string[] = [];
+
+  used.forEach((a, idx) => {
+    const dateShort = a.timestamp.slice(0, 10);
+    const r = a.skills.reading?.score ?? 0;
+    const l = a.skills.listening?.score ?? 0;
+    const w = a.skills.writing?.score ?? 0;
+    const s = a.skills.speaking?.score ?? 0;
+    lines.push(
+      `${idx + 1}. [${dateShort}] ${a.mode.toUpperCase()} | Overall ${a.overallScore}% (${a.passed ? 'PASS' : 'FAIL'}) | R:${r}% L:${l}% W:${w}% S:${s}% | Time:${Math.round(a.durationUsedSeconds / 60)}m | ${a.officialGradeLabel || ''}`
+    );
+
+    (a.questionReviews || []).forEach((q) => {
+      if (!q.isCorrect) {
+        missedTagCounts[q.sectionTag] = (missedTagCounts[q.sectionTag] || 0) + 1;
+      }
+    });
+    if (a.aiAssessment) {
+      ALL_SKILLS.forEach((sk) => {
+        const ws = a.aiAssessment?.skillInsights[sk]?.weaknesses || [];
+        ws.slice(0, 1).forEach((wNote) => recurringNotes.push(`[${sk}] ${wNote}`));
+      });
+    } else {
+      (a.writingNotes || []).slice(0, 1).forEach((n) => recurringNotes.push(`[writing] ${n}`));
+      (a.speakingNotes || []).slice(0, 1).forEach((n) => recurringNotes.push(`[speaking] ${n}`));
+    }
+  });
+
+  const topMissedTags = Object.entries(missedTagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag, cnt]) => `${tag} (${cnt} missed)`);
+  if (topMissedTags.length > 0) {
+    lines.push(`\nMOST FREQUENT MISSED SECTIONS: ${topMissedTags.join(', ')}`);
+  }
+  if (recurringNotes.length > 0) {
+    lines.push(`\nRECORDED WEAKNESSES & EXAMINER NOTES:\n- ${recurringNotes.slice(0, 8).join('\n- ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Analyzes the learner's entire simulated exam history using the configured AI provider
+ * to advise whether they are ready to book the real official certification exam or need more practice.
+ * Falls back gracefully to deterministic statistical readiness analysis if AI is off or fails.
+ */
+export async function analyzeExamHistoryReadinessWithAIOrFallback(params: {
+  config: AIProviderConfig;
+  attempts: ExamAttemptRecord[];
+  languageId?: string;
+  targetLevel?: CEFRLevel;
+  fetchImpl?: typeof fetch;
+}): Promise<ExamHistoryReadinessReport | null> {
+  const baseline = buildOfflineReadinessReport({
+    attempts: params.attempts,
+    languageId: params.languageId,
+    targetLevel: params.targetLevel,
+  });
+  if (!baseline) return null;
+
+  if (!isAIConfigReady(params.config)) {
+    return baseline;
+  }
+
+  const langName = baseline.languageId === 'german' ? 'German' : 'English';
+  const examBoard =
+    baseline.languageId === 'german'
+      ? 'Goethe-Zertifikat / telc / TestDaF'
+      : 'Cambridge English / IELTS / TOEFL';
+
+  const systemPrompt = `You are a candid, data-driven Senior ${examBoard} Certification Advisor evaluating a learner's simulated ${langName} ${baseline.targetLevel} exam history.
+Your job: Tell the learner clearly whether they are READY to book and pass the REAL official exam now, ALMOST READY (needs short targeted polish), or NEED MORE PRACTICE before spending money on official registration.
+Consider: consistency across attempts, score trend, modular pass risk (all 4 skills must pass reliably), and Strict timed exam proof vs. Practice mode.
+Return ONLY valid JSON (no markdown fences) matching this exact schema:
+{
+  "verdict": "ready|almost-ready|needs-practice",
+  "readinessScore": <0-100>,
+  "confidence": "high|medium|low",
+  "headline": "<crisp 1-line decision telling them whether to book the real exam or keep practicing>",
+  "rationale": "<2-3 sentences grounded in their exact exam history numbers, trend, and modular risks>",
+  "estimatedPrepTime": "<e.g. Ready to book now | 1-2 weeks focused polish | 3-4 weeks structured practice>",
+  "strengths": ["<concrete proof of readiness 1>", "<strength 2>"],
+  "blockingRisks": ["<exact gap/risk before booking 1>", "<risk 2>"],
+  "nextSteps": ["<prioritized concrete action 1>", "<action 2>", "<action 3>"],
+  "skillNotes": {
+    "reading": "<1 concise sentence diagnosing reading history>",
+    "listening": "<1 concise sentence diagnosing listening history>",
+    "writing": "<1 concise sentence diagnosing writing history>",
+    "speaking": "<1 concise sentence diagnosing speaking history>"
+  }
+}`;
+
+  try {
+    const raw = await callAIProvider(
+      params.config,
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildCompactHistoryDigest(params.attempts, baseline) },
+      ],
+      params.fetchImpl
+    );
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return baseline;
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+
+    const validVerdicts: ExamReadinessVerdict[] = ['ready', 'almost-ready', 'needs-practice'];
+    const verdict: ExamReadinessVerdict =
+      typeof parsed.verdict === 'string' && validVerdicts.includes(parsed.verdict as ExamReadinessVerdict)
+        ? (parsed.verdict as ExamReadinessVerdict)
+        : baseline.verdict;
+
+    const validConf: ReadinessConfidence[] = ['high', 'medium', 'low'];
+    const confidence: ReadinessConfidence =
+      typeof parsed.confidence === 'string' && validConf.includes(parsed.confidence as ReadinessConfidence)
+        ? (parsed.confidence as ReadinessConfidence)
+        : baseline.confidence;
+
+    const rawScore = Number(parsed.readinessScore);
+    const readinessScore = Number.isFinite(rawScore)
+      ? Math.max(5, Math.min(99, Math.round(rawScore)))
+      : baseline.readinessScore;
+
+    const rawSkillNotes =
+      parsed.skillNotes && typeof parsed.skillNotes === 'object'
+        ? (parsed.skillNotes as Record<string, unknown>)
+        : {};
+
+    const mergedSkills = { ...baseline.skillReadiness };
+    for (const sk of ALL_SKILLS) {
+      const note = rawSkillNotes[sk];
+      if (typeof note === 'string' && note.trim()) {
+        mergedSkills[sk] = {
+          ...mergedSkills[sk],
+          note: note.trim(),
+        };
+      }
+    }
+
+    const aiStrengths = cleanStrings(parsed.strengths, 4);
+    const aiRisks = cleanStrings(parsed.blockingRisks, 4);
+    const aiNextSteps = cleanStrings(parsed.nextSteps, 5);
+
+    return {
+      ...baseline,
+      generatedAt: new Date().toISOString(),
+      source: 'ai',
+      providerLabel: `${AI_PROVIDER_PRESETS[params.config.provider].label} (${params.config.model})`,
+      verdict,
+      readinessScore,
+      confidence,
+      headline:
+        typeof parsed.headline === 'string' && parsed.headline.trim()
+          ? parsed.headline.trim()
+          : baseline.headline,
+      rationale:
+        typeof parsed.rationale === 'string' && parsed.rationale.trim()
+          ? parsed.rationale.trim()
+          : baseline.rationale,
+      estimatedPrepTime:
+        typeof parsed.estimatedPrepTime === 'string' && parsed.estimatedPrepTime.trim()
+          ? parsed.estimatedPrepTime.trim()
+          : baseline.estimatedPrepTime,
+      strengths: aiStrengths.length > 0 ? aiStrengths : baseline.strengths,
+      blockingRisks: aiRisks.length > 0 ? aiRisks : baseline.blockingRisks,
+      nextSteps: aiNextSteps.length > 0 ? aiNextSteps : baseline.nextSteps,
+      skillReadiness: mergedSkills,
+    };
+  } catch {
+    return baseline;
+  }
+}
+
+export function buildCoachSeedFromReadinessReport(
+  report: ExamHistoryReadinessReport,
+  skill: SkillType = report.prioritySkill
+): string {
+  const skStat = report.skillReadiness[skill];
+  const risks = report.blockingRisks.slice(0, 2).join('; ');
+  return `I'm preparing for the real ${report.targetCertificate} (${report.targetLevel}) exam. Across ${report.attemptsAnalyzed} simulated exam(s), my ${skill} average is ${skStat.averageScore}% (latest ${skStat.latestScore}%). Readiness status: ${report.headline}. Key risks: ${risks || skStat.note}. Please build a targeted ${report.targetLevel} ${skill} practice session to get me exam-ready.`;
 }

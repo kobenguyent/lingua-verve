@@ -1150,6 +1150,122 @@ public struct ExamAIAssessment: Codable, Equatable, Sendable {
     }
 }
 
+public enum ExamReadinessVerdict: String, Codable, Equatable, Sendable {
+    case ready
+    case almostReady = "almost-ready"
+    case needsPractice = "needs-practice"
+
+    public var badgeLabel: String {
+        switch self {
+        case .ready: return "READY FOR REAL EXAM"
+        case .almostReady: return "ALMOST READY · SHORT POLISH"
+        case .needsPractice: return "MORE PRACTICE NEEDED"
+        }
+    }
+}
+
+public struct HistorySkillReadiness: Codable, Equatable, Sendable {
+    public let skill: SkillType
+    public let averageScore: Int
+    public let latestScore: Int
+    public let trend: String // "improving" | "steady" | "declining" | "insufficient-data"
+    public let status: String // "ready" | "borderline" | "needs-work"
+    public let note: String
+
+    public init(
+        skill: SkillType,
+        averageScore: Int,
+        latestScore: Int,
+        trend: String,
+        status: String,
+        note: String
+    ) {
+        self.skill = skill
+        self.averageScore = averageScore
+        self.latestScore = latestScore
+        self.trend = trend
+        self.status = status
+        self.note = note
+    }
+}
+
+public struct ExamHistoryReadinessReport: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let generatedAt: String
+    public let source: String // "ai" | "offline-rubric"
+    public let providerLabel: String
+    public let languageId: String
+    public let targetLevel: CEFRLevel
+    public let targetCertificate: String
+    public let attemptsAnalyzed: Int
+    public let strictAttemptsCount: Int
+    public let passRatePercent: Int
+    public let recentTrend: String // "improving" | "steady" | "declining" | "insufficient-data"
+    public let verdict: ExamReadinessVerdict
+    public let readinessScore: Int // 0..100
+    public let confidence: String // "high" | "medium" | "low"
+    public let headline: String
+    public let rationale: String
+    public let estimatedPrepTime: String
+    public let prioritySkill: SkillType
+    public let strengths: [String]
+    public let blockingRisks: [String]
+    public let nextSteps: [String]
+    public let skillReadiness: [String: HistorySkillReadiness]
+
+    public init(
+        id: String = "readiness-\(UUID().uuidString.prefix(8))",
+        generatedAt: String = ISO8601DateFormatter().string(from: Date()),
+        source: String,
+        providerLabel: String,
+        languageId: String,
+        targetLevel: CEFRLevel,
+        targetCertificate: String,
+        attemptsAnalyzed: Int,
+        strictAttemptsCount: Int,
+        passRatePercent: Int,
+        recentTrend: String,
+        verdict: ExamReadinessVerdict,
+        readinessScore: Int,
+        confidence: String,
+        headline: String,
+        rationale: String,
+        estimatedPrepTime: String,
+        prioritySkill: SkillType,
+        strengths: [String],
+        blockingRisks: [String],
+        nextSteps: [String],
+        skillReadiness: [String: HistorySkillReadiness]
+    ) {
+        self.id = id
+        self.generatedAt = generatedAt
+        self.source = source
+        self.providerLabel = providerLabel
+        self.languageId = languageId
+        self.targetLevel = targetLevel
+        self.targetCertificate = targetCertificate
+        self.attemptsAnalyzed = attemptsAnalyzed
+        self.strictAttemptsCount = strictAttemptsCount
+        self.passRatePercent = passRatePercent
+        self.recentTrend = recentTrend
+        self.verdict = verdict
+        self.readinessScore = readinessScore
+        self.confidence = confidence
+        self.headline = headline
+        self.rationale = rationale
+        self.estimatedPrepTime = estimatedPrepTime
+        self.prioritySkill = prioritySkill
+        self.strengths = strengths
+        self.blockingRisks = blockingRisks
+        self.nextSteps = nextSteps
+        self.skillReadiness = skillReadiness
+    }
+
+    public func readiness(for skill: SkillType) -> HistorySkillReadiness? {
+        skillReadiness[skill.rawValue]
+    }
+}
+
 public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let timestamp: String
@@ -1541,10 +1657,11 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
     public var activityLog: [StudyActivityEntry]
     public var studyDays: [String]
     public var unitProgress: [String: UnitStudyProgress]
+    public var latestReadinessReport: ExamHistoryReadinessReport?
 
     enum CodingKeys: String, CodingKey {
         case version, completedModuleIds, enrolledCourseIds, preTestHistory, examHistory
-        case aiSessionHistory, activityLog, studyDays, unitProgress
+        case aiSessionHistory, activityLog, studyDays, unitProgress, latestReadinessReport
     }
 
     public init(
@@ -1556,7 +1673,8 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         aiSessionHistory: [AISessionRecord] = [],
         activityLog: [StudyActivityEntry] = [],
         studyDays: [String] = [],
-        unitProgress: [String: UnitStudyProgress] = [:]
+        unitProgress: [String: UnitStudyProgress] = [:],
+        latestReadinessReport: ExamHistoryReadinessReport? = nil
     ) {
         self.version = version
         self.completedModuleIds = completedModuleIds
@@ -1567,6 +1685,7 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         self.activityLog = activityLog
         self.studyDays = studyDays
         self.unitProgress = unitProgress
+        self.latestReadinessReport = latestReadinessReport
     }
 
     public init(from decoder: Decoder) throws {
@@ -1580,6 +1699,7 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         self.activityLog = try c.decodeIfPresent([StudyActivityEntry].self, forKey: .activityLog) ?? []
         self.studyDays = try c.decodeIfPresent([String].self, forKey: .studyDays) ?? []
         self.unitProgress = try c.decodeIfPresent([String: UnitStudyProgress].self, forKey: .unitProgress) ?? [:]
+        self.latestReadinessReport = try c.decodeIfPresent(ExamHistoryReadinessReport.self, forKey: .latestReadinessReport)
     }
 }
 

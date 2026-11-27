@@ -2,6 +2,7 @@ import {
   AISessionRecord,
   CEFRLevel,
   ExamAttemptRecord,
+  ExamHistoryReadinessReport,
   LearnerProgressState,
   PreTestResult,
   SkillType,
@@ -51,6 +52,10 @@ export function loadLearnerState(): LearnerProgressState {
         parsed.unitProgress && typeof parsed.unitProgress === 'object' && !Array.isArray(parsed.unitProgress)
           ? parsed.unitProgress
           : {},
+      latestReadinessReport:
+        parsed.latestReadinessReport && typeof parsed.latestReadinessReport === 'object'
+          ? parsed.latestReadinessReport
+          : undefined,
     };
   } catch {
     return createEmptyLearnerState();
@@ -241,6 +246,16 @@ export function updateExamAttemptAssessment(
         aiAssessment: assessment,
       };
     }),
+  };
+}
+
+export function saveReadinessReport(
+  state: LearnerProgressState,
+  report: ExamHistoryReadinessReport
+): LearnerProgressState {
+  return {
+    ...state,
+    latestReadinessReport: report,
   };
 }
 
