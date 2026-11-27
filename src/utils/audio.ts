@@ -178,12 +178,63 @@ export const ELEVENLABS_NEURAL_VOICES: NeuralVoicePreset[] = [
   { id: 'XB0fDUnXU5powFXDhCwa', label: 'Charlotte (European Female)', note: 'Smooth European EN & DE articulation' },
 ];
 
+export const GEMINI_NEURAL_VOICES: NeuralVoicePreset[] = [
+  { id: 'Aoede', label: 'Aoede (Warm Female)', note: 'Smooth, natural conversational warmth (recommended)' },
+  { id: 'Kore', label: 'Kore (Clear Female)', note: 'Crisp, articulate language tutor cadence' },
+  { id: 'Zephyr', label: 'Zephyr (Bright Female)', note: 'Clear, upbeat everyday intonation' },
+  { id: 'Leda', label: 'Leda (Expressive Female)', note: 'Youthful, dynamic conversational flow' },
+  { id: 'Charon', label: 'Charon (Calm Male)', note: 'Measured, authoritative host & tutor voice' },
+  { id: 'Puck', label: 'Puck (Lively Male)', note: 'Upbeat, engaging everyday dialogue partner' },
+  { id: 'Orus', label: 'Orus (Grounded Male)', note: 'Warm, firm narrative clarity' },
+  { id: 'Fenrir', label: 'Fenrir (Expressive Male)', note: 'Rich, emotive storytelling delivery' },
+];
+
+export interface LocalTTSServerPreset {
+  id: 'mlx-audio' | 'kokoro-fastapi' | 'speaches-piper';
+  label: string;
+  endpoint: string;
+  model: string;
+  voice: string;
+  note: string;
+}
+
+export const LOCAL_TTS_SERVER_PRESETS: LocalTTSServerPreset[] = [
+  {
+    id: 'mlx-audio',
+    label: 'MLX-Audio (Apple Silicon)',
+    endpoint: 'http://localhost:8000/v1/audio/speech',
+    model: 'mlx-community/Kokoro-82M-bf16',
+    voice: 'bf_emma',
+    note: 'Native Apple Silicon GPU speech server (Kokoro-82M EN + Chatterbox Multilingual EN/DE).',
+  },
+  {
+    id: 'kokoro-fastapi',
+    label: 'Kokoro-FastAPI',
+    endpoint: 'http://localhost:8880/v1/audio/speech',
+    model: 'kokoro',
+    voice: 'bf_emma',
+    note: 'Fast local OpenAI-compatible Kokoro server on port 8880.',
+  },
+  {
+    id: 'speaches-piper',
+    label: 'Speaches / Piper (DE & EN)',
+    endpoint: 'http://localhost:8000/v1/audio/speech',
+    model: 'tts-1',
+    voice: 'de_DE-thorsten-high',
+    note: 'Privacy-first Piper VITS voices with strong German (Thorsten/Eva) & English models.',
+  },
+];
+
 export const LOCAL_NEURAL_VOICES: NeuralVoicePreset[] = [
-  { id: 'bf_emma', label: 'Kokoro Emma (British F)', note: 'Natural British neural voice (Kokoro-FastAPI)' },
+  { id: 'de_DE-thorsten-high', label: 'Thorsten High (German M · Piper/Speaches)', note: 'Natural studio German male neural voice (Piper / OpenedAI-Speech)' },
+  { id: 'de_DE-eva_k-x_low', label: 'Eva K (German F · Piper/Speaches)', note: 'Warm German female neural voice (Piper / Speaches)' },
+  { id: 'de_DE-kerstin-low', label: 'Kerstin (German F · Piper/Speaches)', note: 'Clear German female conversational neural voice' },
+  { id: 'bf_emma', label: 'Kokoro Emma (British F)', note: 'Natural British neural voice (Kokoro / MLX-Audio)' },
   { id: 'bm_george', label: 'Kokoro George (British M)', note: 'Natural British male neural voice' },
   { id: 'af_heart', label: 'Kokoro Heart (American F)', note: 'Top-rated warm US neural voice' },
   { id: 'am_michael', label: 'Kokoro Michael (American M)', note: 'Natural US male neural voice' },
   { id: 'af_bella', label: 'Kokoro Bella (American F)', note: 'Expressive conversational US voice' },
+  { id: 'chatterbox-multilingual', label: 'Chatterbox Multilingual (EN & DE)', note: 'Expressive local multilingual voice via MLX-Audio' },
 ];
 
 export interface VoiceProviderPresetMeta {
@@ -209,6 +260,17 @@ export const VOICE_PROVIDER_PRESETS: Record<VoiceProviderType, VoiceProviderPres
     setupHint:
       'Auto-selects Siri Neural, Apple Enhanced/Premium, Edge Online Natural, or Google voices and filters out legacy robotic voices. Zero API key needed.',
   },
+  gemini: {
+    label: 'Google Gemini Native Dialogue (2.5 Flash TTS)',
+    mode: 'cloud',
+    defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    defaultModel: 'gemini-2.5-flash-preview-tts',
+    defaultVoice: 'Aoede',
+    suggestedModels: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
+    requiresApiKey: true,
+    setupHint:
+      'Renders 2-speaker English & German dialogues in a single API call with genuine human breaths, reactions, and natural turn-taking. Reuses your Gemini AI key.',
+  },
   openai: {
     label: 'OpenAI Human TTS (gpt-4o-mini-tts)',
     mode: 'cloud',
@@ -218,29 +280,34 @@ export const VOICE_PROVIDER_PRESETS: Record<VoiceProviderType, VoiceProviderPres
     suggestedModels: ['gpt-4o-mini-tts', 'tts-1-hd', 'tts-1'],
     requiresApiKey: true,
     setupHint:
-      'Uses gpt-4o-mini-tts with real accent coaching instructions so UK, US, Australian, Irish, Indian, Austrian & Swiss accents sound genuinely human.',
+      'Uses gpt-4o-mini-tts with accent & conversational turn-context instructions so UK, US, Australian, Irish, Indian, Austrian & Swiss accents sound genuinely human.',
   },
   elevenlabs: {
-    label: 'ElevenLabs Ultra-Human Voices',
+    label: 'ElevenLabs Ultra-Human Voices (v3 & v2)',
     mode: 'cloud',
     defaultEndpoint: 'https://api.elevenlabs.io/v1/text-to-speech',
     defaultModel: 'eleven_multilingual_v2',
     defaultVoice: 'JBFqnCBsd6RMkjVDRZzb',
-    suggestedModels: ['eleven_multilingual_v2', 'eleven_flash_v2_5'],
+    suggestedModels: ['eleven_v3', 'eleven_multilingual_v2', 'eleven_flash_v2_5'],
     requiresApiKey: true,
     setupHint:
-      'Industry-leading lifelike multilingual human voices for English & German with natural breathing and expressive prosody.',
+      'Lifelike multilingual human voices with continuous turn prosody (previous/next text context), language locking, and expressive style tuning.',
   },
   'local-openai': {
-    label: 'Local Neural TTS (Kokoro / Speaches)',
+    label: 'Local Neural TTS (MLX-Audio / Kokoro / Piper)',
     mode: 'local',
-    defaultEndpoint: 'http://localhost:8880/v1/audio/speech',
-    defaultModel: 'kokoro',
+    defaultEndpoint: 'http://localhost:8000/v1/audio/speech',
+    defaultModel: 'mlx-community/Kokoro-82M-bf16',
     defaultVoice: 'bf_emma',
-    suggestedModels: ['kokoro', 'tts-1'],
+    suggestedModels: [
+      'kokoro',
+      'mlx-community/Kokoro-82M-bf16',
+      'mlx-community/chatterbox-multilingual',
+      'tts-1',
+    ],
     requiresApiKey: false,
     setupHint:
-      '100% private local neural voices via Kokoro-FastAPI (port 8880) or Speaches/OpenedAI-Speech (port 8000). No cloud key needed.',
+      '100% private local neural voices via MLX-Audio (Apple Silicon GPU, port 8000), Kokoro-FastAPI (port 8880), or Speaches/Piper (port 8000). No cloud key needed.',
   },
 };
 
@@ -362,6 +429,7 @@ export function getDefaultVoiceSettings(): VoiceSettings {
     model: VOICE_PROVIDER_PRESETS.openai.defaultModel,
     neuralVoice: VOICE_PROVIDER_PRESETS.openai.defaultVoice,
     reuseOpenAIKey: true,
+    reuseGeminiKey: true,
   };
 }
 
@@ -387,6 +455,7 @@ export function loadVoiceSettings(): VoiceSettings {
         typeof parsed.rateMultiplier === 'number'
           ? Math.max(0.75, Math.min(1.25, parsed.rateMultiplier))
           : 1.0,
+      reuseGeminiKey: parsed.reuseGeminiKey !== false,
     };
   } catch {
     return defaults;
@@ -537,19 +606,309 @@ export function buildNeuralVoiceInstructions(
   return `${accentCue} ${styleCue[style]} ${paceCue} Never sound flat or mechanical.`;
 }
 
-function readSharedOpenAIKey(): string {
+function readSharedAIProviderKey(provider: 'openai' | 'gemini'): string {
   if (typeof window === 'undefined') return '';
   try {
     const raw = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
     if (!raw) return '';
     const parsed = JSON.parse(raw) as { provider?: string; apiKey?: string };
-    if (parsed.provider === 'openai' && parsed.apiKey) {
+    if (parsed.provider === provider && parsed.apiKey) {
       return parsed.apiKey.trim();
     }
     return '';
   } catch {
     return '';
   }
+}
+
+export function parseSampleRateFromMimeType(mimeType: string, fallback: number = 24000): number {
+  const match = /rate=(\d{4,6})/i.exec(mimeType || '');
+  if (!match) return fallback;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) && parsed >= 8000 && parsed <= 96000 ? parsed : fallback;
+}
+
+/**
+ * Prepends a standard 44-byte RIFF/WAVE PCM header to raw 16-bit signed little-endian PCM bytes.
+ */
+export function wrapPCM16AsWAV(
+  pcmBytes: Uint8Array,
+  sampleRate: number = 24000,
+  channels: number = 1
+): Uint8Array {
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * channels * (bitsPerSample / 8);
+  const blockAlign = channels * (bitsPerSample / 8);
+  const dataSize = pcmBytes.byteLength;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeAscii = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  new Uint8Array(buffer, 44).set(pcmBytes);
+  return new Uint8Array(buffer);
+}
+
+export function resolveGeminiTTSEndpoint(endpoint: string, model: string): string {
+  const effectiveModel = (model || 'gemini-2.5-flash-preview-tts').trim().replace(/^models\//i, '');
+  let base = (endpoint || VOICE_PROVIDER_PRESETS.gemini.defaultEndpoint).trim().replace(/\/+$/, '');
+  if (!base) base = VOICE_PROVIDER_PRESETS.gemini.defaultEndpoint;
+
+  if (/generateContent/i.test(base)) {
+    return base.split('?')[0];
+  }
+  if (/\/models\/[^/]+$/i.test(base)) {
+    return `${base}:generateContent`;
+  }
+  if (/\/models$/i.test(base)) {
+    return `${base}/${effectiveModel}:generateContent`;
+  }
+  return `${base}/models/${effectiveModel}:generateContent`;
+}
+
+export function buildGeminiTTSRequestBody(params: {
+  text: string;
+  accentCode: string;
+  style: VoiceSpeakingStyle;
+  slow: boolean;
+  voice: string;
+  dialogueTurns?: DialogueTurn[];
+  secondaryVoice?: string;
+}): Record<string, unknown> {
+  const { text, accentCode, style, slow, voice, dialogueTurns, secondaryVoice } = params;
+  const directorCue = buildNeuralVoiceInstructions(accentCode, style, slow);
+
+  const distinctSpeakers: Array<{ speaker: string; speakerIndex: number }> = [];
+  if (dialogueTurns && dialogueTurns.length >= 2) {
+    const seen = new Set<string>();
+    for (const turn of dialogueTurns) {
+      const norm = turn.speaker.toLowerCase();
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        distinctSpeakers.push({ speaker: turn.speaker, speakerIndex: turn.speakerIndex });
+      }
+    }
+  }
+
+  if (dialogueTurns && distinctSpeakers.length === 2) {
+    const primaryVoice = voice || 'Aoede';
+    const altVoice = secondaryVoice && secondaryVoice !== primaryVoice
+      ? secondaryVoice
+      : primaryVoice === 'Charon'
+      ? 'Aoede'
+      : 'Charon';
+
+    const scriptLines = dialogueTurns.map((t) => {
+      const canonical =
+        distinctSpeakers.find((s) => s.speakerIndex === t.speakerIndex)?.speaker || t.speaker;
+      return `${canonical}: ${t.text}`;
+    });
+
+    const promptText = [
+      `Read this live human conversation naturally. ${directorCue}`,
+      'Maintain authentic turn-taking, subtle breathing, and spontaneous conversational warmth without reading speaker labels aloud:',
+      '',
+      ...scriptLines,
+    ].join('\n');
+
+    return {
+      contents: [{ parts: [{ text: promptText }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          multiSpeakerVoiceConfig: {
+            speakerVoiceConfigs: [
+              {
+                speaker: distinctSpeakers[0].speaker,
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: primaryVoice } },
+              },
+              {
+                speaker: distinctSpeakers[1].speaker,
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: altVoice } },
+              },
+            ],
+          },
+        },
+      },
+    };
+  }
+
+  const promptText = `${directorCue}\nSpeak only the exact text below naturally:\n\n${text}`;
+  return {
+    contents: [{ parts: [{ text: promptText }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: voice || 'Aoede',
+          },
+        },
+      },
+    },
+  };
+}
+
+export function buildElevenLabsRequestBody(params: {
+  text: string;
+  model: string;
+  style: VoiceSpeakingStyle;
+  speed: number;
+  accentCode: string;
+  previousText?: string;
+  nextText?: string;
+}): Record<string, unknown> {
+  const { text, model, style, speed, accentCode, previousText, nextText } = params;
+  const effectiveModel = (model || 'eleven_multilingual_v2').trim();
+  const modelLower = effectiveModel.toLowerCase();
+  const isV3 = modelLower.includes('v3');
+  const isFlash = modelLower.includes('flash');
+
+  const stylePresetMap: Record<VoiceSpeakingStyle, { stability: number; similarity_boost: number; style: number }> = {
+    conversational: { stability: 0.35, similarity_boost: 0.78, style: 0.45 },
+    natural: { stability: 0.45, similarity_boost: 0.78, style: 0.30 },
+    tutor: { stability: 0.60, similarity_boost: 0.80, style: 0.20 },
+    broadcast: { stability: 0.65, similarity_boost: 0.80, style: 0.15 },
+  };
+  const preset = stylePresetMap[style] || stylePresetMap.natural;
+
+  const voiceSettings: Record<string, unknown> = {
+    stability: preset.stability,
+    similarity_boost: preset.similarity_boost,
+    style: preset.style,
+    use_speaker_boost: true,
+  };
+  if (!isV3) {
+    voiceSettings.speed = Math.max(0.7, Math.min(1.2, Number(speed.toFixed(2))));
+  }
+
+  const body: Record<string, unknown> = {
+    text,
+    model_id: effectiveModel,
+    voice_settings: voiceSettings,
+  };
+  if (previousText?.trim()) {
+    body.previous_text = previousText.trim();
+  }
+  if (nextText?.trim()) {
+    body.next_text = nextText.trim();
+  }
+  const langBase = (accentCode || '').slice(0, 2).toLowerCase();
+  if ((isFlash || isV3) && /^[a-z]{2}$/.test(langBase)) {
+    body.language_code = langBase;
+  }
+  return body;
+}
+
+export function buildOpenAIDialogueInstructions(
+  accentCode: string,
+  style: VoiceSpeakingStyle,
+  speaker: string,
+  speakerIndex: number,
+  slow: boolean,
+  previousTurn?: DialogueTurn
+): string {
+  const baseInstructions = buildNeuralVoiceInstructions(accentCode, style, slow);
+  const roleCue =
+    speakerIndex % 2 === 0
+      ? `You are ${speaker} speaking spontaneously in a natural live two-person conversation.`
+      : `You are ${speaker}, responding warmly and naturally as the conversation partner.`;
+  const contextCue = previousTurn
+    ? ` Respond naturally right after ${previousTurn.speaker} said: "${previousTurn.text.slice(0, 140)}".`
+    : '';
+  return `${baseInstructions} ${roleCue}${contextCue} Never sound like you are reading a script.`;
+}
+
+export function naturalTurnPauseMs(
+  previousText: string,
+  _nextText: string,
+  slow: boolean
+): number {
+  const trimmed = (previousText || '').trim();
+  let baseMs = 220;
+  if (trimmed.length > 0 && (trimmed.length <= 28 || trimmed.endsWith('!') || trimmed.endsWith('—'))) {
+    baseMs = 120;
+  } else if (trimmed.endsWith('?')) {
+    baseMs = 200;
+  } else if (trimmed.length >= 95) {
+    baseMs = 300;
+  }
+  return slow ? Math.round(baseMs * 1.25) : baseMs;
+}
+
+export async function checkLocalTTSServer(
+  endpoint: string
+): Promise<{ ok: boolean; message: string; models?: string[] }> {
+  const trimmed = (endpoint || '').trim();
+  if (!trimmed) {
+    return { ok: false, message: 'Enter a local TTS endpoint URL first.' };
+  }
+  if (typeof fetch !== 'function') {
+    return { ok: false, message: 'Fetch API unavailable in this environment.' };
+  }
+
+  let baseOrigin = trimmed.replace(/\/+$/, '');
+  const v1Idx = baseOrigin.toLowerCase().indexOf('/v1/');
+  if (v1Idx !== -1) {
+    baseOrigin = baseOrigin.slice(0, v1Idx);
+  }
+  const candidates = [`${baseOrigin}/v1/models`, `${baseOrigin}/health`];
+
+  for (const url of candidates) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+    const timer = controller ? setTimeout(() => controller.abort(), 3000) : undefined;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        signal: controller?.signal,
+      });
+      if (timer) clearTimeout(timer);
+      if (res.ok) {
+        let models: string[] = [];
+        try {
+          const json = (await res.json()) as { data?: Array<{ id?: string }>; models?: string[] };
+          if (Array.isArray(json.data)) {
+            models = json.data.map((m) => m.id || '').filter(Boolean);
+          } else if (Array.isArray(json.models)) {
+            models = json.models.filter(Boolean);
+          }
+        } catch {
+          // /health may return plain text
+        }
+        const suffix = models.length > 0 ? ` (${models.slice(0, 3).join(', ')})` : '';
+        return {
+          ok: true,
+          message: `Local TTS server reachable at ${baseOrigin}${suffix}.`,
+          models,
+        };
+      }
+    } catch {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  return {
+    ok: false,
+    message: `Could not reach ${baseOrigin}. Start mlx-audio (port 8000) or Kokoro-FastAPI (port 8880) and retry.`,
+  };
 }
 
 export interface DialogueTurn {
@@ -642,7 +1001,29 @@ function pickNeuralVoiceForSpeaker(
 ): string {
   const isGerman = accentCode.toLowerCase().startsWith('de');
   const gender = inferSpeakerGender(speaker);
-  const primary = cfg.neuralVoice || (cfg.provider === 'openai' ? 'coral' : cfg.provider === 'elevenlabs' ? ELEVENLABS_NEURAL_VOICES[0].id : 'bf_emma');
+  const defaultForProvider =
+    cfg.provider === 'gemini'
+      ? 'Aoede'
+      : cfg.provider === 'openai'
+      ? 'coral'
+      : cfg.provider === 'elevenlabs'
+      ? ELEVENLABS_NEURAL_VOICES[0].id
+      : 'bf_emma';
+  const primary = cfg.neuralVoice || defaultForProvider;
+
+  if (cfg.provider === 'gemini') {
+    const females = ['Aoede', 'Kore', 'Zephyr', 'Leda'];
+    const males = ['Charon', 'Puck', 'Orus', 'Fenrir'];
+    const primaryLower = primary.toLowerCase();
+    if (speakerIndex === 0) {
+      if (gender === 'male' && females.some((v) => v.toLowerCase() === primaryLower)) return 'Charon';
+      if (gender === 'female' && males.some((v) => v.toLowerCase() === primaryLower)) return 'Aoede';
+      return primary;
+    }
+    if (gender === 'male') return males.find((v) => v.toLowerCase() !== primaryLower) || 'Charon';
+    if (gender === 'female') return females.find((v) => v.toLowerCase() !== primaryLower) || 'Kore';
+    return females.some((v) => v.toLowerCase() === primaryLower) ? 'Charon' : 'Aoede';
+  }
 
   if (cfg.provider === 'openai') {
     const females = ['coral', 'sage', 'nova', 'shimmer'];
@@ -780,7 +1161,10 @@ class SoundEngine {
   public getEffectiveApiKey(settings: VoiceSettings = this.settings): string {
     if (settings.apiKey.trim()) return settings.apiKey.trim();
     if (settings.provider === 'openai' && settings.reuseOpenAIKey) {
-      return readSharedOpenAIKey();
+      return readSharedAIProviderKey('openai');
+    }
+    if (settings.provider === 'gemini' && settings.reuseGeminiKey !== false) {
+      return readSharedAIProviderKey('gemini');
     }
     return '';
   }
@@ -791,6 +1175,83 @@ class SoundEngine {
       return Boolean(settings.endpoint.trim());
     }
     return Boolean(settings.endpoint.trim() && this.getEffectiveApiKey(settings));
+  }
+
+  private static hashCacheKey(key: string): string {
+    let h1 = 0x811c9dc5;
+    let h2 = 0x9e3779b9;
+    for (let i = 0; i < key.length; i += 1) {
+      const c = key.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 0x01000193);
+      h2 ^= c + i;
+      h2 = Math.imul(h2, 0x85ebca6b);
+    }
+    return `${(h1 >>> 0).toString(16)}-${(h2 >>> 0).toString(16)}-${key.length}`;
+  }
+
+  private async readPersistentAudioBlob(cacheKey: string): Promise<Blob | null> {
+    if (typeof window === 'undefined' || typeof caches === 'undefined') return null;
+    try {
+      const cache = await caches.open('linguaverve-tts-v1');
+      const syntheticUrl = `https://linguaverve.local/tts-cache/${SoundEngine.hashCacheKey(cacheKey)}`;
+      const hit = await cache.match(syntheticUrl);
+      if (!hit) return null;
+      return await hit.blob();
+    } catch {
+      return null;
+    }
+  }
+
+  private async writePersistentAudioBlob(cacheKey: string, blob: Blob): Promise<void> {
+    if (typeof window === 'undefined' || typeof caches === 'undefined') return;
+    try {
+      const cache = await caches.open('linguaverve-tts-v1');
+      const keys = await cache.keys();
+      if (keys.length >= 80) {
+        const overflow = keys.length - 79;
+        for (let i = 0; i < overflow; i += 1) {
+          await cache.delete(keys[i]);
+        }
+      }
+      const syntheticUrl = `https://linguaverve.local/tts-cache/${SoundEngine.hashCacheKey(cacheKey)}`;
+      const contentType = blob.type || 'audio/mpeg';
+      await cache.put(syntheticUrl, new Response(blob, { headers: { 'Content-Type': contentType } }));
+    } catch {
+      // Cache Storage unavailable or quota exceeded
+    }
+  }
+
+  public async clearNeuralAudioCache(): Promise<void> {
+    for (const url of this.neuralAudioCache.values()) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Ignore
+      }
+    }
+    this.neuralAudioCache.clear();
+    if (typeof window !== 'undefined' && typeof caches !== 'undefined') {
+      try {
+        await caches.delete('linguaverve-tts-v1');
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  public async getNeuralAudioCacheCount(): Promise<number> {
+    let persistentCount = 0;
+    if (typeof window !== 'undefined' && typeof caches !== 'undefined') {
+      try {
+        const cache = await caches.open('linguaverve-tts-v1');
+        const keys = await cache.keys();
+        persistentCount = keys.length;
+      } catch {
+        persistentCount = 0;
+      }
+    }
+    return Math.max(this.neuralAudioCache.size, persistentCount);
   }
 
   public getHumanSystemVoices(languageId?: string): SpeechSynthesisVoice[] {
@@ -970,46 +1431,150 @@ class SoundEngine {
     return this.speakSingleNeuralSegment(text, accentCode, slow, generation, cfg);
   }
 
+  private static decodeBase64ToBytes(base64: string): Uint8Array {
+    const clean = base64.replace(/\s+/g, '');
+    if (typeof atob === 'function') {
+      const bin = atob(clean);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) {
+        bytes[i] = bin.charCodeAt(i);
+      }
+      return bytes;
+    }
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const out: number[] = [];
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < clean.length; i += 1) {
+      const ch = clean[i];
+      if (ch === '=') break;
+      const val = alphabet.indexOf(ch);
+      if (val === -1) continue;
+      buffer = (buffer << 6) | val;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        out.push((buffer >> bits) & 0xff);
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  private resolvePlaybackRateForProvider(cfg: VoiceSettings, slow: boolean): number {
+    const isV3 = cfg.provider === 'elevenlabs' && (cfg.model || '').toLowerCase().includes('v3');
+    if (cfg.provider === 'gemini' || isV3) {
+      const base = slow ? 0.84 : 1.0;
+      return Math.max(0.8, Math.min(1.2, base * (cfg.rateMultiplier || 1.0)));
+    }
+    return 1.0;
+  }
+
   private async fetchNeuralSegmentUrl(
     text: string,
     accentCode: string,
     slow: boolean,
     cfg: VoiceSettings,
     voiceOverride?: string,
-    instructionsOverride?: string
+    instructionsOverride?: string,
+    elevenContext?: { previousText?: string; nextText?: string },
+    geminiDialogue?: { turns: DialogueTurn[]; secondaryVoice?: string }
   ): Promise<string> {
-    const effectiveVoice =
-      voiceOverride || cfg.neuralVoice || (cfg.provider === 'openai' ? 'coral' : cfg.provider === 'elevenlabs' ? ELEVENLABS_NEURAL_VOICES[0].id : 'bf_emma');
-    const cacheKey = `${cfg.provider}|${cfg.model}|${effectiveVoice}|${accentCode}|${cfg.speakingStyle}|${cfg.rateMultiplier}|${slow ? '1' : '0'}|${instructionsOverride || ''}|${text}`;
+    const defaultVoiceForProvider =
+      cfg.provider === 'gemini'
+        ? 'Aoede'
+        : cfg.provider === 'openai'
+        ? 'coral'
+        : cfg.provider === 'elevenlabs'
+        ? ELEVENLABS_NEURAL_VOICES[0].id
+        : 'bf_emma';
+    const effectiveVoice = voiceOverride || cfg.neuralVoice || defaultVoiceForProvider;
+    const secondaryKey = geminiDialogue?.secondaryVoice || '';
+    const prevKey = elevenContext?.previousText || '';
+    const nextKey = elevenContext?.nextText || '';
+    const cacheKey = `${cfg.provider}|${cfg.model}|${effectiveVoice}|${secondaryKey}|${accentCode}|${cfg.speakingStyle}|${cfg.rateMultiplier}|${slow ? '1' : '0'}|${instructionsOverride || ''}|${prevKey}|${nextKey}|${text}`;
+
     const cachedUrl = this.neuralAudioCache.get(cacheKey);
     if (cachedUrl) return cachedUrl;
+
+    const persistentBlob = await this.readPersistentAudioBlob(cacheKey);
+    if (persistentBlob) {
+      const objectUrl = URL.createObjectURL(persistentBlob);
+      this.storeMemoryCacheUrl(cacheKey, objectUrl);
+      return objectUrl;
+    }
 
     const apiKey = this.getEffectiveApiKey(cfg);
     const speed = Math.max(0.65, Math.min(1.3, (slow ? 0.8 : 0.98) * (cfg.rateMultiplier || 1.0)));
 
-    let response: Response;
-    if (cfg.provider === 'elevenlabs') {
+    let blob: Blob;
+    if (cfg.provider === 'gemini') {
+      const url = resolveGeminiTTSEndpoint(cfg.endpoint, cfg.model);
+      const body = buildGeminiTTSRequestBody({
+        text,
+        accentCode,
+        style: cfg.speakingStyle,
+        slow,
+        voice: effectiveVoice,
+        dialogueTurns: geminiDialogue?.turns,
+        secondaryVoice: geminiDialogue?.secondaryVoice,
+      });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const json = (await response.json()) as {
+        candidates?: Array<{
+          content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> };
+        }>;
+      };
+      const inlinePart = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+      if (!inlinePart?.data) {
+        throw new Error('Empty Gemini audio response');
+      }
+      const rawBytes = SoundEngine.decodeBase64ToBytes(inlinePart.data);
+      const mime = (inlinePart.mimeType || 'audio/L16;codec=pcm;rate=24000').toLowerCase();
+      if (mime.includes('pcm') || mime.includes('l16')) {
+        const rate = parseSampleRateFromMimeType(mime, 24000);
+        const wavBytes = wrapPCM16AsWAV(rawBytes, rate, 1);
+        const wavBuffer = wavBytes.buffer.slice(wavBytes.byteOffset, wavBytes.byteOffset + wavBytes.byteLength) as ArrayBuffer;
+        blob = new Blob([wavBuffer], { type: 'audio/wav' });
+      } else {
+        const rawBuffer = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength) as ArrayBuffer;
+        blob = new Blob([rawBuffer], { type: mime });
+      }
+    } else if (cfg.provider === 'elevenlabs') {
       const base = cfg.endpoint.replace(/\/+$/, '');
       const voiceId = encodeURIComponent(effectiveVoice);
       const url = base.includes('/text-to-speech/') ? base : `${base}/${voiceId}`;
-      response = await fetch(url, {
+      const payload = buildElevenLabsRequestBody({
+        text,
+        model: cfg.model || 'eleven_multilingual_v2',
+        style: cfg.speakingStyle,
+        speed,
+        accentCode,
+        previousText: elevenContext?.previousText,
+        nextText: elevenContext?.nextText,
+      });
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
           'xi-api-key': apiKey,
         },
-        body: JSON.stringify({
-          text,
-          model_id: cfg.model || 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.45,
-            similarity_boost: 0.78,
-            style: 0.35,
-            use_speaker_boost: true,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      blob = await response.blob();
     } else {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
@@ -1027,19 +1592,24 @@ class SoundEngine {
         payload.instructions =
           instructionsOverride || buildNeuralVoiceInstructions(accentCode, cfg.speakingStyle, slow);
       }
-      response = await fetch(cfg.endpoint, {
+      const response = await fetch(cfg.endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      blob = await response.blob();
     }
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
+    this.storeMemoryCacheUrl(cacheKey, objectUrl);
+    void this.writePersistentAudioBlob(cacheKey, blob);
+    return objectUrl;
+  }
+
+  private storeMemoryCacheUrl(cacheKey: string, objectUrl: string): void {
     if (this.neuralAudioCache.size >= 40) {
       const oldestKey = this.neuralAudioCache.keys().next().value;
       if (oldestKey) {
@@ -1049,16 +1619,18 @@ class SoundEngine {
       }
     }
     this.neuralAudioCache.set(cacheKey, objectUrl);
-    return objectUrl;
   }
 
-  private playAudioUrl(url: string): Promise<void> {
+  private playAudioUrl(url: string, playbackRate: number = 1.0): Promise<void> {
     return new Promise((resolve, reject) => {
       if (typeof Audio === 'undefined') {
         reject(new Error('HTML5 Audio unavailable'));
         return;
       }
       const audio = new Audio(url);
+      if (Math.abs(playbackRate - 1.0) > 0.01) {
+        audio.playbackRate = Math.max(0.75, Math.min(1.25, playbackRate));
+      }
       this.activeHtmlAudio = audio;
       audio.onended = () => {
         if (this.activeHtmlAudio === audio) this.activeHtmlAudio = null;
@@ -1084,13 +1656,67 @@ class SoundEngine {
     cfg: VoiceSettings
   ): Promise<{ ok: boolean; engine: string; note?: string }> {
     try {
-      const accentCue =
-        getAccentOption(accentCode)?.neuralHint ?? `Speak in natural, idiomatic ${accentCode}.`;
+      const playbackRate = this.resolvePlaybackRateForProvider(cfg, slow);
+      const distinctSpeakerIndices = Array.from(new Set(turns.map((t) => t.speakerIndex)));
+
+      // Google Gemini 2.5 TTS synthesizes an entire 2-speaker conversation in ONE call!
+      if (cfg.provider === 'gemini' && distinctSpeakerIndices.length === 2) {
+        const firstTurn0 = turns.find((t) => t.speakerIndex === distinctSpeakerIndices[0])!;
+        const firstTurn1 = turns.find((t) => t.speakerIndex === distinctSpeakerIndices[1])!;
+        const voice0 = pickNeuralVoiceForSpeaker(cfg, accentCode, firstTurn0.speaker, 0);
+        const voice1 = pickNeuralVoiceForSpeaker(cfg, accentCode, firstTurn1.speaker, 1);
+
+        const url = await this.fetchNeuralSegmentUrl(
+          rawText,
+          accentCode,
+          slow,
+          cfg,
+          voice0,
+          undefined,
+          undefined,
+          { turns, secondaryVoice: voice1 }
+        );
+        if (generation !== this.speakGeneration) {
+          this.setActiveSpeaker(null);
+          return { ok: true, engine: cfg.provider };
+        }
+        this.setActiveSpeaker(`${firstTurn0.speaker} & ${firstTurn1.speaker}`);
+        await this.playAudioUrl(url, playbackRate);
+        this.setActiveSpeaker(null);
+        this.lastVoiceNotice = null;
+        return { ok: true, engine: `gemini · Multi-Speaker Dialogue (${accentCode})` };
+      }
+
       const urls = await Promise.all(
-        turns.map((turn) => {
+        turns.map((turn, idx) => {
           const voice = pickNeuralVoiceForSpeaker(cfg, accentCode, turn.speaker, turn.speakerIndex);
-          const instructions = `${accentCue} You are ${turn.speaker} speaking spontaneously in a natural live two-person conversation. Never sound like you are reading a script.`;
-          return this.fetchNeuralSegmentUrl(turn.text, accentCode, slow, cfg, voice, instructions);
+          const instructions =
+            cfg.provider === 'openai'
+              ? buildOpenAIDialogueInstructions(
+                  accentCode,
+                  cfg.speakingStyle,
+                  turn.speaker,
+                  turn.speakerIndex,
+                  slow,
+                  idx > 0 ? turns[idx - 1] : undefined
+                )
+              : undefined;
+          const elevenContext =
+            cfg.provider === 'elevenlabs'
+              ? {
+                  previousText: idx > 0 ? turns[idx - 1].text : undefined,
+                  nextText: idx < turns.length - 1 ? turns[idx + 1].text : undefined,
+                }
+              : undefined;
+          return this.fetchNeuralSegmentUrl(
+            turn.text,
+            accentCode,
+            slow,
+            cfg,
+            voice,
+            instructions,
+            elevenContext
+          );
         })
       );
 
@@ -1100,9 +1726,10 @@ class SoundEngine {
           return { ok: true, engine: cfg.provider };
         }
         this.setActiveSpeaker(turns[i].speaker);
-        await this.playAudioUrl(urls[i]);
+        await this.playAudioUrl(urls[i], playbackRate);
         if (i < turns.length - 1 && generation === this.speakGeneration) {
-          await new Promise((r) => setTimeout(r, 220));
+          const pauseMs = naturalTurnPauseMs(turns[i].text, turns[i + 1].text, slow);
+          await new Promise((r) => setTimeout(r, pauseMs));
         }
       }
       this.setActiveSpeaker(null);
@@ -1134,7 +1761,7 @@ class SoundEngine {
         return { ok: true, engine: cfg.provider };
       }
       this.lastVoiceNotice = null;
-      await this.playAudioUrl(url);
+      await this.playAudioUrl(url, this.resolvePlaybackRateForProvider(cfg, slow));
       return { ok: true, engine: `${cfg.provider} · ${cfg.neuralVoice} (${accentCode})` };
     } catch (err) {
       if (generation !== this.speakGeneration) {
@@ -1199,10 +1826,16 @@ class SoundEngine {
 
         turns.forEach((turn, idx) => {
           const spVoice = voiceBySpeaker.get(turn.speakerIndex) || chosenVoice;
+          const isNeuralVoice = spVoice ? classifyVoiceQuality(spVoice) === 'neural' : false;
           const gender = inferSpeakerGender(turn.speaker);
           const isLower = gender === 'male' || (gender === 'unknown' && turn.speakerIndex % 2 === 1);
-          const paceFactor = hasDistinctVoices ? (turn.speakerIndex % 2 === 0 ? 1.0 : 0.97) : isLower ? 0.95 : 1.02;
-          const pitch = hasDistinctVoices ? 1.0 : isLower ? 0.92 : 1.05;
+          const paceFactor = hasDistinctVoices
+            ? (turn.speakerIndex % 2 === 0 ? 1.0 : 0.98)
+            : isLower
+            ? 0.97
+            : 1.01;
+          // Never pitch-shift neural voices — preserve natural vocoder timbre and differentiate via cadence
+          const pitch = hasDistinctVoices || isNeuralVoice ? 1.0 : isLower ? 0.97 : 1.02;
 
           const utterance = new SpeechSynthesisUtterance(turn.text);
           utterance.rate = Math.max(0.65, Math.min(1.28, baseRate * (cfg.rateMultiplier || 1.0) * paceFactor));

@@ -545,7 +545,7 @@ export interface AIProviderConfig {
 // HUMAN VOICE & MULTI-ACCENT TTS STUDIO
 // ============================================================
 
-export type VoiceProviderType = 'system' | 'openai' | 'elevenlabs' | 'local-openai';
+export type VoiceProviderType = 'system' | 'gemini' | 'openai' | 'elevenlabs' | 'local-openai';
 
 export type VoiceSpeakingStyle = 'natural' | 'tutor' | 'conversational' | 'broadcast';
 
@@ -570,6 +570,7 @@ export interface VoiceSettings {
   model: string;
   neuralVoice: string;
   reuseOpenAIKey: boolean;
+  reuseGeminiKey?: boolean;
 }
 
 export interface AIModelInfo {

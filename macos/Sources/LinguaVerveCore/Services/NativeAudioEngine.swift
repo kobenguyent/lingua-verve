@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import CryptoKit
 import Observation
 
 #if os(macOS)
@@ -13,6 +14,7 @@ import AudioToolbox
 
 public enum VoiceProviderType: String, Codable, CaseIterable, Identifiable, Sendable {
     case system = "system"
+    case gemini = "gemini"
     case openai = "openai"
     case elevenlabs = "elevenlabs"
     case localOpenAI = "local-openai"
@@ -22,15 +24,17 @@ public enum VoiceProviderType: String, Codable, CaseIterable, Identifiable, Send
     public var label: String {
         switch self {
         case .system: return "On-Device Siri / Neural (Free · Offline)"
+        case .gemini: return "Google Gemini Native Dialogue (2.5 Flash TTS)"
         case .openai: return "OpenAI Human TTS (gpt-4o-mini-tts)"
-        case .elevenlabs: return "ElevenLabs Ultra-Human Voices"
-        case .localOpenAI: return "Local Neural TTS (Kokoro / Speaches)"
+        case .elevenlabs: return "ElevenLabs Ultra-Human Voices (v3 & v2)"
+        case .localOpenAI: return "Local Neural TTS (MLX-Audio / Kokoro / Piper)"
         }
     }
 
     public var shortLabel: String {
         switch self {
         case .system: return "Siri / Neural"
+        case .gemini: return "Gemini TTS"
         case .openai: return "OpenAI TTS"
         case .elevenlabs: return "ElevenLabs"
         case .localOpenAI: return "Local Neural"
@@ -40,24 +44,27 @@ public enum VoiceProviderType: String, Codable, CaseIterable, Identifiable, Send
     public var defaultEndpoint: String {
         switch self {
         case .system: return ""
+        case .gemini: return "https://generativelanguage.googleapis.com/v1beta/models"
         case .openai: return "https://api.openai.com/v1/audio/speech"
         case .elevenlabs: return "https://api.elevenlabs.io/v1/text-to-speech"
-        case .localOpenAI: return "http://localhost:8880/v1/audio/speech"
+        case .localOpenAI: return "http://localhost:8000/v1/audio/speech"
         }
     }
 
     public var defaultModel: String {
         switch self {
         case .system: return "system-neural"
+        case .gemini: return "gemini-2.5-flash-preview-tts"
         case .openai: return "gpt-4o-mini-tts"
         case .elevenlabs: return "eleven_multilingual_v2"
-        case .localOpenAI: return "kokoro"
+        case .localOpenAI: return "mlx-community/Kokoro-82M-bf16"
         }
     }
 
     public var defaultVoice: String {
         switch self {
         case .system: return ""
+        case .gemini: return "Aoede"
         case .openai: return "coral"
         case .elevenlabs: return "JBFqnCBsd6RMkjVDRZzb"
         case .localOpenAI: return "bf_emma"
@@ -67,26 +74,29 @@ public enum VoiceProviderType: String, Codable, CaseIterable, Identifiable, Send
     public var suggestedModels: [String] {
         switch self {
         case .system: return ["system-neural"]
+        case .gemini: return ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"]
         case .openai: return ["gpt-4o-mini-tts", "tts-1-hd", "tts-1"]
-        case .elevenlabs: return ["eleven_multilingual_v2", "eleven_flash_v2_5"]
-        case .localOpenAI: return ["kokoro", "tts-1"]
+        case .elevenlabs: return ["eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5"]
+        case .localOpenAI: return ["kokoro", "mlx-community/Kokoro-82M-bf16", "mlx-community/chatterbox-multilingual", "tts-1"]
         }
     }
 
     public var requiresAPIKey: Bool {
-        self == .openai || self == .elevenlabs
+        self == .gemini || self == .openai || self == .elevenlabs
     }
 
     public var setupHint: String {
         switch self {
         case .system:
             return "Prioritizes Siri Neural, Gryphon Neural, and Apple Enhanced/Premium voices while blocking legacy robotic/Eloquence voices. Works 100% offline."
+        case .gemini:
+            return "Renders 2-speaker English & German dialogues in a single API call with genuine human breaths, reactions, and natural turn-taking. Reuses your Gemini AI key."
         case .openai:
-            return "Uses gpt-4o-mini-tts with real accent instructions so British, American, Australian, Irish, Indian, Austrian & Swiss accents sound genuinely human."
+            return "Uses gpt-4o-mini-tts with accent & conversational turn-context instructions so British, American, Australian, Irish, Indian, Austrian & Swiss accents sound genuinely human."
         case .elevenlabs:
-            return "Studio-grade lifelike multilingual human voices for English and German with natural breathing and expressive prosody."
+            return "Lifelike multilingual human voices with continuous turn prosody (previous/next text context), language locking, and expressive style tuning."
         case .localOpenAI:
-            return "100% private local neural voices via Kokoro-FastAPI (port 8880) or Speaches/OpenedAI-Speech (port 8000). No cloud key required."
+            return "100% private local neural voices via MLX-Audio (Apple Silicon GPU, port 8000), Kokoro-FastAPI (port 8880), or Speaches/Piper (port 8000). No cloud key required."
         }
     }
 }
@@ -150,6 +160,24 @@ public struct NeuralVoicePreset: Identifiable, Equatable, Sendable {
     }
 }
 
+public struct LocalTTSServerPreset: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let label: String
+    public let endpoint: String
+    public let model: String
+    public let voice: String
+    public let note: String
+
+    public init(id: String, label: String, endpoint: String, model: String, voice: String, note: String) {
+        self.id = id
+        self.label = label
+        self.endpoint = endpoint
+        self.model = model
+        self.voice = voice
+        self.note = note
+    }
+}
+
 public struct VoiceSettings: Codable, Equatable, Sendable {
     public var provider: VoiceProviderType
     public var accents: [String: String]
@@ -161,6 +189,7 @@ public struct VoiceSettings: Codable, Equatable, Sendable {
     public var model: String
     public var neuralVoice: String
     public var reuseOpenAIKey: Bool
+    public var reuseGeminiKey: Bool
 
     public init(
         provider: VoiceProviderType = .system,
@@ -177,7 +206,8 @@ public struct VoiceSettings: Codable, Equatable, Sendable {
         apiKey: String = "",
         model: String = VoiceProviderType.openai.defaultModel,
         neuralVoice: String = VoiceProviderType.openai.defaultVoice,
-        reuseOpenAIKey: Bool = true
+        reuseOpenAIKey: Bool = true,
+        reuseGeminiKey: Bool = true
     ) {
         self.provider = provider
         self.accents = accents
@@ -189,6 +219,27 @@ public struct VoiceSettings: Codable, Equatable, Sendable {
         self.model = model
         self.neuralVoice = neuralVoice
         self.reuseOpenAIKey = reuseOpenAIKey
+        self.reuseGeminiKey = reuseGeminiKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.provider = try container.decodeIfPresent(VoiceProviderType.self, forKey: .provider) ?? .system
+        self.accents = try container.decodeIfPresent([String: String].self, forKey: .accents) ?? [
+            "english": "en-GB",
+            "german": "de-DE",
+            "spanish": "es-ES",
+            "french": "fr-FR"
+        ]
+        self.preferredSystemVoices = try container.decodeIfPresent([String: String].self, forKey: .preferredSystemVoices) ?? [:]
+        self.rateMultiplier = try container.decodeIfPresent(Double.self, forKey: .rateMultiplier) ?? 1.0
+        self.speakingStyle = try container.decodeIfPresent(VoiceSpeakingStyle.self, forKey: .speakingStyle) ?? .natural
+        self.endpoint = try container.decodeIfPresent(String.self, forKey: .endpoint) ?? VoiceProviderType.openai.defaultEndpoint
+        self.apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        self.model = try container.decodeIfPresent(String.self, forKey: .model) ?? VoiceProviderType.openai.defaultModel
+        self.neuralVoice = try container.decodeIfPresent(String.self, forKey: .neuralVoice) ?? VoiceProviderType.openai.defaultVoice
+        self.reuseOpenAIKey = try container.decodeIfPresent(Bool.self, forKey: .reuseOpenAIKey) ?? true
+        self.reuseGeminiKey = try container.decodeIfPresent(Bool.self, forKey: .reuseGeminiKey) ?? true
     }
 }
 
@@ -241,6 +292,57 @@ private final class SpeechTurnDelegate: NSObject, AVSpeechSynthesizerDelegate, @
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         speakerByUtteranceId.removeAll()
         onSpeakerChange?(nil)
+    }
+}
+
+private final class AudioPlaybackContinuationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func storeOrResumeImmediately(isPlaying: Bool, _ cont: CheckedContinuation<Void, Never>) {
+        lock.lock()
+        if !isPlaying {
+            lock.unlock()
+            cont.resume()
+            return
+        }
+        continuation = cont
+        lock.unlock()
+    }
+
+    func resumeOnce() {
+        lock.lock()
+        let cont = continuation
+        continuation = nil
+        lock.unlock()
+        cont?.resume()
+    }
+}
+
+private final class AudioPlaybackDelegate: NSObject, AVAudioPlayerDelegate, @unchecked Sendable {
+    private let box = AudioPlaybackContinuationBox()
+
+    nonisolated func waitForFinish(player: AVAudioPlayer) async {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                box.storeOrResumeImmediately(isPlaying: player.isPlaying, cont)
+            }
+        } onCancel: {
+            player.stop()
+            box.resumeOnce()
+        }
+    }
+
+    nonisolated func resumeOnce() {
+        box.resumeOnce()
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        box.resumeOnce()
+    }
+
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        box.resumeOnce()
     }
 }
 
@@ -394,15 +496,54 @@ public final class NativeAudioEngine {
         NeuralVoicePreset(id: "XB0fDUnXU5powFXDhCwa", label: "Charlotte (European Female)", note: "Smooth European EN & DE articulation")
     ]
 
+    public static let geminiNeuralVoices: [NeuralVoicePreset] = [
+        NeuralVoicePreset(id: "Aoede", label: "Aoede (Warm Female)", note: "Smooth, natural conversational warmth (recommended)"),
+        NeuralVoicePreset(id: "Kore", label: "Kore (Clear Female)", note: "Crisp, articulate language tutor cadence"),
+        NeuralVoicePreset(id: "Zephyr", label: "Zephyr (Bright Female)", note: "Clear, upbeat everyday intonation"),
+        NeuralVoicePreset(id: "Leda", label: "Leda (Expressive Female)", note: "Youthful, dynamic conversational flow"),
+        NeuralVoicePreset(id: "Charon", label: "Charon (Calm Male)", note: "Measured, authoritative host & tutor voice"),
+        NeuralVoicePreset(id: "Puck", label: "Puck (Lively Male)", note: "Upbeat, engaging everyday dialogue partner"),
+        NeuralVoicePreset(id: "Orus", label: "Orus (Grounded Male)", note: "Warm, firm narrative clarity"),
+        NeuralVoicePreset(id: "Fenrir", label: "Fenrir (Expressive Male)", note: "Rich, emotive storytelling delivery")
+    ]
+
+    public static let localServerPresets: [LocalTTSServerPreset] = [
+        LocalTTSServerPreset(
+            id: "mlx-audio",
+            label: "MLX-Audio (Apple Silicon)",
+            endpoint: "http://localhost:8000/v1/audio/speech",
+            model: "mlx-community/Kokoro-82M-bf16",
+            voice: "bf_emma",
+            note: "Native Apple Silicon GPU speech server (Kokoro-82M EN + Chatterbox Multilingual EN/DE)."
+        ),
+        LocalTTSServerPreset(
+            id: "kokoro-fastapi",
+            label: "Kokoro-FastAPI",
+            endpoint: "http://localhost:8880/v1/audio/speech",
+            model: "kokoro",
+            voice: "bf_emma",
+            note: "Fast local OpenAI-compatible Kokoro server on port 8880."
+        ),
+        LocalTTSServerPreset(
+            id: "speaches-piper",
+            label: "Speaches / Piper (DE & EN)",
+            endpoint: "http://localhost:8000/v1/audio/speech",
+            model: "tts-1",
+            voice: "de_DE-thorsten-high",
+            note: "Privacy-first Piper VITS voices with strong German (Thorsten/Eva) & English models."
+        )
+    ]
+
     public static let localNeuralVoices: [NeuralVoicePreset] = [
         NeuralVoicePreset(id: "de_DE-thorsten-high", label: "Thorsten High (German M · Piper/Speaches)", note: "Ultra-natural studio German male neural voice (Piper / OpenedAI-Speech)"),
         NeuralVoicePreset(id: "de_DE-eva_k-x_low", label: "Eva K (German F · Piper/Speaches)", note: "Warm German female neural voice (Piper / Speaches)"),
         NeuralVoicePreset(id: "de_DE-kerstin-low", label: "Kerstin (German F · Piper/Speaches)", note: "Clear German female conversational neural voice"),
-        NeuralVoicePreset(id: "bf_emma", label: "Kokoro Emma (British F)", note: "Natural British neural voice (Kokoro-FastAPI)"),
+        NeuralVoicePreset(id: "bf_emma", label: "Kokoro Emma (British F)", note: "Natural British neural voice (Kokoro / MLX-Audio)"),
         NeuralVoicePreset(id: "bm_george", label: "Kokoro George (British M)", note: "Natural British male neural voice"),
         NeuralVoicePreset(id: "af_heart", label: "Kokoro Heart (American F)", note: "Top-rated warm US neural voice"),
         NeuralVoicePreset(id: "am_michael", label: "Kokoro Michael (American M)", note: "Natural US male neural voice"),
-        NeuralVoicePreset(id: "af_bella", label: "Kokoro Bella (American F)", note: "Expressive conversational US voice")
+        NeuralVoicePreset(id: "af_bella", label: "Kokoro Bella (American F)", note: "Expressive conversational US voice"),
+        NeuralVoicePreset(id: "chatterbox-multilingual", label: "Chatterbox Multilingual (EN & DE)", note: "Expressive local multilingual voice via MLX-Audio")
     ]
 
     private static let roboticVoiceNames: Set<String> = [
@@ -434,10 +575,12 @@ public final class NativeAudioEngine {
 
     private var synthesizer = AVSpeechSynthesizer()
     private let speechDelegate = SpeechTurnDelegate()
+    private let playbackDelegate = AudioPlaybackDelegate()
     private var audioPlayer: AVAudioPlayer?
     private var neuralTask: Task<Void, Never>?
     private var neuralCache: [String: Data] = [:]
     private var neuralCacheOrder: [String] = []
+    private let cacheDirectory: URL?
     private let defaults: UserDefaults
     #if os(macOS)
     @ObservationIgnored private var cachedTinkSound: NSSound?
@@ -454,8 +597,19 @@ public final class NativeAudioEngine {
     public var lastVoiceNotice: String?
     public var voiceSettings: VoiceSettings
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard, cacheDirectory: URL? = nil) {
         self.defaults = defaults
+        if let cacheDirectory {
+            self.cacheDirectory = cacheDirectory
+        } else {
+            self.cacheDirectory = FileManager.default
+                .urls(for: .cachesDirectory, in: .userDomainMask)
+                .first?
+                .appendingPathComponent("LinguaVerveAudioCache", isDirectory: true)
+        }
+        if let dir = self.cacheDirectory {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
         if let raw = defaults.data(forKey: Self.settingsKey),
            let decoded = try? JSONDecoder().decode(VoiceSettings.self, from: raw) {
             self.voiceSettings = decoded
@@ -609,11 +763,21 @@ public final class NativeAudioEngine {
         let target = cfg ?? voiceSettings
         let direct = target.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if !direct.isEmpty { return direct }
+
+        let targetAIProvider: AIProviderType?
         if target.provider == .openai && target.reuseOpenAIKey {
+            targetAIProvider = .openai
+        } else if target.provider == .gemini && target.reuseGeminiKey {
+            targetAIProvider = .gemini
+        } else {
+            targetAIProvider = nil
+        }
+
+        if let targetAIProvider {
             for key in [Self.sharedAIConfigKey, Self.legacySharedAIConfigKey] {
                 if let raw = defaults.data(forKey: key),
                    let aiCfg = try? JSONDecoder().decode(AIProviderConfig.self, from: raw),
-                   aiCfg.provider == .openai {
+                   aiCfg.provider == targetAIProvider {
                     let trimmed = aiCfg.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !trimmed.isEmpty { return trimmed }
                 }
@@ -629,7 +793,7 @@ public final class NativeAudioEngine {
             return false
         case .localOpenAI:
             return !target.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .openai, .elevenlabs:
+        case .gemini, .openai, .elevenlabs:
             return !target.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && !effectiveAPIKey(for: target).isEmpty
         }
@@ -740,6 +904,7 @@ public final class NativeAudioEngine {
         neuralTask = nil
         audioPlayer?.stop()
         audioPlayer = nil
+        playbackDelegate.resumeOnce()
         speechDelegate.speakerByUtteranceId.removeAll()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
@@ -1054,6 +1219,293 @@ public final class NativeAudioEngine {
         return .unspecified
     }
 
+    public static func parseSampleRate(from mimeType: String, fallback: Int = 24000) -> Int {
+        let lower = mimeType.lowercased()
+        guard let range = lower.range(of: #"rate=(\d{4,6})"#, options: .regularExpression) else {
+            return fallback
+        }
+        let digits = lower[range].replacingOccurrences(of: "rate=", with: "")
+        if let parsed = Int(digits), (8000...96000).contains(parsed) {
+            return parsed
+        }
+        return fallback
+    }
+
+    /// Prepends a standard 44-byte RIFF/WAVE PCM header to raw 16-bit signed little-endian PCM bytes.
+    public static func wrapPCM16AsWAV(_ pcmData: Data, sampleRate: Int = 24000, channels: Int = 1) -> Data {
+        let bitsPerSample = 16
+        let byteRate = UInt32(sampleRate * channels * (bitsPerSample / 8))
+        let blockAlign = UInt16(channels * (bitsPerSample / 8))
+        let dataSize = UInt32(pcmData.count)
+        let chunkSize = UInt32(36) &+ dataSize
+
+        var wav = Data(capacity: 44 + pcmData.count)
+        wav.append(contentsOf: "RIFF".utf8)
+        var leChunkSize = chunkSize.littleEndian
+        wav.append(Data(bytes: &leChunkSize, count: 4))
+        wav.append(contentsOf: "WAVE".utf8)
+        wav.append(contentsOf: "fmt ".utf8)
+        var subchunk1Size = UInt32(16).littleEndian
+        wav.append(Data(bytes: &subchunk1Size, count: 4))
+        var audioFormat = UInt16(1).littleEndian
+        wav.append(Data(bytes: &audioFormat, count: 2))
+        var leChannels = UInt16(channels).littleEndian
+        wav.append(Data(bytes: &leChannels, count: 2))
+        var leSampleRate = UInt32(sampleRate).littleEndian
+        wav.append(Data(bytes: &leSampleRate, count: 4))
+        var leByteRate = byteRate.littleEndian
+        wav.append(Data(bytes: &leByteRate, count: 4))
+        var leBlockAlign = blockAlign.littleEndian
+        wav.append(Data(bytes: &leBlockAlign, count: 2))
+        var leBitsPerSample = UInt16(bitsPerSample).littleEndian
+        wav.append(Data(bytes: &leBitsPerSample, count: 2))
+        wav.append(contentsOf: "data".utf8)
+        var leDataSize = dataSize.littleEndian
+        wav.append(Data(bytes: &leDataSize, count: 4))
+        wav.append(pcmData)
+        return wav
+    }
+
+    public static func resolveGeminiTTSEndpoint(_ endpoint: String, model: String) -> URL? {
+        let effectiveModel = (model.isEmpty ? "gemini-2.5-flash-preview-tts" : model)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "models/", with: "")
+        var base = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") { base.removeLast() }
+        if base.isEmpty {
+            base = VoiceProviderType.gemini.defaultEndpoint
+        }
+        if base.range(of: "generateContent", options: .caseInsensitive) != nil {
+            let clean = base.split(separator: "?", maxSplits: 1).first.map(String.init) ?? base
+            return URL(string: clean)
+        }
+        if base.range(of: #"/models/[^/]+$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return URL(string: "\(base):generateContent")
+        }
+        if base.lowercased().hasSuffix("/models") {
+            return URL(string: "\(base)/\(effectiveModel):generateContent")
+        }
+        return URL(string: "\(base)/models/\(effectiveModel):generateContent")
+    }
+
+    public static func buildGeminiTTSRequestBody(
+        text: String,
+        accentCode: String,
+        style: VoiceSpeakingStyle,
+        slow: Bool,
+        voice: String,
+        dialogueTurns: [DialogueTurn]? = nil,
+        secondaryVoice: String? = nil
+    ) -> [String: Any] {
+        let directorCue = buildNeuralInstructions(accentCode: accentCode, style: style, slow: slow)
+
+        var distinctSpeakers: [(speaker: String, speakerIndex: Int)] = []
+        if let turns = dialogueTurns, turns.count >= 2 {
+            var seen = Set<String>()
+            for t in turns {
+                let norm = t.speaker.lowercased()
+                if !seen.contains(norm) {
+                    seen.insert(norm)
+                    distinctSpeakers.append((speaker: t.speaker, speakerIndex: t.speakerIndex))
+                }
+            }
+        }
+
+        if let turns = dialogueTurns, distinctSpeakers.count == 2 {
+            let primaryVoice = voice.isEmpty ? "Aoede" : voice
+            let altVoice: String
+            if let sec = secondaryVoice, !sec.isEmpty, sec != primaryVoice {
+                altVoice = sec
+            } else {
+                altVoice = (primaryVoice == "Charon") ? "Aoede" : "Charon"
+            }
+
+            let lines = turns.map { turn in
+                let canonical = distinctSpeakers.first(where: { $0.speakerIndex == turn.speakerIndex })?.speaker ?? turn.speaker
+                return "\(canonical): \(turn.text)"
+            }
+            let promptText = ([
+                "Read this live human conversation naturally. \(directorCue)",
+                "Maintain authentic turn-taking, subtle breathing, and spontaneous conversational warmth without reading speaker labels aloud:",
+                ""
+            ] + lines).joined(separator: "\n")
+
+            return [
+                "contents": [["parts": [["text": promptText]]]],
+                "generationConfig": [
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": [
+                        "multiSpeakerVoiceConfig": [
+                            "speakerVoiceConfigs": [
+                                [
+                                    "speaker": distinctSpeakers[0].speaker,
+                                    "voiceConfig": ["prebuiltVoiceConfig": ["voiceName": primaryVoice]]
+                                ],
+                                [
+                                    "speaker": distinctSpeakers[1].speaker,
+                                    "voiceConfig": ["prebuiltVoiceConfig": ["voiceName": altVoice]]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        }
+
+        let promptText = "\(directorCue)\nSpeak only the exact text below naturally:\n\n\(text)"
+        return [
+            "contents": [["parts": [["text": promptText]]]],
+            "generationConfig": [
+                "responseModalities": ["AUDIO"],
+                "speechConfig": [
+                    "voiceConfig": [
+                        "prebuiltVoiceConfig": [
+                            "voiceName": voice.isEmpty ? "Aoede" : voice
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    }
+
+    public static func buildElevenLabsRequestBody(
+        text: String,
+        model: String,
+        style: VoiceSpeakingStyle,
+        speed: Double,
+        accentCode: String,
+        previousText: String? = nil,
+        nextText: String? = nil
+    ) -> [String: Any] {
+        let effectiveModel = model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "eleven_multilingual_v2"
+            : model.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelLower = effectiveModel.lowercased()
+        let isV3 = modelLower.contains("v3")
+        let isFlash = modelLower.contains("flash")
+
+        let stability: Double
+        let styleWeight: Double
+        switch style {
+        case .conversational:
+            stability = 0.35
+            styleWeight = 0.45
+        case .natural:
+            stability = 0.45
+            styleWeight = 0.30
+        case .tutor:
+            stability = 0.60
+            styleWeight = 0.20
+        case .broadcast:
+            stability = 0.65
+            styleWeight = 0.15
+        }
+
+        var voiceSettings: [String: Any] = [
+            "stability": stability,
+            "similarity_boost": 0.78,
+            "style": styleWeight,
+            "use_speaker_boost": true
+        ]
+        if !isV3 {
+            let clamped = max(0.7, min(1.2, (speed * 100).rounded() / 100))
+            voiceSettings["speed"] = clamped
+        }
+
+        var body: [String: Any] = [
+            "text": text,
+            "model_id": effectiveModel,
+            "voice_settings": voiceSettings
+        ]
+        if let prev = previousText?.trimmingCharacters(in: .whitespacesAndNewlines), !prev.isEmpty {
+            body["previous_text"] = prev
+        }
+        if let nxt = nextText?.trimmingCharacters(in: .whitespacesAndNewlines), !nxt.isEmpty {
+            body["next_text"] = nxt
+        }
+        let langBase = String(accentCode.prefix(2)).lowercased()
+        if (isFlash || isV3) && langBase.count == 2 && langBase.allSatisfy({ $0.isLetter }) {
+            body["language_code"] = langBase
+        }
+        return body
+    }
+
+    public static func buildOpenAIDialogueInstructions(
+        accentCode: String,
+        style: VoiceSpeakingStyle,
+        speakerName: String,
+        speakerIndex: Int,
+        slow: Bool,
+        previousTurn: DialogueTurn? = nil
+    ) -> String {
+        let base = buildNeuralInstructions(accentCode: accentCode, style: style, slow: slow)
+        let roleCue = speakerIndex % 2 == 0
+            ? "You are \(speakerName) speaking spontaneously in a natural live two-person conversation."
+            : "You are \(speakerName), responding warmly and naturally as the conversation partner."
+        let contextCue: String
+        if let previousTurn {
+            let snippet = String(previousTurn.text.prefix(140))
+            contextCue = " Respond naturally right after \(previousTurn.speaker) said: \"\(snippet)\"."
+        } else {
+            contextCue = ""
+        }
+        return "\(base) \(roleCue)\(contextCue) Never sound like you are reading a script."
+    }
+
+    public static func naturalTurnPauseSeconds(
+        previousText: String,
+        nextText: String,
+        slow: Bool
+    ) -> Double {
+        let trimmed = previousText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base: Double
+        if !trimmed.isEmpty && (trimmed.count <= 28 || trimmed.hasSuffix("!") || trimmed.hasSuffix("—")) {
+            base = 0.12
+        } else if trimmed.hasSuffix("?") {
+            base = 0.20
+        } else if trimmed.count >= 95 {
+            base = 0.30
+        } else {
+            base = 0.22
+        }
+        return slow ? base * 1.25 : base
+    }
+
+    public static func checkLocalTTSServer(endpoint: String) async -> (ok: Bool, message: String) {
+        let trimmed = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return (false, "Enter a local TTS endpoint URL first.")
+        }
+        var origin = trimmed
+        while origin.hasSuffix("/") { origin.removeLast() }
+        if let v1Range = origin.range(of: "/v1/", options: .caseInsensitive) {
+            origin = String(origin[..<v1Range.lowerBound])
+        }
+
+        let candidates = ["\(origin)/v1/models", "\(origin)/health"]
+        for rawUrl in candidates {
+            guard let url = URL(string: rawUrl) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "GET"
+            req.timeoutInterval = 3
+            if let (data, resp) = try? await URLSession.shared.data(for: req),
+               let http = resp as? HTTPURLResponse,
+               (200...299).contains(http.statusCode) {
+                var modelIds: [String] = []
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if let arr = json["data"] as? [[String: Any]] {
+                        modelIds = arr.compactMap { $0["id"] as? String }
+                    } else if let arr = json["models"] as? [String] {
+                        modelIds = arr
+                    }
+                }
+                let suffix = modelIds.isEmpty ? "" : " (\(modelIds.prefix(3).joined(separator: ", ")))"
+                return (true, "Local TTS server reachable at \(origin)\(suffix).")
+            }
+        }
+        return (false, "Could not reach \(origin). Start mlx-audio (port 8000) or Kokoro-FastAPI (port 8880) and retry.")
+    }
+
     private static func buildNeuralConversationInstructions(
         accentCode: String,
         speakerName: String,
@@ -1082,6 +1534,27 @@ public final class NativeAudioEngine {
         let primary = cfg.neuralVoice.isEmpty ? cfg.provider.defaultVoice : cfg.neuralVoice
 
         switch cfg.provider {
+        case .gemini:
+            let femaleVoices = ["Aoede", "Kore", "Zephyr", "Leda"]
+            let maleVoices = ["Charon", "Puck", "Orus", "Fenrir"]
+            let primaryLower = primary.lowercased()
+            if speakerIndex == 0 {
+                if inferred == .male && femaleVoices.contains(where: { $0.lowercased() == primaryLower }) {
+                    return "Charon"
+                }
+                if inferred == .female && maleVoices.contains(where: { $0.lowercased() == primaryLower }) {
+                    return "Aoede"
+                }
+                return primary
+            }
+            if inferred == .male {
+                return maleVoices.first(where: { $0.lowercased() != primaryLower }) ?? "Charon"
+            }
+            if inferred == .female {
+                return femaleVoices.first(where: { $0.lowercased() != primaryLower }) ?? "Kore"
+            }
+            return femaleVoices.contains(where: { $0.lowercased() == primaryLower }) ? "Charon" : "Aoede"
+
         case .openai:
             let femaleVoices = ["coral", "sage", "nova", "shimmer"]
             let maleVoices = ["ash", "echo", "onyx", "fable"]
@@ -1223,12 +1696,12 @@ public final class NativeAudioEngine {
                         : max(AVSpeechUtteranceMinimumSpeechRate, min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier) * speakerRateAdj))
                     utterance.pitchMultiplier = 1.0
                 } else {
-                    // Single high-quality voice installed: apply subtle natural conversational vocal distinction
-                    // without dropping down to robotic 22kHz compact voices!
+                    // Single high-quality voice installed: preserve pure neural timbre (1.0 pitch)
+                    // and differentiate speakers cleanly via subtle cadence & turn pauses.
                     let gender = Self.inferredGender(for: turn.speaker)
                     let isLowerVoice = (gender == .male) || (gender == .unspecified && turn.speakerIndex % 2 == 1)
-                    let pitch: Float = isLowerVoice ? 0.92 : 1.04
-                    let paceFactor: Float = isLowerVoice ? 0.96 : 1.02
+                    let pitch: Float = isNeuralOrHQ ? 1.0 : (isLowerVoice ? 0.97 : 1.02)
+                    let paceFactor: Float = isLowerVoice ? 0.97 : 1.01
                     utterance.rate = max(
                         AVSpeechUtteranceMinimumSpeechRate,
                         min(AVSpeechUtteranceMaximumSpeechRate, baseRate * Float(cfg.rateMultiplier) * paceFactor)
@@ -1237,8 +1710,16 @@ public final class NativeAudioEngine {
                 }
 
                 utterance.prefersAssistiveTechnologySettings = false
-                utterance.preUtteranceDelay = idx == 0 ? 0.03 : 0.14
-                utterance.postUtteranceDelay = idx < dialogueTurns.count - 1 ? 0.22 : 0.04
+                utterance.preUtteranceDelay = idx == 0 ? 0.03 : 0.08
+                if idx < dialogueTurns.count - 1 {
+                    utterance.postUtteranceDelay = Self.naturalTurnPauseSeconds(
+                        previousText: turn.text,
+                        nextText: dialogueTurns[idx + 1].text,
+                        slow: slow
+                    )
+                } else {
+                    utterance.postUtteranceDelay = 0.04
+                }
                 speechDelegate.speakerByUtteranceId[ObjectIdentifier(utterance)] = turn.speaker
                 synthesizer.speak(utterance)
             }
@@ -1311,6 +1792,15 @@ public final class NativeAudioEngine {
         )
     }
 
+    private func resolvePlaybackRate(for cfg: VoiceSettings, slow: Bool) -> Float {
+        let isV3 = cfg.provider == .elevenlabs && cfg.model.lowercased().contains("v3")
+        if cfg.provider == .gemini || isV3 {
+            let base: Double = slow ? 0.84 : 1.0
+            return Float(max(0.80, min(1.20, base * cfg.rateMultiplier)))
+        }
+        return 1.0
+    }
+
     private func speakDialogueWithNeuralProvider(
         turns: [DialogueTurn],
         bcp47: String,
@@ -1331,41 +1821,103 @@ public final class NativeAudioEngine {
         }
 
         do {
-            // Fetch all turns (reusing cache for repeated plays!) so playback flows with zero mid-conversation stutter
-            var turnAudios: [(turn: DialogueTurn, data: Data)] = []
-            for turn in turns {
-                if Task.isCancelled { return (false, "Cancelled") }
-                let voiceId = Self.neuralVoiceForDialogueSpeaker(
+            let playbackRate = resolvePlaybackRate(for: cfg, slow: slow)
+            let distinctSpeakerIndices = Array(Set(turns.map(\.speakerIndex))).sorted()
+
+            // Google Gemini 2.5 TTS synthesizes an entire 2-speaker conversation in ONE call!
+            if cfg.provider == .gemini && distinctSpeakerIndices.count == 2,
+               let first0 = turns.first(where: { $0.speakerIndex == distinctSpeakerIndices[0] }),
+               let first1 = turns.first(where: { $0.speakerIndex == distinctSpeakerIndices[1] }) {
+                let voice0 = Self.neuralVoiceForDialogueSpeaker(
                     cfg: cfg,
                     bcp47: bcp47,
-                    speakerName: turn.speaker,
-                    speakerIndex: turn.speakerIndex
+                    speakerName: first0.speaker,
+                    speakerIndex: 0
                 )
-                let instructions = Self.buildNeuralConversationInstructions(
-                    accentCode: bcp47,
-                    speakerName: turn.speaker,
-                    speakerIndex: turn.speakerIndex,
-                    slow: slow
+                let voice1 = Self.neuralVoiceForDialogueSpeaker(
+                    cfg: cfg,
+                    bcp47: bcp47,
+                    speakerName: first1.speaker,
+                    speakerIndex: 1
                 )
+                let combinedText = turns.map { "\($0.speaker): \($0.text)" }.joined(separator: "\n")
                 let data = try await fetchNeuralAudioData(
-                    text: turn.text,
+                    text: combinedText,
                     bcp47: bcp47,
                     slow: slow,
                     cfg: cfg,
-                    voiceOverride: voiceId,
-                    instructionsOverride: instructions
+                    voiceOverride: voice0,
+                    instructionsOverride: nil,
+                    geminiDialogue: (turns: turns, secondaryVoice: voice1)
                 )
-                turnAudios.append((turn: turn, data: data))
+                if Task.isCancelled { return (false, "Cancelled") }
+                await MainActor.run {
+                    self.isLoadingNeuralAudio = false
+                    self.activeSpeakerName = "\(first0.speaker) & \(first1.speaker)"
+                }
+                try await playAudioDataAndWait(data, playbackRate: playbackRate)
+                return (true, "Gemini TTS · Multi-Speaker Dialogue (\(bcp47))")
+            }
+
+            // Fetch all turns concurrently while preserving turn order so playback has zero mid-dialogue delay
+            let indexedResults = try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+                for (idx, turn) in turns.enumerated() {
+                    group.addTask {
+                        if Task.isCancelled { throw CancellationError() }
+                        let voiceId = Self.neuralVoiceForDialogueSpeaker(
+                            cfg: cfg,
+                            bcp47: bcp47,
+                            speakerName: turn.speaker,
+                            speakerIndex: turn.speakerIndex
+                        )
+                        let instructions: String? = cfg.provider == .openai
+                            ? Self.buildOpenAIDialogueInstructions(
+                                accentCode: bcp47,
+                                style: cfg.speakingStyle,
+                                speakerName: turn.speaker,
+                                speakerIndex: turn.speakerIndex,
+                                slow: slow,
+                                previousTurn: idx > 0 ? turns[idx - 1] : nil
+                            )
+                            : nil
+                        let prevText = idx > 0 ? turns[idx - 1].text : nil
+                        let nextText = idx < turns.count - 1 ? turns[idx + 1].text : nil
+                        let data = try await self.fetchNeuralAudioData(
+                            text: turn.text,
+                            bcp47: bcp47,
+                            slow: slow,
+                            cfg: cfg,
+                            voiceOverride: voiceId,
+                            instructionsOverride: instructions,
+                            previousText: prevText,
+                            nextText: nextText
+                        )
+                        return (idx, data)
+                    }
+                }
+
+                var collected: [(Int, Data)] = []
+                for try await pair in group {
+                    collected.append(pair)
+                }
+                return collected.sorted { $0.0 < $1.0 }
             }
 
             await MainActor.run { self.isLoadingNeuralAudio = false }
 
-            for (idx, item) in turnAudios.enumerated() {
+            for (idx, data) in indexedResults {
                 if Task.isCancelled { return (false, "Cancelled") }
-                await MainActor.run { self.activeSpeakerName = item.turn.speaker }
-                let duration = try await MainActor.run { try self.playAudioData(item.data) }
-                let waitNs = UInt64(max(0.25, duration + (idx < turnAudios.count - 1 ? 0.24 : 0.05)) * 1_000_000_000)
-                try await Task.sleep(nanoseconds: waitNs)
+                let turn = turns[idx]
+                await MainActor.run { self.activeSpeakerName = turn.speaker }
+                try await playAudioDataAndWait(data, playbackRate: playbackRate)
+                if idx < turns.count - 1 && !Task.isCancelled {
+                    let pauseSec = Self.naturalTurnPauseSeconds(
+                        previousText: turn.text,
+                        nextText: turns[idx + 1].text,
+                        slow: slow
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(pauseSec * 1_000_000_000))
+                }
             }
             return (true, "\(cfg.provider.shortLabel) · Multi-Speaker Dialogue (\(bcp47))")
         } catch {
@@ -1386,19 +1938,47 @@ public final class NativeAudioEngine {
         slow: Bool,
         cfg: VoiceSettings,
         voiceOverride: String?,
-        instructionsOverride: String?
+        instructionsOverride: String?,
+        previousText: String? = nil,
+        nextText: String? = nil,
+        geminiDialogue: (turns: [DialogueTurn], secondaryVoice: String)? = nil
     ) async throws -> Data {
         let effectiveVoice = voiceOverride ?? (cfg.neuralVoice.isEmpty ? cfg.provider.defaultVoice : cfg.neuralVoice)
-        let cacheKey = "\(cfg.provider.rawValue)|\(cfg.model)|\(effectiveVoice)|\(bcp47)|\(cfg.speakingStyle.rawValue)|\(cfg.rateMultiplier)|\(slow)|\(instructionsOverride ?? "")|\(text)"
+        let secKey = geminiDialogue?.secondaryVoice ?? ""
+        let cacheKey = "\(cfg.provider.rawValue)|\(cfg.model)|\(effectiveVoice)|\(secKey)|\(bcp47)|\(cfg.speakingStyle.rawValue)|\(cfg.rateMultiplier)|\(slow)|\(instructionsOverride ?? "")|\(previousText ?? "")|\(nextText ?? "")|\(text)"
         if let cached = neuralCache[cacheKey] {
             return cached
+        }
+        if let diskHit = readDiskCache(forKey: cacheKey) {
+            storeInMemoryCache(key: cacheKey, data: diskHit)
+            return diskHit
         }
 
         let apiKey = effectiveAPIKey(for: cfg)
         let speed = max(0.65, min(1.3, (slow ? 0.80 : 0.98) * cfg.rateMultiplier))
         var request: URLRequest
 
-        if cfg.provider == .elevenlabs {
+        switch cfg.provider {
+        case .gemini:
+            guard let url = Self.resolveGeminiTTSEndpoint(cfg.endpoint, model: cfg.model) else {
+                throw URLError(.badURL)
+            }
+            request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+            let body = Self.buildGeminiTTSRequestBody(
+                text: text,
+                accentCode: bcp47,
+                style: cfg.speakingStyle,
+                slow: slow,
+                voice: effectiveVoice,
+                dialogueTurns: geminiDialogue?.turns,
+                secondaryVoice: geminiDialogue?.secondaryVoice
+            )
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        case .elevenlabs:
             let base = cfg.endpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let voiceId = effectiveVoice.isEmpty ? Self.elevenLabsNeuralVoices[0].id : effectiveVoice
             let urlStr = base.contains("/text-to-speech/") ? base : "\(base)/\(voiceId)"
@@ -1408,18 +1988,18 @@ public final class NativeAudioEngine {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
             request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
-            let body: [String: Any] = [
-                "text": text,
-                "model_id": cfg.model.isEmpty ? "eleven_multilingual_v2" : cfg.model,
-                "voice_settings": [
-                    "stability": 0.45,
-                    "similarity_boost": 0.78,
-                    "style": 0.35,
-                    "use_speaker_boost": true
-                ]
-            ]
+            let body = Self.buildElevenLabsRequestBody(
+                text: text,
+                model: cfg.model.isEmpty ? "eleven_multilingual_v2" : cfg.model,
+                style: cfg.speakingStyle,
+                speed: speed,
+                accentCode: bcp47,
+                previousText: previousText,
+                nextText: nextText
+            )
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        } else {
+
+        case .openai, .localOpenAI, .system:
             guard let url = URL(string: cfg.endpoint) else { throw URLError(.badURL) }
             request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -1445,14 +2025,44 @@ public final class NativeAudioEngine {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
-        request.timeoutInterval = 25
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), !data.isEmpty else {
+        request.timeoutInterval = 30
+        let (rawData, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), !rawData.isEmpty else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw NSError(domain: "LinguaVerveTTS", code: code, userInfo: [NSLocalizedDescriptionKey: "HTTP \(code)"])
         }
-        storeInCache(key: cacheKey, data: data)
-        return data
+
+        let finalAudioData: Data
+        if cfg.provider == .gemini {
+            finalAudioData = try Self.extractGeminiAudioData(from: rawData)
+        } else {
+            finalAudioData = rawData
+        }
+
+        storeInCache(key: cacheKey, data: finalAudioData)
+        return finalAudioData
+    }
+
+    public static func extractGeminiAudioData(from responseData: Data) throws -> Data {
+        guard let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content = candidates.first?["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]] else {
+            throw NSError(domain: "LinguaVerveTTS", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid Gemini TTS JSON response"])
+        }
+        for part in parts {
+            if let inlineData = part["inlineData"] as? [String: Any],
+               let b64 = inlineData["data"] as? String,
+               let decoded = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) {
+                let mime = (inlineData["mimeType"] as? String ?? "audio/L16;codec=pcm;rate=24000").lowercased()
+                if mime.contains("pcm") || mime.contains("l16") {
+                    let rate = parseSampleRate(from: mime, fallback: 24000)
+                    return wrapPCM16AsWAV(decoded, sampleRate: rate, channels: 1)
+                }
+                return decoded
+            }
+        }
+        throw NSError(domain: "LinguaVerveTTS", code: -2, userInfo: [NSLocalizedDescriptionKey: "Missing audio payload in Gemini response"])
     }
 
     private func fetchAndPlaySingleNeuralSegment(
@@ -1487,9 +2097,8 @@ public final class NativeAudioEngine {
                 instructionsOverride: instructionsOverride
             )
             if Task.isCancelled { return (false, "Cancelled") }
-            _ = try await MainActor.run {
-                try self.playAudioData(data)
-            }
+            let playbackRate = resolvePlaybackRate(for: cfg, slow: slow)
+            try await playAudioDataAndWait(data, playbackRate: playbackRate)
             return (true, "\(cfg.provider.shortLabel) · \(voiceOverride ?? cfg.neuralVoice) (\(bcp47))")
         } catch {
             if Task.isCancelled { return (false, "Cancelled") }
@@ -1502,7 +2111,63 @@ public final class NativeAudioEngine {
         }
     }
 
-    private func storeInCache(key: String, data: Data) {
+    // MARK: - Persistent SHA-256 Disk & Memory Audio Cache
+
+    private static func sha256Hex(_ input: String) -> String {
+        let digest = SHA256.hash(data: Data(input.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func diskCacheFileURL(forKey key: String) -> URL? {
+        cacheDirectory?.appendingPathComponent("\(Self.sha256Hex(key)).audio")
+    }
+
+    private func readDiskCache(forKey key: String) -> Data? {
+        guard let fileURL = diskCacheFileURL(forKey: key),
+              let data = try? Data(contentsOf: fileURL),
+              !data.isEmpty else {
+            return nil
+        }
+        return data
+    }
+
+    private func writeDiskCache(key: String, data: Data) {
+        guard let dir = cacheDirectory, let fileURL = diskCacheFileURL(forKey: key) else { return }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? data.write(to: fileURL, options: .atomic)
+        evictDiskCacheIfNeeded(in: dir)
+    }
+
+    private func evictDiskCacheIfNeeded(in dir: URL, maxFiles: Int = 150, maxBytes: Int64 = 50 * 1024 * 1024) {
+        guard let urls = try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        var entries: [(url: URL, date: Date, size: Int64)] = []
+        var totalSize: Int64 = 0
+        for url in urls where url.pathExtension == "audio" {
+            let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            let size = Int64(vals?.fileSize ?? 0)
+            let date = vals?.contentModificationDate ?? .distantPast
+            totalSize += size
+            entries.append((url: url, date: date, size: size))
+        }
+
+        guard entries.count > maxFiles || totalSize > maxBytes else { return }
+        entries.sort { $0.date < $1.date }
+        var remainingCount = entries.count
+        var remainingBytes = totalSize
+        for entry in entries {
+            if remainingCount <= maxFiles && remainingBytes <= maxBytes { break }
+            try? FileManager.default.removeItem(at: entry.url)
+            remainingCount -= 1
+            remainingBytes -= entry.size
+        }
+    }
+
+    private func storeInMemoryCache(key: String, data: Data) {
         if neuralCache[key] == nil {
             neuralCacheOrder.append(key)
             if neuralCacheOrder.count > 40 {
@@ -1513,20 +2178,69 @@ public final class NativeAudioEngine {
         neuralCache[key] = data
     }
 
-    @MainActor
-    @discardableResult
-    private func playAudioData(_ data: Data) throws -> TimeInterval {
-        #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try? session.setActive(true)
-        #endif
+    public func storeInCache(key: String, data: Data) {
+        storeInMemoryCache(key: key, data: data)
+        writeDiskCache(key: key, data: data)
+    }
 
-        audioPlayer?.stop()
-        let player = try AVAudioPlayer(data: data)
-        player.prepareToPlay()
-        player.play()
-        audioPlayer = player
-        return player.duration
+    public func loadFromCache(key: String) -> Data? {
+        if let mem = neuralCache[key] { return mem }
+        if let disk = readDiskCache(forKey: key) {
+            storeInMemoryCache(key: key, data: disk)
+            return disk
+        }
+        return nil
+    }
+
+    public func clearAudioCache() {
+        neuralCache.removeAll()
+        neuralCacheOrder.removeAll()
+        if let dir = cacheDirectory {
+            try? FileManager.default.removeItem(at: dir)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+    }
+
+    public func audioCacheStats() -> (fileCount: Int, totalBytes: Int64) {
+        guard let dir = cacheDirectory,
+              let urls = try? FileManager.default.contentsOfDirectory(
+                  at: dir,
+                  includingPropertiesForKeys: [.fileSizeKey],
+                  options: [.skipsHiddenFiles]
+              ) else {
+            return (0, 0)
+        }
+        var count = 0
+        var bytes: Int64 = 0
+        for url in urls where url.pathExtension == "audio" {
+            count += 1
+            let vals = try? url.resourceValues(forKeys: [.fileSizeKey])
+            bytes += Int64(vals?.fileSize ?? 0)
+        }
+        return (count, bytes)
+    }
+
+    private func playAudioDataAndWait(_ data: Data, playbackRate: Float = 1.0) async throws {
+        let player = try await MainActor.run { () -> AVAudioPlayer in
+            #if os(iOS)
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try? session.setActive(true)
+            #endif
+
+            self.audioPlayer?.stop()
+            self.playbackDelegate.resumeOnce()
+            let p = try AVAudioPlayer(data: data)
+            if abs(playbackRate - 1.0) > 0.01 {
+                p.enableRate = true
+                p.rate = max(0.75, min(1.25, playbackRate))
+            }
+            p.delegate = self.playbackDelegate
+            p.prepareToPlay()
+            p.play()
+            self.audioPlayer = p
+            return p
+        }
+        await playbackDelegate.waitForFinish(player: player)
     }
 }

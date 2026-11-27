@@ -441,6 +441,113 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(phrases.count, 2)
     }
 
+    func testGeminiTTSPayloadsElevenLabsDiskCacheAndAdaptiveTurnPauses() throws {
+        // 1. Legacy VoiceSettings JSON without reuseGeminiKey decodes cleanly
+        let legacyVoiceJSON = """
+        {"provider":"openai","accents":{"english":"en-GB"},"preferredSystemVoices":{},"rateMultiplier":1.0,"speakingStyle":"natural","endpoint":"https://api.openai.com/v1/audio/speech","apiKey":"","model":"gpt-4o-mini-tts","neuralVoice":"coral","reuseOpenAIKey":true}
+        """
+        let decodedLegacy = try JSONDecoder().decode(VoiceSettings.self, from: Data(legacyVoiceJSON.utf8))
+        XCTAssertTrue(decodedLegacy.reuseGeminiKey)
+        XCTAssertEqual(decodedLegacy.provider, .openai)
+
+        // 2. Shared Gemini key reuse
+        let defaults = UserDefaults(suiteName: "LinguaVerveGeminiVoiceTests.\(UUID().uuidString)")!
+        let aiCfg = AIProviderConfig(provider: .gemini, apiKey: "test-gemini-placeholder-key", enabled: true)
+        defaults.set(try JSONEncoder().encode(aiCfg), forKey: "linguaverve.apple.aiConfig.v1")
+
+        let tempCacheDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LinguaVerveAudioCacheTest-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempCacheDir) }
+
+        let engine = NativeAudioEngine(defaults: defaults, cacheDirectory: tempCacheDir)
+        var geminiSettings = VoiceSettings()
+        geminiSettings.provider = .gemini
+        geminiSettings.endpoint = VoiceProviderType.gemini.defaultEndpoint
+        geminiSettings.model = VoiceProviderType.gemini.defaultModel
+        geminiSettings.neuralVoice = "Aoede"
+        geminiSettings.reuseGeminiKey = true
+        XCTAssertEqual(engine.effectiveAPIKey(for: geminiSettings), "test-gemini-placeholder-key")
+        XCTAssertTrue(engine.isNeuralProviderReady(for: geminiSettings))
+
+        // 3. WAV header + sample rate parsing + endpoint resolution
+        XCTAssertEqual(NativeAudioEngine.parseSampleRate(from: "audio/L16;codec=pcm;rate=24000"), 24000)
+        XCTAssertEqual(NativeAudioEngine.parseSampleRate(from: "audio/L16;rate=16000"), 16000)
+        let pcm = Data([1, 2, 3, 4])
+        let wav = NativeAudioEngine.wrapPCM16AsWAV(pcm, sampleRate: 24000, channels: 1)
+        XCTAssertEqual(wav.count, 48)
+        XCTAssertEqual(String(data: wav.subdata(in: 0..<4), encoding: .ascii), "RIFF")
+        XCTAssertEqual(String(data: wav.subdata(in: 8..<12), encoding: .ascii), "WAVE")
+        XCTAssertEqual(String(data: wav.subdata(in: 36..<40), encoding: .ascii), "data")
+
+        let resolvedURL = NativeAudioEngine.resolveGeminiTTSEndpoint(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            model: "gemini-2.5-flash-preview-tts"
+        )
+        XCTAssertEqual(
+            resolvedURL?.absoluteString,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+        )
+
+        // 4. Multi-speaker Gemini body
+        let turns = NativeAudioEngine.parseDialogueTurns("Clara: Hallo Lukas!\nLukas: Hallo Clara!")
+        let multiBody = NativeAudioEngine.buildGeminiTTSRequestBody(
+            text: "",
+            accentCode: "de-DE",
+            style: .conversational,
+            slow: false,
+            voice: "Aoede",
+            dialogueTurns: turns,
+            secondaryVoice: "Charon"
+        )
+        let genCfg = multiBody["generationConfig"] as? [String: Any]
+        let speechCfg = genCfg?["speechConfig"] as? [String: Any]
+        let multiCfg = speechCfg?["multiSpeakerVoiceConfig"] as? [String: Any]
+        let speakerCfgs = multiCfg?["speakerVoiceConfigs"] as? [[String: Any]]
+        XCTAssertEqual(speakerCfgs?.count, 2)
+        XCTAssertEqual(speakerCfgs?[0]["speaker"] as? String, "Clara")
+        XCTAssertEqual(speakerCfgs?[1]["speaker"] as? String, "Lukas")
+
+        // 5. ElevenLabs v3 omits speed, Flash v2.5 includes speed & context
+        let flashBody = NativeAudioEngine.buildElevenLabsRequestBody(
+            text: "Ja!",
+            model: "eleven_flash_v2_5",
+            style: .conversational,
+            speed: 0.85,
+            accentCode: "de-AT",
+            previousText: "Bereit?",
+            nextText: "Los!"
+        )
+        let flashVS = flashBody["voice_settings"] as? [String: Any]
+        XCTAssertEqual(flashVS?["speed"] as? Double ?? 0, 0.85, accuracy: 0.01)
+        XCTAssertEqual(flashBody["previous_text"] as? String, "Bereit?")
+        XCTAssertEqual(flashBody["next_text"] as? String, "Los!")
+
+        let v3Body = NativeAudioEngine.buildElevenLabsRequestBody(
+            text: "Hello",
+            model: "eleven_v3",
+            style: .tutor,
+            speed: 0.80,
+            accentCode: "en-GB"
+        )
+        let v3VS = v3Body["voice_settings"] as? [String: Any]
+        XCTAssertNil(v3VS?["speed"])
+
+        // 6. Adaptive turn pauses
+        XCTAssertEqual(NativeAudioEngine.naturalTurnPauseSeconds(previousText: "Oh, super!", nextText: "Next", slow: false), 0.12, accuracy: 0.001)
+        XCTAssertEqual(NativeAudioEngine.naturalTurnPauseSeconds(previousText: "Wann fährt der Zug nach Basel ab?", nextText: "Um zehn", slow: false), 0.20, accuracy: 0.001)
+        XCTAssertEqual(NativeAudioEngine.naturalTurnPauseSeconds(previousText: "Oh, super!", nextText: "Next", slow: true), 0.15, accuracy: 0.001)
+
+        // 7. Persistent disk cache read/write/clear across instances + voice cache invalidation
+        engine.storeInCache(key: "unit-test-audio-key", data: wav)
+        XCTAssertEqual(engine.audioCacheStats().fileCount, 1)
+
+        let secondEngine = NativeAudioEngine(defaults: defaults, cacheDirectory: tempCacheDir)
+        XCTAssertEqual(secondEngine.loadFromCache(key: "unit-test-audio-key"), wav)
+        secondEngine.clearAudioCache()
+        XCTAssertEqual(secondEngine.audioCacheStats().fileCount, 0)
+        secondEngine.invalidateVoiceCache()
+    }
+
     func testMultiPartRealWorldExamsDecodeWithOfficialGradesAndRubrics() {
         let store = makeTestStore()
         XCTAssertEqual(store.bundle.mockExams.count, 12)

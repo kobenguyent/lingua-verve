@@ -18,11 +18,14 @@ import {
   VoiceSpeakingStyle,
 } from '../types';
 import {
+  checkLocalTTSServer,
   classifyVoiceQuality,
   ELEVENLABS_NEURAL_VOICES,
+  GEMINI_NEURAL_VOICES,
   getAccentsForLanguage,
   getAccentOption,
   LOCAL_NEURAL_VOICES,
+  LOCAL_TTS_SERVER_PRESETS,
   OPENAI_NEURAL_VOICES,
   soundEngine,
   VOICE_PROVIDER_PRESETS,
@@ -37,7 +40,7 @@ interface VoiceSettingsModalProps {
   activeLanguageId?: string;
 }
 
-const PROVIDERS: VoiceProviderType[] = ['system', 'openai', 'elevenlabs', 'local-openai'];
+const PROVIDERS: VoiceProviderType[] = ['system', 'gemini', 'openai', 'elevenlabs', 'local-openai'];
 
 const SPEAKING_STYLES: { id: VoiceSpeakingStyle; label: string; desc: string }[] = [
   { id: 'natural', label: 'Natural Human', desc: 'Warm everyday cadence & pauses' },
@@ -60,14 +63,25 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
   const [previewingCode, setPreviewingCode] = useState<string | null>(null);
   const [previewStatus, setPreviewStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [voiceRefreshTick, setVoiceRefreshTick] = useState(0);
+  const [localHealth, setLocalHealth] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testingLocal, setTestingLocal] = useState(false);
+  const [cacheCount, setCacheCount] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     if (isOpen) {
       setDraft(settings);
       setAccentTab(activeLanguageId === 'german' ? 'german' : 'english');
       setPreviewStatus(null);
+      setLocalHealth(null);
       setVoiceRefreshTick((t) => t + 1);
+      void soundEngine.getNeuralAudioCacheCount().then((count) => {
+        if (!cancelled && count > 0) setCacheCount(count);
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, settings, activeLanguageId]);
 
   useEffect(() => {
@@ -88,7 +102,9 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
 
   const providerPreset = VOICE_PROVIDER_PRESETS[draft.provider];
   const neuralPresets =
-    draft.provider === 'openai'
+    draft.provider === 'gemini'
+      ? GEMINI_NEURAL_VOICES
+      : draft.provider === 'openai'
       ? OPENAI_NEURAL_VOICES
       : draft.provider === 'elevenlabs'
       ? ELEVENLABS_NEURAL_VOICES
@@ -105,6 +121,24 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
       neuralVoice: meta.defaultVoice || prev.neuralVoice,
     }));
     setPreviewStatus(null);
+    setLocalHealth(null);
+  };
+
+  const handleTestLocalServer = async () => {
+    setTestingLocal(true);
+    setLocalHealth(null);
+    try {
+      const res = await checkLocalTTSServer(draft.endpoint);
+      setLocalHealth({ ok: res.ok, text: res.message });
+    } finally {
+      setTestingLocal(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    soundEngine.playClickSound();
+    await soundEngine.clearNeuralAudioCache();
+    setCacheCount(0);
   };
 
   const handlePreviewAccent = async (accentCode: string) => {
@@ -339,9 +373,67 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
               </div>
             )}
 
-            {/* Neural Provider Settings (OpenAI / ElevenLabs / Local Kokoro) */}
+            {/* Neural Provider Settings (Gemini / OpenAI / ElevenLabs / Local Neural) */}
             {draft.provider !== 'system' && (
               <div className="space-y-3.5 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                {draft.provider === 'local-openai' && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono font-bold uppercase text-slate-500 dark:text-slate-400">
+                        Quick Local Server Presets
+                      </span>
+                      <button
+                        type="button"
+                        disabled={testingLocal}
+                        onClick={() => void handleTestLocalServer()}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700 hover:border-sky-400 transition-colors"
+                      >
+                        <span>{testingLocal ? 'Checking...' : 'Test Local Server'}</span>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {LOCAL_TTS_SERVER_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playClickSound();
+                            setDraft((prev) => ({
+                              ...prev,
+                              endpoint: preset.endpoint,
+                              model: preset.model,
+                              neuralVoice: preset.voice,
+                            }));
+                            setLocalHealth(null);
+                          }}
+                          className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-left hover:border-sky-400 transition-colors"
+                        >
+                          <div className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                            {preset.label}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                            {preset.note}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {localHealth && (
+                      <div
+                        className={`p-2 rounded-lg text-[11px] border ${
+                          localHealth.ok
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200'
+                        }`}
+                      >
+                        {localHealth.text}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono bg-white/70 dark:bg-slate-900/70 px-2.5 py-1.5 rounded-lg border border-slate-200/70 dark:border-slate-800">
+                      Apple Silicon quick start: pip install mlx-audio[tts] &amp;&amp; mlx_audio.server --port 8000
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[11px] font-mono font-bold uppercase text-slate-500 dark:text-slate-400 block">
@@ -385,7 +477,9 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
                       value={draft.apiKey}
                       onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
                       placeholder={
-                        draft.provider === 'openai'
+                        draft.provider === 'gemini'
+                          ? 'AIza... (leave empty if reusing AI Provider Gemini key)'
+                          : draft.provider === 'openai'
                           ? 'sk-... (leave empty if reusing AI Provider OpenAI key)'
                           : 'ElevenLabs xi-api-key...'
                       }
@@ -402,6 +496,19 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
                           className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                         />
                         <span>Automatically reuse my OpenAI key from AI Provider settings</span>
+                      </label>
+                    )}
+                    {draft.provider === 'gemini' && (
+                      <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={draft.reuseGeminiKey !== false}
+                          onChange={(e) =>
+                            setDraft({ ...draft, reuseGeminiKey: e.target.checked })
+                          }
+                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                        <span>Automatically reuse my Gemini key from AI Provider settings</span>
                       </label>
                     )}
                   </div>
@@ -520,9 +627,20 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Keys stay local · Automatic offline fallback if neural TTS is unreachable</span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Keys stay local · Offline fallback enabled</span>
+            </span>
+            {cacheCount > 0 && (
+              <button
+                type="button"
+                onClick={() => void handleClearCache()}
+                className="px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+              >
+                Clear Audio Cache ({cacheCount})
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
