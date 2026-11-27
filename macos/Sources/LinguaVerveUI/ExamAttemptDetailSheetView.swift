@@ -21,6 +21,7 @@ public struct ExamAttemptDetailSheetView: View {
     @State private var showReferenceBenchmarks = false
     @State private var isAnalyzingAI = false
     @State private var showAISettingsSheet = false
+    @State private var showCertificateSheet = false
 
     public init(store: CurriculumStore, attempt: ExamAttemptRecord) {
         self.store = store
@@ -89,6 +90,17 @@ public struct ExamAttemptDetailSheetView: View {
                     }
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
+                    if attempt.passed {
+                        Button {
+                            NativeAudioEngine.shared.playSuccessChime()
+                            showCertificateSheet = true
+                        } label: {
+                            Label("Certificate", systemImage: "rosette")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(BrandTheme.deepGold)
+                    }
+
                     Button {
                         PlatformClipboard.copy(buildPlainTextDossier())
                         NativeAudioEngine.shared.playClickSound()
@@ -129,6 +141,10 @@ public struct ExamAttemptDetailSheetView: View {
             AIProviderSheetView(store: store)
                 .applyAppFontScale(store)
         }
+        .sheet(isPresented: $showCertificateSheet) {
+            LinguaVerveCertificateSheetView(store: store, attempt: attempt)
+                .applyAppFontScale(store)
+        }
         .confirmationDialog("Delete this exam record from history?", isPresented: $showDeleteConfirm) {
             Button("Delete Exam Record", role: .destructive) {
                 NativeAudioEngine.shared.stopSpeech()
@@ -166,7 +182,44 @@ public struct ExamAttemptDetailSheetView: View {
                 metaPill(icon: "rosette", text: attempt.alignedCertificate)
             }
 
-            if !attempt.passed && !failedSkills.isEmpty {
+            if attempt.passed {
+                let certPreview = CertificateService.buildCertificate(
+                    for: attempt,
+                    learnerName: store.learnerState.learnerName,
+                    passingScorePercent: matchedExamInfo?.exam.passingScorePercent ?? 60
+                )
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .scaledFont(.subheadline, weight: .bold)
+                        .foregroundStyle(BrandTheme.deepGold)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(certPreview.honorsTitle) · Credential \(certPreview.certificateId)")
+                            .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                            .foregroundStyle(BrandTheme.deepGold)
+                        Text(certPreview.encouragementHeadline)
+                            .scaledFont(.caption, weight: .semibold)
+                    }
+                    Spacer()
+                    Button {
+                        NativeAudioEngine.shared.playSuccessChime()
+                        showCertificateSheet = true
+                    } label: {
+                        Label("Open Diploma", systemImage: "rosette")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandTheme.deepGold)
+                    .controlSize(.small)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(BrandTheme.champagneGold.opacity(0.14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(BrandTheme.deepGold.opacity(0.35), lineWidth: 1)
+                        )
+                )
+            } else if !failedSkills.isEmpty {
                 let names = failedSkills.map(\.shortName).joined(separator: ", ")
                 Text("Skills below pass mark: \(names). Review feedback & benchmarks below before retaking.")
                     .scaledFont(.caption)

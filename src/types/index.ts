@@ -640,6 +640,7 @@ export interface UnitStudyProgress {
 
 export interface LearnerProgressState {
   version: number;
+  learnerName?: string;
   completedModuleIds: string[];
   enrolledCourseIds: string[];
   preTestHistory: PreTestResult[];

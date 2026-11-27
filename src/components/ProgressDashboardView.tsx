@@ -45,6 +45,8 @@ import {
   resolveOfficialGradeLabel,
 } from './ExamAttemptDetailModal';
 import { ExamReadinessAdvisorCard } from './ExamReadinessAdvisorCard';
+import { CertificateModal } from './CertificateModal';
+import { buildLinguaVerveCertificate } from '../utils/certificate';
 
 interface ProgressDashboardViewProps {
   learnerState: LearnerProgressState;
@@ -58,6 +60,7 @@ interface ProgressDashboardViewProps {
   onOpenAISettings?: () => void;
   onUpdateExamAssessment?: (attemptId: string, assessment: ExamAIAssessment) => void;
   onSaveReadinessReport?: (report: ExamHistoryReadinessReport) => void;
+  onUpdateLearnerName?: (name: string) => void;
   onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
 }
 
@@ -80,12 +83,14 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
   onOpenAISettings,
   onUpdateExamAssessment,
   onSaveReadinessReport,
+  onUpdateLearnerName,
   onLaunchAICoach,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const [filterLang, setFilterLang] = useState<'all' | LearningLanguageId>('all');
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptRecord | null>(null);
+  const [certificateAttempt, setCertificateAttempt] = useState<ExamAttemptRecord | null>(null);
 
   const streak = computeStudyStreak(learnerState.studyDays);
   const skillAverages = computeSkillAverages(learnerState, filterLang);
@@ -95,6 +100,7 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
   const filteredExams = learnerState.examHistory.filter(
     (e) => filterLang === 'all' || e.languageId === filterLang
   );
+  const passedFilteredExams = filteredExams.filter((e) => e.passed);
   const filteredPreTests = learnerState.preTestHistory.filter(
     (p) => filterLang === 'all' || p.languageId === filterLang
   );
@@ -358,6 +364,66 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
         onLaunchAICoach={onLaunchAICoach}
       />
 
+      {/* Earned Official LinguaVerve Certificates Trophy Shelf */}
+      {passedFilteredExams.length > 0 && (
+        <section className="p-5 rounded-2xl bg-gradient-to-br from-amber-50/90 via-white to-amber-50/40 dark:from-amber-950/25 dark:via-slate-900 dark:to-slate-900 border border-amber-400/40 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                Earned LinguaVerve Certificates ({passedFilteredExams.length})
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-amber-800/80 dark:text-amber-300/80">
+              Click any diploma to personalize, download PNG/SVG, or print PDF
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {passedFilteredExams.map((attempt) => {
+              const cert = buildLinguaVerveCertificate({
+                attempt,
+                learnerName: learnerState.learnerName,
+              });
+              return (
+                <button
+                  type="button"
+                  key={`cert-${attempt.id}`}
+                  onClick={() => {
+                    soundEngine.playSuccessChime();
+                    setCertificateAttempt(attempt);
+                  }}
+                  className="text-left p-4 rounded-xl bg-[#FDFBF5] dark:bg-slate-950/80 border-2 border-amber-500/45 hover:border-amber-500 shadow-sm hover:shadow-md transition-all space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        ★ {cert.honorsTitle}
+                      </div>
+                      <div className="font-display text-sm font-bold text-slate-900 dark:text-white">
+                        {cert.languageFlag} {cert.languageName} · Level {cert.level}
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-extrabold bg-slate-900 text-amber-300 border border-amber-400/50 shrink-0">
+                      {cert.overallScore}%
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-sky-800 dark:text-sky-300 truncate">
+                    {cert.officialGradeLabel}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-500/20 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                    <span>{cert.certificateId}</span>
+                    <span className="font-bold text-amber-700 dark:text-amber-400 inline-flex items-center gap-0.5">
+                      Open Diploma <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Simulated Exam Results & Pre-Test History */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Simulated Exam History */}
@@ -442,9 +508,17 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
                         {new Date(attempt.timestamp).toLocaleString()} · {attempt.mode} ·{' '}
                         {formatExamClock(attempt.durationUsedSeconds)}
                       </span>
-                      <span className="inline-flex items-center gap-0.5 font-semibold text-sky-700 dark:text-sky-400">
-                        Inspect Details
-                        <ChevronRight className="w-3.5 h-3.5" />
+                      <span className="inline-flex items-center gap-2 font-semibold text-sky-700 dark:text-sky-400">
+                        {attempt.passed && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                            <Award className="w-3 h-3" />
+                            Certificate
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-0.5">
+                          Inspect Details
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
                       </span>
                     </div>
                   </button>
@@ -518,6 +592,15 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
         onOpenAISettings={onOpenAISettings}
         onUpdateAssessment={onUpdateExamAssessment}
         onLaunchAICoach={onLaunchAICoach}
+        learnerName={learnerState.learnerName}
+        onUpdateLearnerName={onUpdateLearnerName}
+      />
+
+      <CertificateModal
+        attempt={certificateAttempt}
+        learnerName={learnerState.learnerName}
+        onUpdateLearnerName={onUpdateLearnerName}
+        onClose={() => setCertificateAttempt(null)}
       />
     </div>
   );

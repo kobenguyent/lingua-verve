@@ -7,6 +7,8 @@ import { AICoachView } from '../components/AICoachView';
 import { AIProviderModal } from '../components/AIProviderModal';
 import { VoiceSettingsModal } from '../components/VoiceSettingsModal';
 import { ProgressDashboardView } from '../components/ProgressDashboardView';
+import { CertificateModal } from '../components/CertificateModal';
+import { ExamAttemptDetailModal } from '../components/ExamAttemptDetailModal';
 import { getDefaultAIConfig } from '../utils/aiClient';
 import { repairClozePassage } from '../utils/aiExamGenerator';
 import { getDefaultVoiceSettings, soundEngine } from '../utils/audio';
@@ -1093,6 +1095,108 @@ describe('French and Japanese Learning Languages UI', () => {
     );
 
     expect(screen.getAllByText(/JLPT N5/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Official LinguaVerve Certificate Modal & Trophy Shelf', () => {
+  const passedAttempt = {
+    id: 'attempt-pass-cert-ui',
+    timestamp: '2026-11-27T15:00:00Z',
+    examId: 'exam-fr-b1',
+    examTitle: 'DELF B1 Full Simulation',
+    alignedCertificate: 'DELF B1',
+    languageId: 'french',
+    level: 'B1' as const,
+    mode: 'strict' as const,
+    durationUsedSeconds: 2100,
+    overallScore: 86,
+    passed: true,
+    officialGradeLabel: 'DELF B1: Mention Très Bien (86/100)',
+    skills: {
+      reading: { score: 89, passed: true, feedback: '8/9 correct' },
+      listening: { score: 89, passed: true, feedback: '8/9 correct' },
+      writing: {
+        score: 82,
+        passed: true,
+        feedback: 'Strong cohesive structure',
+        aiGraded: true,
+        rubric: { taskFulfillment: 84, coherenceCohesion: 82, lexicalRange: 80, grammaticalAccuracy: 82 },
+      },
+      speaking: {
+        score: 84,
+        passed: true,
+        feedback: 'Clear fluent argumentation',
+        aiGraded: true,
+        rubric: { taskFulfillment: 85, coherenceCohesion: 84, lexicalRange: 83, grammaticalAccuracy: 84 },
+      },
+    },
+  };
+
+  it('displays Earned LinguaVerve Certificates in ProgressDashboardView and lets learner personalize name in CertificateModal', () => {
+    const onUpdateName = vi.fn();
+    const state = {
+      ...createEmptyLearnerState(),
+      learnerName: 'Sophie Moreau',
+      examHistory: [passedAttempt],
+    };
+
+    render(
+      <ProgressDashboardView
+        learnerState={state}
+        masteredTipsCount={4}
+        onImportState={vi.fn()}
+        onResetProgress={vi.fn()}
+        onJumpToCourse={vi.fn()}
+        onUpdateLearnerName={onUpdateName}
+      />
+    );
+
+    expect(screen.getByText(/Earned LinguaVerve Certificates \(1\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Open Diploma/i));
+
+    expect(screen.getByText(/DIPLÔME DE COMPÉTENCE EN LANGUE FRANÇAISE/i)).toBeInTheDocument();
+    expect(screen.getByText('Sophie Moreau')).toBeInTheDocument();
+    expect(screen.getAllByText(/WITH DISTINCTION/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/Compréhension écrite/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Download PNG/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Print \/ PDF/i })).toBeInTheDocument();
+
+    const nameInput = screen.getByLabelText(/Recipient Name on Certificate/i);
+    fireEvent.change(nameInput, { target: { value: 'Claire Dubois' } });
+    expect(onUpdateName).toHaveBeenCalledWith('Claire Dubois');
+    expect(screen.getByText('Claire Dubois')).toBeInTheDocument();
+  });
+
+  it('shows View Certificate button in ExamAttemptDetailModal only for passed exams and opens CertificateModal directly', () => {
+    const { rerender } = render(
+      <ExamAttemptDetailModal
+        attempt={passedAttempt}
+        onClose={vi.fn()}
+        learnerName="Aoi Takahashi"
+      />
+    );
+
+    const viewCertBtn = screen.getByRole('button', { name: /View Certificate/i });
+    fireEvent.click(viewCertBtn);
+    expect(screen.getByText('Aoi Takahashi')).toBeInTheDocument();
+
+    rerender(
+      <ExamAttemptDetailModal
+        attempt={{ ...passedAttempt, id: 'attempt-fail-ui', passed: false, overallScore: 48 }}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /View Certificate/i })).not.toBeInTheDocument();
+
+    // Direct CertificateModal render sanity
+    render(
+      <CertificateModal
+        attempt={passedAttempt}
+        learnerName="Kenji Watanabe"
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Kenji Watanabe')).toBeInTheDocument();
   });
 });
 

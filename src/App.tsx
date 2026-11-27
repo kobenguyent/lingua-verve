@@ -31,6 +31,7 @@ import {
   saveLearnerState,
   saveReadinessReport,
   saveUnitProgressInState,
+  setLearnerNameInState,
   toggleModuleCompletionInState,
   updateExamAttemptAssessment,
 } from './utils/progressStore';
@@ -434,6 +435,10 @@ export const App: React.FC = () => {
             onOpenAISettings={() => setIsAISettingsOpen(true)}
             onCompleteExam={handleCompleteExam}
             onLaunchAICoach={handleLaunchAICoach}
+            learnerName={learnerState.learnerName}
+            onUpdateLearnerName={(name) =>
+              setLearnerState((prev) => setLearnerNameInState(prev, name))
+            }
           />
         </main>
       )}
@@ -474,6 +479,9 @@ export const App: React.FC = () => {
             }
             onSaveReadinessReport={(report) =>
               setLearnerState((prev) => saveReadinessReport(prev, report))
+            }
+            onUpdateLearnerName={(name) =>
+              setLearnerState((prev) => setLearnerNameInState(prev, name))
             }
             onLaunchAICoach={handleLaunchAICoach}
           />

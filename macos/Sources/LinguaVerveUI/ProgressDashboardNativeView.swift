@@ -8,6 +8,7 @@ public struct ProgressDashboardNativeView: View {
     @State private var showResetConfirm = false
     @State private var filterLang: String = "all"
     @State private var selectedAttempt: ExamAttemptRecord? = nil
+    @State private var certificateAttempt: ExamAttemptRecord? = nil
 
     public init(store: CurriculumStore) {
         self.store = store
@@ -21,6 +22,7 @@ public struct ProgressDashboardNativeView: View {
         let filteredExams = store.learnerState.examHistory.filter {
             filterLang == "all" || $0.languageId == filterLang
         }
+        let passedFilteredExams = filteredExams.filter(\.passed)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -99,6 +101,83 @@ public struct ProgressDashboardNativeView: View {
                 // AI Real-Exam Readiness Advisor (Analyze Exam History -> Ready vs More Practice)
                 ExamReadinessAdvisorCardView(store: store, filterLang: filterLang)
 
+                // Earned Official LinguaVerve Certificates Shelf
+                if !passedFilteredExams.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Label("Earned LinguaVerve Certificates (\(passedFilteredExams.count))", systemImage: "rosette")
+                                .scaledFont(.headline, weight: .semibold)
+                                .foregroundStyle(BrandTheme.deepGold)
+                            Spacer()
+                            Text("Click any diploma to personalize & export PDF/PNG")
+                                .scaledFont(.footnote, design: .monospaced)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(255, scale: fontScale)), spacing: 10)], spacing: 10) {
+                            ForEach(passedFilteredExams) { passedAttempt in
+                                let cert = CertificateService.buildCertificate(
+                                    for: passedAttempt,
+                                    learnerName: store.learnerState.learnerName,
+                                    passingScorePercent: store.exam(for: passedAttempt)?.exam.passingScorePercent ?? 60
+                                )
+                                Button {
+                                    NativeAudioEngine.shared.playSuccessChime()
+                                    certificateAttempt = passedAttempt
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(alignment: .top) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("★ \(cert.honorsTitle)")
+                                                    .scaledFont(size: 9.5, weight: .bold, design: .monospaced)
+                                                    .foregroundStyle(BrandTheme.deepGold)
+                                                Text("\(cert.language.flag) \(cert.language.name) · Level \(cert.level.rawValue)")
+                                                    .scaledFont(.subheadline, weight: .bold, design: .serif)
+                                                    .foregroundStyle(.primary)
+                                            }
+                                            Spacer()
+                                            Text("\(cert.overallScore)%")
+                                                .scaledFont(.caption, weight: .bold, design: .monospaced)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 3)
+                                                .background(Capsule().fill(Color(red: 0.047, green: 0.071, blue: 0.129)))
+                                                .foregroundStyle(BrandTheme.champagneGold)
+                                        }
+                                        Text(cert.officialGradeLabel)
+                                            .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                                            .foregroundStyle(BrandTheme.editorialBlue)
+                                            .lineLimit(1)
+                                        Divider()
+                                        HStack {
+                                            Text(cert.certificateId)
+                                                .scaledFont(size: 9.5, design: .monospaced)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text("Open Diploma →")
+                                                .scaledFont(.caption2, weight: .bold)
+                                                .foregroundStyle(BrandTheme.deepGold)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(BrandTheme.champagneGold.opacity(0.09))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .strokeBorder(BrandTheme.deepGold.opacity(0.42), lineWidth: 1.3)
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+                }
+
                 // Exam History
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
@@ -159,6 +238,10 @@ public struct ProgressDashboardNativeView: View {
         }
         .sheet(item: $selectedAttempt) { attempt in
             ExamAttemptDetailSheetView(store: store, attempt: attempt)
+                .applyAppFontScale(store)
+        }
+        .sheet(item: $certificateAttempt) { attempt in
+            LinguaVerveCertificateSheetView(store: store, attempt: attempt)
                 .applyAppFontScale(store)
         }
         .confirmationDialog("Reset All Progress & Test History?", isPresented: $showResetConfirm) {
@@ -240,6 +323,14 @@ public struct ProgressDashboardNativeView: View {
                         .scaledFont(.caption2, design: .monospaced)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    if attempt.passed {
+                        Label("Certificate", systemImage: "rosette")
+                            .scaledFont(.caption2, weight: .bold)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.22)))
+                            .foregroundStyle(BrandTheme.deepGold)
+                    }
                     Label("Inspect Details", systemImage: "chevron.right")
                         .labelStyle(.titleAndIcon)
                         .scaledFont(.caption2, weight: .semibold)

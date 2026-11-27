@@ -1885,6 +1885,7 @@ public struct UnitStudyProgress: Codable, Equatable, Sendable {
 
 public struct LearnerProgressState: Codable, Equatable, Sendable {
     public var version: Int
+    public var learnerName: String?
     public var completedModuleIds: [String]
     public var enrolledCourseIds: [String]
     public var preTestHistory: [PreTestResult]
@@ -1896,12 +1897,13 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
     public var latestReadinessReport: ExamHistoryReadinessReport?
 
     enum CodingKeys: String, CodingKey {
-        case version, completedModuleIds, enrolledCourseIds, preTestHistory, examHistory
+        case version, learnerName, completedModuleIds, enrolledCourseIds, preTestHistory, examHistory
         case aiSessionHistory, activityLog, studyDays, unitProgress, latestReadinessReport
     }
 
     public init(
         version: Int = 1,
+        learnerName: String? = nil,
         completedModuleIds: [String] = [],
         enrolledCourseIds: [String] = [],
         preTestHistory: [PreTestResult] = [],
@@ -1913,6 +1915,7 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
         latestReadinessReport: ExamHistoryReadinessReport? = nil
     ) {
         self.version = version
+        self.learnerName = learnerName
         self.completedModuleIds = completedModuleIds
         self.enrolledCourseIds = enrolledCourseIds
         self.preTestHistory = preTestHistory
@@ -1927,6 +1930,8 @@ public struct LearnerProgressState: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        let rawName = try c.decodeIfPresent(String.self, forKey: .learnerName)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.learnerName = (rawName?.isEmpty == false) ? rawName : nil
         self.completedModuleIds = try c.decodeIfPresent([String].self, forKey: .completedModuleIds) ?? []
         self.enrolledCourseIds = try c.decodeIfPresent([String].self, forKey: .enrolledCourseIds) ?? []
         self.preTestHistory = try c.decodeIfPresent([PreTestResult].self, forKey: .preTestHistory) ?? []

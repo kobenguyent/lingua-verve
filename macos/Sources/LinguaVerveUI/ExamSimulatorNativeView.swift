@@ -50,6 +50,7 @@ public struct ExamSimulatorNativeView: View {
     @State private var writingNotes: [String] = []
     @State private var speakingNotes: [String] = []
     @State private var allModulesPassed: Bool = false
+    @State private var showCertificateSheet: Bool = false
 
     private enum ExamPhase: Equatable {
         case lobby, running, grading, report
@@ -115,6 +116,12 @@ public struct ExamSimulatorNativeView: View {
         .onDisappear {
             speechRecognizer.stop()
             NativeAudioEngine.shared.stopSpeech()
+        }
+        .sheet(isPresented: $showCertificateSheet) {
+            if let report, report.passed {
+                LinguaVerveCertificateSheetView(store: store, attempt: report)
+                    .applyAppFontScale(store)
+            }
         }
     }
 
@@ -1083,6 +1090,44 @@ public struct ExamSimulatorNativeView: View {
                 }
             }
 
+            // Celebratory Official LinguaVerve Certificate Unlock Banner (when PASSED)
+            if report.passed {
+                let certPreview = CertificateService.buildCertificate(
+                    for: report,
+                    learnerName: store.learnerState.learnerName,
+                    passingScorePercent: exam.passingScorePercent
+                )
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 14) {
+                        certificateCelebrationText(certPreview)
+                        Spacer()
+                        certificateOpenButton
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        certificateCelebrationText(certPreview)
+                        certificateOpenButton
+                    }
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    BrandTheme.champagneGold.opacity(0.18),
+                                    BrandTheme.emeraldMint.opacity(0.10)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(BrandTheme.deepGold.opacity(0.45), lineWidth: 1.2)
+                        )
+                )
+            }
+
             // 4-Skill Score Cards + 4-Criterion CEFR Rubric Bars
             LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(210, scale: fontScale)), spacing: 10)], spacing: 10) {
                 ForEach(SkillType.allCases) { sk in
@@ -1337,6 +1382,46 @@ public struct ExamSimulatorNativeView: View {
             result += AttributedString(String(passage[cursor..<passage.endIndex]))
         }
         return result
+    }
+
+    private func certificateCelebrationText(_ cert: LinguaVerveCertificate) -> some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "rosette")
+                .scaledFont(.title2, weight: .bold)
+                .foregroundStyle(BrandTheme.deepGold)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                FlowLayout(spacing: 6, lineSpacing: 4) {
+                    Text("🎉 OFFICIAL LINGUAVERVE CERTIFICATE UNLOCKED · \(cert.honorsTitle)")
+                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                        .foregroundStyle(BrandTheme.deepGold)
+                    Text(cert.certificateId)
+                        .scaledFont(size: 10, weight: .semibold, design: .monospaced)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                        .foregroundStyle(.secondary)
+                }
+                Text(cert.encouragementHeadline)
+                    .scaledFont(.headline, weight: .bold)
+                Text(cert.encouragementMessage)
+                    .scaledFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var certificateOpenButton: some View {
+        Button {
+            NativeAudioEngine.shared.playSuccessChime()
+            showCertificateSheet = true
+        } label: {
+            Label("View & Export Certificate", systemImage: "checkmark.seal.fill")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(BrandTheme.deepGold)
+        .controlSize(.regular)
     }
 
     private func rubricBarRow(_ title: String, value: Int) -> some View {

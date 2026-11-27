@@ -41,6 +41,10 @@ export function loadLearnerState(): LearnerProgressState {
     const parsed = JSON.parse(raw) as Partial<LearnerProgressState>;
     return {
       version: 1,
+      learnerName:
+        typeof parsed.learnerName === 'string' && parsed.learnerName.trim().length > 0
+          ? parsed.learnerName.trim()
+          : undefined,
       completedModuleIds: Array.isArray(parsed.completedModuleIds) ? parsed.completedModuleIds : [],
       enrolledCourseIds: Array.isArray(parsed.enrolledCourseIds) ? parsed.enrolledCourseIds : [],
       preTestHistory: Array.isArray(parsed.preTestHistory) ? parsed.preTestHistory : [],
@@ -259,6 +263,17 @@ export function saveReadinessReport(
   };
 }
 
+export function setLearnerNameInState(
+  state: LearnerProgressState,
+  learnerName: string
+): LearnerProgressState {
+  const cleaned = learnerName.trim();
+  return {
+    ...state,
+    learnerName: cleaned.length > 0 ? cleaned : undefined,
+  };
+}
+
 export function recordAISession(
   state: LearnerProgressState,
   session: AISessionRecord
@@ -372,6 +387,10 @@ export function parseImportedLearnerProgressJSON(raw: string): LearnerProgressSt
   }
   return {
     version: 1,
+    learnerName:
+      typeof candidate.learnerName === 'string' && candidate.learnerName.trim().length > 0
+        ? candidate.learnerName.trim()
+        : undefined,
     completedModuleIds: Array.isArray(candidate.completedModuleIds) ? candidate.completedModuleIds : [],
     enrolledCourseIds: Array.isArray(candidate.enrolledCourseIds) ? candidate.enrolledCourseIds : [],
     preTestHistory: Array.isArray(candidate.preTestHistory) ? candidate.preTestHistory : [],
@@ -383,5 +402,9 @@ export function parseImportedLearnerProgressJSON(raw: string): LearnerProgressSt
       candidate.unitProgress && typeof candidate.unitProgress === 'object' && !Array.isArray(candidate.unitProgress)
         ? candidate.unitProgress
         : {},
+    latestReadinessReport:
+      candidate.latestReadinessReport && typeof candidate.latestReadinessReport === 'object'
+        ? candidate.latestReadinessReport
+        : undefined,
   };
 }

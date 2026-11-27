@@ -63,6 +63,8 @@ import {
   buildOfflineExamAssessment,
 } from '../utils/examAssessment';
 import { ExamAIAssessmentPanel } from './ExamAIAssessmentPanel';
+import { CertificateModal } from './CertificateModal';
+import { buildLinguaVerveCertificate } from '../utils/certificate';
 import {
   countLanguageUnits,
   getLearningLanguageMeta,
@@ -79,6 +81,8 @@ interface ExamSimulatorViewProps {
   onOpenAISettings: () => void;
   onCompleteExam: (record: ExamAttemptRecord) => void;
   onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
+  learnerName?: string;
+  onUpdateLearnerName?: (name: string) => void;
 }
 
 const SECTION_ORDER: SkillType[] = ['reading', 'listening', 'writing', 'speaking'];
@@ -230,6 +234,8 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   onOpenAISettings,
   onCompleteExam,
   onLaunchAICoach,
+  learnerName,
+  onUpdateLearnerName,
 }) => {
   const examLang = normalizeLearningLanguageId(activeLanguageId);
   const examLangMeta = getLearningLanguageMeta(examLang);
@@ -240,6 +246,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   const [timingMode, setTimingMode] = useState<'official' | 'sprint'>('official');
   const [phase, setPhase] = useState<'lobby' | 'running' | 'grading' | 'report'>('lobby');
   const [activeSection, setActiveSection] = useState<SkillType>('reading');
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
 
   // AI-Generated Fresh Exam Bank state
   const [generatedExams, setGeneratedExams] = useState<MockExam[]>(() => loadGeneratedExams());
@@ -2108,6 +2115,52 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
               </div>
             </div>
 
+            {/* Celebratory Official LinguaVerve Certificate Unlock Banner (when PASSED) */}
+            {report.passed && (() => {
+              const certPreview = buildLinguaVerveCertificate({
+                attempt: report,
+                learnerName,
+                passingScorePercent: currentExam.passingScorePercent,
+              });
+              return (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-emerald-500/15 border border-amber-500/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-md shrink-0">
+                      <Award className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                          🎉 Official LinguaVerve Certificate Unlocked · {certPreview.honorsTitle}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900/10 dark:bg-white/10 text-slate-700 dark:text-slate-200">
+                          {certPreview.certificateId}
+                        </span>
+                      </div>
+                      <h3 className="font-display text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                        {certPreview.encouragementHeadline}
+                      </h3>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {certPreview.encouragementMessage}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playSuccessChime();
+                      setShowCertificateModal(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 shadow-md transition-all shrink-0"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>View &amp; Download Certificate</span>
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* 4-Skill Score Cards + 4-Criterion CEFR Rubric Bars */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {SECTION_ORDER.map((sk) => {
@@ -2307,6 +2360,13 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
               </div>
             </div>
           </section>
+          <CertificateModal
+            attempt={showCertificateModal && report.passed ? report : null}
+            learnerName={learnerName}
+            passingScorePercent={currentExam.passingScorePercent}
+            onUpdateLearnerName={onUpdateLearnerName}
+            onClose={() => setShowCertificateModal(false)}
+          />
         </div>
       )}
     </div>

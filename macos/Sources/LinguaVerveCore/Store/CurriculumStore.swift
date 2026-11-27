@@ -693,6 +693,16 @@ public final class CurriculumStore {
         persistLearnerState()
     }
 
+    public func setLearnerName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        learnerState.learnerName = trimmed.isEmpty ? nil : trimmed
+        persistLearnerState()
+    }
+
+    public var passedExamHistory: [ExamAttemptRecord] {
+        learnerState.examHistory.filter(\.passed)
+    }
+
     public func recordAISession(_ session: AISessionRecord) {
         learnerState.aiSessionHistory.insert(session, at: 0)
         if learnerState.aiSessionHistory.count > 60 {

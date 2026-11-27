@@ -9,8 +9,8 @@
 Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulators · Real-Exam Readiness Advisor · Human Multi-Speaker Voice Studio · On-Device, Local & Cloud AI Coaching
 
 <p>
-  <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-76%20passed-10B981?style=flat-square" alt="Web Vitest 76 passed" /></a>
-  <a href="./macos/Tests/LinguaVerveTests"><img src="https://img.shields.io/badge/XCTest-45%20passed-F97316?style=flat-square" alt="Swift XCTest 45 passed" /></a>
+  <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-82%20passed-10B981?style=flat-square" alt="Web Vitest 82 passed" /></a>
+  <a href="./macos/Tests/LinguaVerveTests"><img src="https://img.shields.io/badge/XCTest-46%20passed-F97316?style=flat-square" alt="Swift XCTest 46 passed" /></a>
   <a href="./apple/LinguaVerve.xcodeproj"><img src="https://img.shields.io/badge/Apple-macOS%2014%2B%20%C2%B7%20iPadOS%2017%2B%20%C2%B7%20iOS%2017%2B-111827?style=flat-square&logo=apple" alt="Universal Apple App" /></a>
   <a href="./.github/workflows/deploy.yml"><img src="https://img.shields.io/badge/Deploy-GitHub%20Pages-0284C7?style=flat-square" alt="Deploy to GitHub Pages" /></a>
   <a href="./.github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-macOS%20%26%20Web-6366F1?style=flat-square" alt="CI & Native Apple Builds" /></a>
@@ -56,7 +56,7 @@ Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulat
 | **Placement Pre-Test** | **48** progressive `A1 → C2` items across Reading, Listening, Writing &amp; Speaking |
 | **Official Exam Portals** | **40** verified links (Goethe, telc, TestDaF, Cambridge, IELTS, TOEFL, DELF/DALF, JLPT, IRODORI, NHK) |
 | **Tactical Field Manual** | **52** polyglot blueprints · **4** interactive visual diagrams · **10** False Friends |
-| **Automated Test Suite** | **121** passing tests (**76** Web Vitest + **45** Native Swift XCTest) |
+| **Automated Test Suite** | **128** passing tests (**82** Web Vitest + **46** Native Swift XCTest) |
 
 ---
 
@@ -76,6 +76,7 @@ Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulat
 - **On-Demand AI Exam Generator:** Synthesizes fresh, themed multi-part exams with automatic cloze-gap validation/repair and offline fallbacks.
 - **Strict Exam Pressure Mode vs. Practice Mode:** Live countdown clock with auto-submit, strict audio replay caps (`2x` for A1–B2, `1x` for C1–C2), locked transcripts until submission, live word/character counter, prep & speaking timers, and microphone Speech-to-Text dictation.
 - **AI-Powered 4-Skill Examiner Assessment & Past Attempt Inspector:** Click any past attempt to inspect every question alongside AI examiner rubric scores, inline corrections, upgraded model answers, and targeted study plans.
+- **Official-Style LinguaVerve Proficiency Certificates:** Passing any simulated exam unlocks a personalized archival diploma complete with deterministic Credential ID & verification code, bilingual native headers (EN/DE/FR/JA), Honours standing, official exam-board grade equivalence, full 4-skill modular transcript & CEFR Can-Do descriptor, embossed gold seal, and 1-click **PNG / SVG / PDF** export.
 
 ### 4. 🛡️ Real-Exam Readiness Advisor
 - Synthesizes your simulated exam history across levels and skills (`Reading`, `Listening`, `Writing`, `Speaking`) into a clear **Readiness Verdict** (*Ready for Real Exam*, *Almost Ready · Short Polish*, or *More Practice Needed*).
@@ -126,7 +127,7 @@ src/data/  (Single Source of Truth: 4 active languages, 24 courses, 144 guided u
 ```bash
 npm install
 npm run dev      # Start local Vite dev server
-npm test         # Run Web Vitest suite (76 tests across 7 files)
+npm test         # Run Web Vitest suite (82 tests across 8 files)
 npm run build    # Type-check & build static bundle -> ./dist
 npm run preview  # Preview production build locally
 ```
@@ -140,7 +141,7 @@ npm run macos:launch:fast # Host-arch release rebuild + clean launch of dist-mac
 npm run macos:open        # Launch already-built dist-macos/LinguaVerve.app without rebuilding
 npm run macos:launch      # Full Universal (arm64 + x86_64) .app/.dmg/.zip/SHA256SUMS.txt & launch
 npm run macos:app         # Package Universal macOS release artifacts in dist-macos/
-npm run macos:test        # Sync curriculum.json & run native Swift XCTests (45 tests)
+npm run macos:test        # Sync curriculum.json & run native Swift XCTests (46 tests)
 npm run macos:sync        # Export src/data/ -> curriculum.json
 
 # Universal Xcode Project (macOS · iPadOS · iOS)

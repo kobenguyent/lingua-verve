@@ -45,6 +45,7 @@ import {
   getExamWritingTasks,
 } from '../utils/examScoring';
 import { ExamAIAssessmentPanel } from './ExamAIAssessmentPanel';
+import { CertificateModal } from './CertificateModal';
 
 interface ExamAttemptDetailModalProps {
   attempt: ExamAttemptRecord | null;
@@ -55,6 +56,8 @@ interface ExamAttemptDetailModalProps {
   onOpenAISettings?: () => void;
   onUpdateAssessment?: (attemptId: string, assessment: ExamAIAssessment) => void;
   onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
+  learnerName?: string;
+  onUpdateLearnerName?: (name: string) => void;
 }
 
 type ReviewFilter = 'all' | 'missed' | 'reading' | 'listening';
@@ -187,23 +190,27 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
   onOpenAISettings,
   onUpdateAssessment,
   onLaunchAICoach,
+  learnerName,
+  onUpdateLearnerName,
 }) => {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all');
   const [copied, setCopied] = useState(false);
   const [localAssessment, setLocalAssessment] = useState<ExamAIAssessment | null>(null);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
+  const [showCertificate, setShowCertificate] = useState(false);
 
   useEffect(() => {
     setReviewFilter('all');
     setCopied(false);
     setLocalAssessment(null);
     setIsAnalyzingAI(false);
+    setShowCertificate(false);
   }, [propAttempt?.id]);
 
   useEffect(() => {
     if (!propAttempt) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !showCertificate) {
         soundEngine.stopSpeech();
         onClose();
       }
@@ -213,7 +220,7 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
       window.removeEventListener('keydown', onKeyDown);
       soundEngine.stopSpeech();
     };
-  }, [propAttempt, onClose]);
+  }, [propAttempt, onClose, showCertificate]);
 
   const attempt: ExamAttemptRecord | null = propAttempt
     ? localAssessment
@@ -359,6 +366,20 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {attempt.passed && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playSuccessChime();
+                  setShowCertificate(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 shadow-sm"
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>View Certificate</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleCopyReport}
@@ -863,6 +884,14 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      <CertificateModal
+        attempt={showCertificate && attempt.passed ? attempt : null}
+        learnerName={learnerName}
+        passingScorePercent={matchedExamInfo?.exam.passingScorePercent ?? 60}
+        onUpdateLearnerName={onUpdateLearnerName}
+        onClose={() => setShowCertificate(false)}
+      />
     </div>
   );
 };

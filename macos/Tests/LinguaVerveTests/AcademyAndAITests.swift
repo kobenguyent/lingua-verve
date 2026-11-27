@@ -1220,4 +1220,112 @@ final class AcademyAndAITests: XCTestCase {
         XCTAssertTrue(speakingPrompt.contains("NEVER include role prefixes"))
         XCTAssertTrue(speakingPrompt.contains("[COACH NOTE]"))
     }
+
+    func testOfficialLinguaVerveCertificateAcrossAllLanguagesAndLearnerNameBackup() throws {
+        let store = makeTestStore()
+        store.setLearnerName("  Lina Bergmann  ")
+        XCTAssertEqual(store.learnerState.learnerName, "Lina Bergmann")
+
+        let skills: [String: SkillExamScore] = [
+            SkillType.reading.rawValue: SkillExamScore(score: 89, passed: true, feedback: "8/9 correct"),
+            SkillType.listening.rawValue: SkillExamScore(score: 78, passed: true, feedback: "7/9 correct"),
+            SkillType.writing.rawValue: SkillExamScore(
+                score: 91,
+                passed: true,
+                feedback: "Strong cohesive structure",
+                aiGraded: true,
+                rubric: OfficialRubricBreakdown(taskFulfillment: 92, coherenceCohesion: 90, lexicalRange: 91, grammaticalAccuracy: 90)
+            ),
+            SkillType.speaking.rawValue: SkillExamScore(
+                score: 94,
+                passed: true,
+                feedback: "Fluent spontaneous debate",
+                aiGraded: true,
+                rubric: OfficialRubricBreakdown(taskFulfillment: 95, coherenceCohesion: 93, lexicalRange: 94, grammaticalAccuracy: 92)
+            )
+        ]
+
+        let deAttempt = ExamAttemptRecord(
+            id: "attempt-cert-001",
+            timestamp: "2026-11-27T14:30:00Z",
+            examId: "exam-de-b2",
+            examTitle: "Goethe-Zertifikat B2 / telc B2 Full Simulation",
+            alignedCertificate: "Goethe-Zertifikat B2 / telc Deutsch B2",
+            languageId: "german",
+            level: .B2,
+            mode: "strict",
+            durationUsedSeconds: 2645,
+            overallScore: 88,
+            passed: true,
+            officialGradeLabel: "Goethe/telc: gut (88/100)",
+            skills: skills
+        )
+
+        let cert1 = CertificateService.buildCertificate(for: deAttempt, learnerName: store.learnerState.learnerName)
+        let cert2 = CertificateService.buildCertificate(for: deAttempt, learnerName: store.learnerState.learnerName)
+        XCTAssertEqual(cert1.certificateId, cert2.certificateId)
+        XCTAssertEqual(cert1.verificationCode, cert2.verificationCode)
+        XCTAssertTrue(cert1.certificateId.hasPrefix("LV-DE-B2-20261127-"))
+        XCTAssertTrue(cert1.verificationCode.hasPrefix("VER-"))
+        XCTAssertEqual(cert1.recipientName, "Lina Bergmann")
+        XCTAssertEqual(cert1.documentHeader, "ZERTIFIKAT · SPRACHPRÜFUNG DEUTSCH")
+        XCTAssertEqual(cert1.honorsTier, .distinction)
+        XCTAssertEqual(cert1.honorsTitle, "WITH DISTINCTION")
+        XCTAssertEqual(cert1.skills.map(\.nativeLabel), ["Lesen", "Hören", "Schreiben", "Sprechen"])
+        XCTAssertEqual(cert1.strongestSkill, .speaking)
+        XCTAssertEqual(cert1.nextMilestoneLevel, .C1)
+        XCTAssertTrue(cert1.plainTextCredential.contains(cert1.certificateId))
+
+        // Verify French & Japanese official headers, native skill labels, and honours tiers
+        let frAttempt = ExamAttemptRecord(
+            id: "attempt-fr-c1",
+            timestamp: "2026-11-27T15:00:00Z",
+            examId: "exam-fr-c1",
+            examTitle: "DALF C1 Full Simulation",
+            alignedCertificate: "DALF C1",
+            languageId: "french",
+            level: .C1,
+            mode: "strict",
+            durationUsedSeconds: 3100,
+            overallScore: 93,
+            passed: true,
+            officialGradeLabel: "DALF C1: Mention Très Bien (93/100)",
+            skills: skills
+        )
+        let frCert = CertificateService.buildCertificate(for: frAttempt)
+        XCTAssertEqual(frCert.recipientName, "LinguaVerve Scholar")
+        XCTAssertEqual(frCert.honorsTier, .highestDistinction)
+        XCTAssertTrue(frCert.documentHeader.contains("DIPLÔME DE COMPÉTENCE"))
+        XCTAssertEqual(frCert.skills.first?.nativeLabel, "Compréhension écrite")
+
+        let jaAttempt = ExamAttemptRecord(
+            id: "attempt-ja-n2",
+            timestamp: "2026-11-27T16:00:00Z",
+            examId: "exam-ja-b2",
+            examTitle: "JLPT N2 Full Simulation",
+            alignedCertificate: "JLPT N2",
+            languageId: "japanese",
+            level: .B2,
+            mode: "practice",
+            durationUsedSeconds: 2400,
+            overallScore: 74,
+            passed: true,
+            officialGradeLabel: "JLPT N2: 合格 · Passed (133/180)",
+            skills: skills
+        )
+        let jaCert = CertificateService.buildCertificate(for: jaAttempt, learnerName: "Haruto Sato")
+        XCTAssertTrue(jaCert.certificateId.hasPrefix("LV-JA-B2-20261127-"))
+        XCTAssertTrue(jaCert.documentHeader.contains("日本語能力認定証"))
+        XCTAssertEqual(jaCert.honorsTier, .merit)
+        XCTAssertEqual(jaCert.skills.map(\.nativeLabel), ["読解 (Dokkai)", "聴解 (Chōkai)", "作文 (Sakubun)", "会話 (Kaiwa)"])
+
+        // Record passed attempt & verify JSON backup preserves learnerName + passedExamHistory
+        store.recordExamAttempt(deAttempt)
+        XCTAssertEqual(store.passedExamHistory.count, 1)
+        let json = store.exportProgressJSON()
+        let restored = makeTestStore()
+        try restored.importProgressJSON(json)
+        XCTAssertEqual(restored.learnerState.learnerName, "Lina Bergmann")
+        XCTAssertEqual(restored.passedExamHistory.count, 1)
+    }
 }
