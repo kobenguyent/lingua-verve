@@ -1,74 +1,163 @@
-# LinguaVerve 🌐
-> **The Polyglot's Intensive Academy & Tactical Blueprint** — Zero-to-Hero A1→C2 Intensive Courses, 4-Skill Certification Exam Simulators, Local & Cloud AI Coaching, and Official Exam References for English, German, and beyond.
+<div align="center">
 
-[![Test Suite](https://img.shields.io/badge/Vitest-50%20passed-emerald)](./src/test)
-[![Deploy to GitHub Pages](https://img.shields.io/badge/Deployment-GitHub%20Pages-sky)](./.github/workflows/deploy.yml)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<img src="./docs/screenshots/brand-logo.png" alt="LinguaVerve Logo" width="96" />
+
+# LinguaVerve
+
+**The Polyglot's Intensive Academy & Tactical Blueprint**
+
+Zero-to-Hero `A1 → C2` Intensive Courses · 4-Skill Certification Exam Simulators · Real-Exam Readiness Advisor · Human Multi-Speaker Voice Studio · On-Device, Local & Cloud AI Coaching
+
+<p>
+  <a href="./src/test"><img src="https://img.shields.io/badge/Vitest-66%20passed-10B981?style=flat-square" alt="Web Vitest 66 passed" /></a>
+  <a href="./macos/Tests/LinguaVerveTests"><img src="https://img.shields.io/badge/XCTest-43%20passed-F97316?style=flat-square" alt="Swift XCTest 43 passed" /></a>
+  <a href="./apple/LinguaVerve.xcodeproj"><img src="https://img.shields.io/badge/Apple-macOS%2014%2B%20%C2%B7%20iPadOS%2017%2B%20%C2%B7%20iOS%2017%2B-111827?style=flat-square&logo=apple" alt="Universal Apple App" /></a>
+  <a href="./.github/workflows/deploy.yml"><img src="https://img.shields.io/badge/Deploy-GitHub%20Pages-0284C7?style=flat-square" alt="Deploy to GitHub Pages" /></a>
+  <a href="./.github/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-macOS%20%26%20Web-6366F1?style=flat-square" alt="CI & Native Apple Builds" /></a>
+  <a href="./package.json"><img src="https://img.shields.io/badge/License-MIT-3B82F6?style=flat-square" alt="MIT License" /></a>
+</p>
+
+<p>
+  <a href="#-complete-polyglot-mastery-suite">Features</a> ·
+  <a href="#-human-voice--multi-accent-studio">Voice Studio</a> ·
+  <a href="#-architecture">Architecture</a> ·
+  <a href="#-quick-start">Quick Start</a> ·
+  <a href="#-github-actions-ci-releases--auto-updater">Releases &amp; CI</a>
+</p>
+
+</div>
+
+---
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="./docs/screenshots/macos-workspace.png" alt="LinguaVerve Native macOS Golden Gate Editorial Workspace" />
+      <br />
+      <sub><strong>Native Apple App</strong> — Golden Gate Editorial UI on macOS, iPadOS &amp; iOS</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="./docs/screenshots/web-desktop-hero.png" alt="LinguaVerve Web Studio" />
+      <br />
+      <sub><strong>Web SPA Studio</strong> — Zero-backend React + TypeScript + Tailwind</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## At a Glance
+
+| Pillar | Scope in Repo |
+| :--- | :--- |
+| **Intensive Courses** | **12** full `A1 → C2` courses (6 English + 6 German) · **72** guided curriculum units |
+| **4-Skill Mock Exams** | **12** built-in timed certification exams + **unlimited AI-generated** multi-part exams |
+| **Placement Pre-Test** | **24** progressive `A1 → C2` items across Reading, Listening, Writing &amp; Speaking |
+| **Official Exam Portals** | **24** verified links (Goethe-Institut, telc, TestDaF, ÖSD, Cambridge, IELTS, TOEFL) |
+| **Tactical Field Manual** | **32** polyglot blueprints · **4** interactive visual diagrams · **10** False Friends |
+| **Automated Test Suite** | **109** passing tests (**66** Web Vitest + **43** Native Swift XCTest) |
 
 ---
 
 ## 🌟 Complete Polyglot Mastery Suite
 
 ### 1. 🎓 Zero-to-Hero Intensive Courses (`A1 → C2`)
-12 full intensive courses (**6 English + 6 German**, extensible to Spanish, French, Japanese, and more):
-- Structured multi-week syllabus units covering all 4 certification skills: **Reading**, **Listening & Hearing**, **Writing**, and **Speaking**.
-- Interactive module completion tracking, grammar checkpoints, clickable TTS exam vocabulary, audio ear-training drills (`1.0x` and `0.75x Slow`), and authentic reading mini-passages.
-- **Verified Official Certification & Mock Test Library** linking directly to real internet exam portals:
-  - **🇩🇪 German:** Goethe-Institut (`A1–C2`), telc Deutsch, TestDaF, ÖSD, Deutsche Welle (*Nicos Weg*, *Top-Thema*, *Video-Thema*), and vhs-Lernportal.
-  - **🇬🇧 English:** Cambridge English (`A2 Key`, `B1 Preliminary`, `B2 First`, `C1 Advanced`, `C2 Proficiency`), IELTS (`ielts.org`, British Council, IDP), ETS TOEFL iBT, BBC Learning English, and British Council LearnEnglish.
+- **72 Guided Units across 12 Courses:** Structured multi-week syllabi for **English (`A1–C2`)** and **German (`A1–C2`)**, extensible to Spanish, French, Japanese, and beyond.
+- **5-Step Interactive Unit Lesson Player:** Progress smoothly through **1. Concept & Grammar → 2. Audio Flashcards → 3. Knowledge Check → 4. 4-Skill Drills → 5. Milestone Checkpoint** with persistent per-unit progress and one-click advancement to the next unit or CEFR tier.
+- **24 Official Certification & Mock Test References:** Direct links to **Goethe-Institut**, **telc Deutsch**, **TestDaF**, **ÖSD**, **Deutsche Welle** (*Nicos Weg*, *Top-Thema*), **vhs-Lernportal**, **Cambridge English** (`A2 Key`–`C2 Proficiency`), **IELTS**, **ETS TOEFL iBT**, **BBC Learning English**, and **British Council LearnEnglish**.
 
 ### 2. 🎯 Scored 4-Skill Placement Pre-Test & Collective Course Recommender
-- 12 progressive `A1 → C2` items per language testing Reading, Listening/Hearing (real spoken audio with replay limits), Writing/Grammar, and Speaking Pragmatics.
-- Verifies your authentic starting CEFR tier, diagnoses weak skills, and automatically prescribes and enrolls a **Collective Multi-Course Study Bundle** (Foundation Reinforcement + Core Intensive Course + Bridge to Next Tier).
+- **24 progressive `A1 → C2` diagnostic items** testing Reading, Listening/Hearing (spoken audio with replay caps), Writing/Grammar, and Speaking Pragmatics.
+- Pinpoints your authentic CEFR tier and skill gaps, then automatically prescribes and enrolls a **Collective Multi-Course Study Bundle** (*Foundation Reinforcement + Core Intensive + Bridge to Next Tier*).
 
-### 3. ⏱️ High-Pressure 4-Skill Simulated Exam Arena (`12 Full Exams`)
-- Full timed mock simulations for **English (A1–C2)** and **German (A1–C2)** aligned with Goethe-Zertifikat, telc, TestDaF, Cambridge, IELTS, and TOEFL.
-- **Strict Exam Pressure Mode** vs. **Practice Mode**: live countdown clock with auto-submit, strict audio replay caps (`2x` for A1–B2, `1x` for C1–C2), locked transcripts until submission, live word counter, preparation & speaking countdown timers, live browser microphone Speech-to-Text capture, and full official-style scorecards with model answers & explanations.
+### 3. ⏱️ High-Pressure 4-Skill Simulated Exam Arena (`12 Built-In` + `AI Exam Generator`)
+- **12 Timed Certification Simulations:** Mirrors real Goethe-Zertifikat, telc, TestDaF, Cambridge, IELTS, and TOEFL structures across Reading, Listening, Writing, and Speaking.
+- **On-Demand AI Exam Generator:** Synthesizes fresh, themed multi-part exams with automatic cloze-gap validation/repair and offline fallbacks.
+- **Strict Exam Pressure Mode vs. Practice Mode:** Live countdown clock with auto-submit, strict audio replay caps (`2x` for A1–B2, `1x` for C1–C2), locked transcripts until submission, live word counter, prep & speaking timers, and microphone Speech-to-Text dictation.
+- **AI-Powered 4-Skill Examiner Assessment & Past Attempt Inspector:** Click any past attempt to inspect every question alongside AI examiner rubric scores, inline corrections, upgraded model answers, and targeted study plans.
 
-### 4. 🤖 Connect Local or Cloud AI Providers for 4-Skill Mastery
-Works 100% statically from your browser (zero backend required, ideal for GitHub Pages!):
-- **Local AI (Free & Private):** Ollama (`http://localhost:11434/v1/chat/completions`), LM Studio (`http://localhost:1234/v1/chat/completions`).
-- **Cloud AI:** OpenAI, Google Gemini, OpenRouter, or any Custom OpenAI-compatible endpoint (Groq, Mistral, vLLM, etc.).
-- Built-in connection tester, **4-Skill AI Coaching Studio** (Reading Lab, Listening/Hearing Audio Generator, Writing Exam Examiner, Voice Speaking Roleplay Partner), live AI grading inside Simulated Exams, and an intelligent offline CEFR rubric fallback when no AI provider is configured.
+### 4. 🛡️ Real-Exam Readiness Advisor
+- Synthesizes your simulated exam history across levels and skills (`Reading`, `Listening`, `Writing`, `Speaking`) into a clear **Readiness Verdict** (*Ready for Real Exam*, *Almost Ready · Short Polish*, or *More Practice Needed*).
+- Surfaces skill trends, bottleneck skills, and one-click launches directly into targeted AI Coaching or a fresh re-test.
 
-### 5. 📊 Learner Progress, History & Test Results Tracker
-- Persists completed course modules, Zero-to-Hero CEFR maps, 4-skill competency averages, Pre-Test history, Simulated Exam scorecards, AI coaching logs, and daily study streaks in `localStorage`.
-- One-click **JSON Backup Export & Import** so learners never lose progress across devices.
+### 5. 🤖 On-Device, Local & Cloud AI Coaching
+- **Apple Intelligence On-Device Foundation Model:** Uses `FoundationModels.framework` on macOS 26 / iPadOS 26 / iOS 26 for zero-API-key, 100% private offline coaching and evaluation.
+- **Local & Cloud AI with Live Model Discovery:** Connect **Ollama**, **LM Studio**, **OpenAI**, **Google Gemini**, **OpenRouter**, or any custom OpenAI-compatible endpoint (Groq, Mistral, vLLM, etc.), fetch live model catalogs across providers, and fall back gracefully to an offline CEFR rubric evaluator when disconnected. `NSAllowsLocalNetworking` also allows iPhone/iPad apps to reach Ollama/LM Studio running on your Mac over Wi-Fi.
 
-### 6. 📖 Tactical Field Manual (Tips, SVG Diagrams, Audio & False Friends)
-- All A1–C2 polyglot cheat-codes, 4 interactive SVG visual models (Preposition Pyramid, German Gender Suffix Matrix, Wechselpräpositionen Movement Visualizer, Articulatory Phonetics), native pronunciation engine, and False Friends explorer.
+### 6. 📊 Progress Dashboard, Backup & Tactical Field Manual
+- **Persistent Progress & JSON Backup:** Saves completed units, guided lesson steps, Pre-Tests, Simulated Exam scorecards, AI assessments, readiness reports, and daily study streaks with one-click JSON export/import.
+- **Tactical Field Manual:** **32** polyglot cheat-codes, **4** interactive visual models (*Preposition Pyramid*, *German Gender Suffix Matrix*, *Wechselpräpositionen Movement*, *Articulatory Phonetics*), and **10** False Friends cards.
 
 ---
 
-## 🚀 Quick Start (Web & Native Apple Apps)
+## 🎙️ Human Voice & Multi-Accent Studio
 
-### Web SPA (GitHub Pages)
+Designed to sound genuinely human across **6 English accents** (`en-GB`, `en-US`, `en-AU`, `en-IE`, `en-IN`, `en-ZA`), **3 German DACH accents** (`de-DE`, `de-AT`, `de-CH`), plus **Spanish** and **French**—with `0.75x` slow / `1.0x` normal playback, **4 expressive styles** (*Natural Human*, *Language Coach*, *Conversational*, *News Broadcast*), adaptive conversational turn pauses, and **persistent offline audio caching** (`Caches/LinguaVerveAudioCache` on Apple, `CacheStorage` on Web).
+
+| Engine | Mode | Multi-Speaker & Human Prosody Highlights | Key / Setup |
+| :--- | :--- | :--- | :--- |
+| **Google Gemini 2.5 TTS**<br/>`gemini-2.5-flash-preview-tts` | Cloud | Renders **2-speaker dialogues in a single API call** (`multiSpeakerVoiceConfig`) with real breaths, reactions & 24kHz PCM→WAV output | Reuses Gemini AI key (`x-goog-api-key`) |
+| **OpenAI Human TTS**<br/>`gpt-4o-mini-tts` | Cloud | Accent-coached voices (`coral`, `sage`, `ash`, etc.) with **previous-speaker turn context** in dialogue prompts | Reuses OpenAI AI key |
+| **ElevenLabs**<br/>`eleven_v3` · `v2` · `Flash v2.5` | Cloud | Expressive style presets, `previous_text` / `next_text` turn continuity, speed control (`v2`/`Flash`), and `language_code` locking | ElevenLabs `xi-api-key` |
+| **Local Apple Silicon TTS**<br/>`mlx-audio` · `Kokoro` · `Piper` | 100% Private Local | 1-click presets for **MLX-Audio** (`localhost:8000` Kokoro-82M & Chatterbox Multilingual), **Kokoro-FastAPI** (`:8880`), and **Speaches/Piper** (German `Thorsten`/`Eva`), plus **Test Local Server** health check | Zero API key · Local daemon |
+| **On-Device Neural**<br/>Apple Siri/Premium · Browser | 100% Free Offline | Filters out legacy robotic/Eloquence voices, preserves pure `1.0` pitch on neural voices (no metallic shifting), and includes guided Apple Premium voice setup for English & German | Built-in · Zero setup |
+
+---
+
+## 🧩 Architecture
+
+```text
+src/data/  (Single Source of Truth: courses, 72 guided units, 12 mock exams, 32 tips, pre-tests)
+   │
+   ├─► Web SPA (React 18 + TypeScript + Vite + Tailwind) ──► ./dist (GitHub Pages)
+   │
+   └─► node scripts/export-curriculum.mjs ──► macos/Sources/LinguaVerveCore/Resources/curriculum.json
+          │
+          ├─► LinguaVerveCore  (Models, Store, AI/TTS Engines, Speech, GitHub Auto-Updater)
+          └─► LinguaVerveUI    (Golden Gate Editorial SwiftUI: macOS 14+ · iPadOS 17+ · iOS 17+)
+```
+
+---
+
+## 🚀 Quick Start
+
+### 🌐 Web SPA
 ```bash
 npm install
-npm run dev      # Start local dev server
-npm test         # Run all 50 Vitest unit & component integration tests
-npm run build    # Type-check & build static GitHub Pages bundle -> ./dist
+npm run dev      # Start local Vite dev server
+npm test         # Run Web Vitest suite (66 tests across 6 files)
+npm run build    # Type-check & build static bundle -> ./dist
+npm run preview  # Preview production build locally
 ```
 
-### 📱 Native Apple Universal App (MacBook · iPad · iPhone)
-LinguaVerve shares one single source of truth (`src/data/` → `curriculum.json`) with a 100% native **SwiftUI Multiplatform App** (`LinguaVerveCore` + `LinguaVerveUI`) supporting **macOS 14+**, **iPadOS 17+**, and **iOS 17+**:
-- **Adaptive Layout:** Native `NavigationSplitView` sidebar on **MacBook** & **iPad**, and native bottom `TabView` on **iPhone**.
-- **Native Hardware & On-Device AI:** Built-in **Apple Intelligence On-Device Foundation Model** (`FoundationModels.framework` on macOS 26 / iPadOS 26 / iOS 26 — zero API key, 100% private & offline), `AVSpeechSynthesizer` native voices (`0.75x` slow & `1.0x`), Apple `Speech` (`SFSpeechRecognizer`) live voice dictation for Speaking Exams & AI Roleplays, iOS haptics, and `NSAllowsLocalNetworking` so your **iPhone/iPad** can also connect to **Local Ollama / LM Studio** on your MacBook over Wi-Fi!
-- **MacBook Extras & Auto-Updater:** Universal Apple Silicon + Intel `.app` / `.dmg` / `.zip`, macOS Menu Bar quick-drill popover, keyboard shortcuts (`⌘1`–`⌘6`), and automatic **GitHub Releases auto-updater** (checks on launch & every 6 hours, verifies `SHA256SUMS.txt`, closes the current app cleanly, swaps the bundle atomically with rollback protection, and relaunches).
+### 🍎 Native Apple Apps (MacBook · iPad · iPhone)
+Requires **macOS 14+**, **Xcode** (auto-selected via [`scripts/select-xcode.sh`](./scripts/select-xcode.sh)), and **Node.js**. No paid Apple Developer account is required for local builds (ad-hoc signed).
 
 ```bash
-npm run apple:xcode       # Sync curriculum, generate icons + Xcode project, run Swift XCTests, build iOS/iPadOS & macOS
-npm run apple:open        # Open apple/LinguaVerve.xcodeproj to run on iPhone, iPad, or MacBook
-npm run macos:app         # Build & sign Universal (arm64 + x86_64) dist-macos/LinguaVerve.app (+ .dmg / .zip / SHA256SUMS.txt)
-npm run macos:launch:fast # Fast host-arch rebuild & smooth launch of dist-macos/LinguaVerve.app
+# macOS App (fastest local iteration)
+npm run macos:launch:fast # Host-arch release rebuild + clean launch of dist-macos/LinguaVerve.app
 npm run macos:open        # Launch already-built dist-macos/LinguaVerve.app without rebuilding
-npm run macos:test        # Run native Swift XCTest suite
+npm run macos:launch      # Full Universal (arm64 + x86_64) .app/.dmg/.zip/SHA256SUMS.txt & launch
+npm run macos:app         # Package Universal macOS release artifacts in dist-macos/
+npm run macos:test        # Sync curriculum.json & run native Swift XCTests (43 tests)
+npm run macos:sync        # Export src/data/ -> curriculum.json
+
+# Universal Xcode Project (macOS · iPadOS · iOS)
+npm run apple:xcode       # Sync curriculum, generate icons + LinguaVerve.xcodeproj, test & build iOS/macOS
+npm run apple:open        # Open apple/LinguaVerve.xcodeproj in Xcode
 ```
+
+#### Optional: Local Neural Voices on Apple Silicon (`mlx-audio`)
+```bash
+pip install mlx-audio[tts] && mlx_audio.server --port 8000
+```
+Then open **Voice & Accent Studio → Local Neural TTS → MLX-Audio (Apple Silicon) → Test Local Server**.
 
 ---
 
-## 🚢 GitHub Actions CI, Releases & GitHub Pages Deployment
+## 🚢 GitHub Actions CI, Releases & Auto-Updater
 
-- **Web App (GitHub Pages):** Configured with `base: './'` in [`vite.config.ts`](file:///vite.config.ts) and automated CI/CD in [`.github/workflows/deploy.yml`](file:///.github/workflows/deploy.yml).
-- **CI Native Artifacts ([`.github/workflows/ci.yml`](file:///.github/workflows/ci.yml)):** Every push/PR runs Web Vitest + Swift XCTests, builds Universal macOS (`.dmg` + `.zip`) and unsigned iOS/iPadOS (`.ipa`) packages, verifies `SHA256SUMS.txt`, and uploads downloadable workflow artifacts.
-- **GitHub Releases ([`.github/workflows/release.yml`](file:///.github/workflows/release.yml)):** Push any version tag (`git tag v1.1.0 && git push origin v1.1.0`) or trigger **Actions → Release Native Apple Apps** manually to publish Universal macOS `.dmg`/`.zip`, unsigned iOS/iPadOS `.ipa`, and `SHA256SUMS.txt` directly to GitHub Releases — which existing LinguaVerve macOS installs automatically detect and self-update from!
+- **Web Deployment ([`deploy.yml`](./.github/workflows/deploy.yml)):** Configured with `base: './'` in [`vite.config.ts`](./vite.config.ts). Pushes to `main` run the `betterleaks` secret scan, `npm run test`, and `npm run build`, then publish `./dist` to GitHub Pages.
+- **CI Native Apple & Web ([`ci.yml`](./.github/workflows/ci.yml)):** Every push/PR runs on `macos-26` to execute Web Vitest + Swift XCTests, build Universal macOS (`.dmg` + `.zip`) and unsigned iOS/iPadOS (`.ipa`) artifacts, verify `FoundationModels.framework` linkage and `SHA256SUMS.txt`, and upload downloadable build artifacts.
+- **GitHub Releases & In-App Auto-Updater ([`release.yml`](./.github/workflows/release.yml)):** Tag a release (e.g., `git tag v1.7.0 && git push origin v1.7.0`) or run **Actions → Release Native Apple Apps** to publish Universal macOS `.dmg`/`.zip`, unsigned iOS/iPadOS `.ipa`, and `SHA256SUMS.txt`. Existing macOS installs check GitHub Releases automatically on launch (and every 6 hours), verify `SHA256SUMS.txt`, swap `LinguaVerve.app` atomically with rollback protection, and relaunch.
+  - *First-launch Gatekeeper note for downloaded `.dmg`/`.zip` builds (ad-hoc signed):* use the bundled `Install LinguaVerve (No Apple Dev Account).command` inside the `.dmg`, or run `xattr -cr /Applications/LinguaVerve.app`.
