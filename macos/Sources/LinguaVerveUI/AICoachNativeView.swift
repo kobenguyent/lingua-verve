@@ -22,6 +22,7 @@ public struct AICoachNativeView: View {
     public var body: some View {
         let lang = store.courseLanguageId == "german" ? "german" : "english"
         let langName = lang == "german" ? "German" : "English"
+        let effectiveConfig = store.aiConfig.resolved(for: lang)
 
         VStack(spacing: 0) {
             // Controls Header
@@ -39,11 +40,11 @@ public struct AICoachNativeView: View {
                         showAISettingsSheet = true
                     } label: {
                         Label(
-                            store.aiConfig.isReady ? store.aiConfig.model : "Setup AI",
+                            effectiveConfig.isReady ? effectiveConfig.model : "Setup AI",
                             systemImage: "cpu"
                         )
                     }
-                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: store.aiConfig.isReady, accent: BrandTheme.emeraldMint))
+                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: effectiveConfig.isReady, accent: BrandTheme.emeraldMint))
                 }
 
                 ViewThatFits(in: .horizontal) {
@@ -99,6 +100,7 @@ public struct AICoachNativeView: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: store.aiCoachSkill) { _, _ in
+                    NativeAudioEngine.shared.stopSpeech()
                     messages = []
                     offlineEval = nil
                     errorMessage = nil
@@ -131,8 +133,8 @@ public struct AICoachNativeView: View {
                             Image(systemName: "sparkles")
                                 .scaledFont(.largeTitle)
                                 .foregroundStyle(BrandTheme.celestialSky)
-                            Text(store.aiConfig.isReady
-                                 ? "Connected to \(store.aiConfig.provider.label) (\(store.aiConfig.model))"
+                            Text(effectiveConfig.isReady
+                                 ? "Connected to \(effectiveConfig.provider.label) (\(effectiveConfig.model))"
                                  : "Connect Local (Ollama/LM Studio) or Cloud AI, or paste Writing/Speaking below for offline CEFR rubric grading.")
                                 .scaledFont(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -143,21 +145,98 @@ public struct AICoachNativeView: View {
                     }
 
                     ForEach(messages) { msg in
+                        let parsed = msg.role == "assistant"
+                            ? AIClientService.parseCoachReply(msg.content, skill: store.aiCoachSkill)
+                            : nil
                         HStack {
                             if msg.role == "user" { Spacer(minLength: 40) }
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(msg.content)
-                                    .scaledFont(.subheadline)
-                                    .textSelection(.enabled)
-                                if msg.role == "assistant" {
-                                    Button {
-                                        NativeAudioEngine.shared.speak(String(msg.content.prefix(450)), languageId: lang)
-                                    } label: {
-                                        Label("Listen", systemImage: "speaker.wave.2.fill")
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let parsed {
+                                    if let speaker = parsed.speakerLabel, !speaker.isEmpty {
+                                        Text("\(speaker) · \(langName)")
                                             .scaledFont(.caption2, weight: .semibold)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
+                                    if !parsed.displayBody.isEmpty {
+                                        Text(parsed.displayBody)
+                                            .scaledFont(.subheadline)
+                                            .textSelection(.enabled)
+                                    }
+                                    if !parsed.spokenText.isEmpty {
+                                        HStack(spacing: 6) {
+                                            Button {
+                                                NativeAudioEngine.shared.speak(
+                                                    String(parsed.spokenText.prefix(1200)),
+                                                    languageId: lang
+                                                )
+                                            } label: {
+                                                Label(
+                                                    parsed.audioScript != nil ? "Listen Script (\(langName))" : "Listen (\(langName))",
+                                                    systemImage: "speaker.wave.2.fill"
+                                                )
+                                                .scaledFont(.caption2, weight: .semibold)
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.mini)
+
+                                            Button {
+                                                NativeAudioEngine.shared.speak(
+                                                    String(parsed.spokenText.prefix(1200)),
+                                                    languageId: lang,
+                                                    slow: true
+                                                )
+                                            } label: {
+                                                Label("0.8x", systemImage: "tortoise.fill")
+                                                    .scaledFont(.caption2, weight: .semibold)
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.mini)
+
+                                            Button {
+                                                NativeAudioEngine.shared.stopSpeech()
+                                            } label: {
+                                                Image(systemName: "stop.fill")
+                                                    .scaledFont(.caption2)
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.mini)
+                                            .help("Stop Audio")
+                                        }
+                                    }
+                                    if let note = parsed.coachNote, !note.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 5) {
+                                                Image(systemName: "lightbulb.fill")
+                                                    .scaledFont(.caption2)
+                                                    .foregroundStyle(.orange)
+                                                Text("Coach Note")
+                                                    .scaledFont(.caption2, weight: .bold)
+                                                    .foregroundStyle(.orange)
+                                                Spacer()
+                                                Text("Written tip · skipped in audio")
+                                                    .scaledFont(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Text(note)
+                                                .scaledFont(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .textSelection(.enabled)
+                                        }
+                                        .padding(9)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(Color.orange.opacity(0.09))
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .strokeBorder(Color.orange.opacity(0.24), lineWidth: 1)
+                                        )
+                                    }
+                                } else {
+                                    Text(msg.content)
+                                        .scaledFont(.subheadline)
+                                        .textSelection(.enabled)
                                 }
                             }
                             .padding(12)
@@ -249,6 +328,7 @@ public struct AICoachNativeView: View {
         }
         .onDisappear {
             speechRecognizer.stop()
+            NativeAudioEngine.shared.stopSpeech()
         }
     }
 
@@ -332,8 +412,10 @@ public struct AICoachNativeView: View {
             )
 
             if autoSpeak && (store.aiCoachSkill == .listening || store.aiCoachSkill == .speaking) {
-                let speakable = reply.components(separatedBy: "[COACH NOTE]").first ?? reply
-                NativeAudioEngine.shared.speak(String(speakable.prefix(420)), languageId: lang)
+                let parsed = AIClientService.parseCoachReply(reply, skill: store.aiCoachSkill)
+                if !parsed.spokenText.isEmpty {
+                    NativeAudioEngine.shared.speak(String(parsed.spokenText.prefix(1200)), languageId: lang)
+                }
             }
         } catch {
             errorMessage = error.localizedDescription

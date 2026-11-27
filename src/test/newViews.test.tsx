@@ -9,7 +9,7 @@ import { VoiceSettingsModal } from '../components/VoiceSettingsModal';
 import { ProgressDashboardView } from '../components/ProgressDashboardView';
 import { getDefaultAIConfig } from '../utils/aiClient';
 import { repairClozePassage } from '../utils/aiExamGenerator';
-import { getDefaultVoiceSettings } from '../utils/audio';
+import { getDefaultVoiceSettings, soundEngine } from '../utils/audio';
 import { createEmptyLearnerState } from '../utils/progressStore';
 
 describe('IntensiveCoursesView Component', () => {
@@ -1027,5 +1027,63 @@ describe('VoiceSettingsModal Component', () => {
     expect(saved.accents.german).toBe('de-AT');
     expect(saved.provider).toBe('openai');
     expect(saved.neuralVoice).toBe('sage');
+  });
+});
+
+describe('AICoachView Speaking Audio & Coach Note Separation', () => {
+  it('speaks pure target-language German only and renders English [COACH NOTE] in a separate card', async () => {
+    const mixedReply =
+      '**Examiner:** Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden? [COACH NOTE: Replace "Lieblingsmutter" with "Lieblingsmodell" for correct German.]';
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: mixedReply } }],
+      }),
+    } as unknown as Response);
+    const speakSpy = vi.spyOn(soundEngine, 'speak').mockImplementation(() => {});
+
+    try {
+      const cfg = { ...getDefaultAIConfig('ollama'), enabled: true, model: 'gemma4:latest' };
+      render(
+        <AICoachView
+          activeLanguageId="german"
+          onSelectLanguage={vi.fn()}
+          initialLevel="B1"
+          initialSkill="speaking"
+          aiConfig={cfg}
+          onOpenAISettings={vi.fn()}
+          onLogAISession={vi.fn()}
+        />
+      );
+
+      const input = screen.getByPlaceholderText(/Speak with the mic or type your B1 German response/i);
+      fireEvent.change(input, { target: { value: 'Mein Lieblingsmutter ist der CMC Mercedes-Benz SLA 2003.' } });
+      fireEvent.click(screen.getByRole('button', { name: /Send/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Ah, der CMC Mercedes-Benz SLA 2003!/i)).toBeInTheDocument();
+        expect(screen.getByText('Coach Note')).toBeInTheDocument();
+        expect(screen.getByText(/Replace "Lieblingsmutter" with "Lieblingsmodell"/i)).toBeInTheDocument();
+      });
+
+      const expectedPureGerman =
+        'Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden?';
+      // Auto-speak only spoke pure German (no Examiner:, no English Coach Note)
+      expect(speakSpy).toHaveBeenCalledWith(expectedPureGerman, 'german', false);
+
+      // Manual Listen button also speaks ONLY pure German
+      speakSpy.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: /Listen \(German\)/i }));
+      expect(speakSpy).toHaveBeenCalledWith(expectedPureGerman, 'german', false);
+
+      // Slow 0.8x button passes slow=true with ONLY pure German
+      speakSpy.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: /0\.8x Slow/i }));
+      expect(speakSpy).toHaveBeenCalledWith(expectedPureGerman, 'german', true);
+    } finally {
+      fetchSpy.mockRestore();
+      speakSpy.mockRestore();
+    }
   });
 });

@@ -477,6 +477,28 @@ public struct AIClientService: Sendable {
         }
     }
 
+    public struct ParsedCoachReply: Equatable, Sendable {
+        public let spokenText: String
+        public let displayBody: String
+        public let coachNote: String?
+        public let audioScript: String?
+        public let speakerLabel: String?
+
+        public init(
+            spokenText: String,
+            displayBody: String,
+            coachNote: String? = nil,
+            audioScript: String? = nil,
+            speakerLabel: String? = nil
+        ) {
+            self.spokenText = spokenText
+            self.displayBody = displayBody
+            self.coachNote = coachNote
+            self.audioScript = audioScript
+            self.speakerLabel = speakerLabel
+        }
+    }
+
     public static func buildCoachSystemPrompt(languageId: String, level: CEFRLevel, skill: SkillType) -> String {
         let langName = languageId == "german" ? "German" : "English"
         let examBoard = languageId == "german" ? "Goethe-Zertifikat, telc, and TestDaF" : "Cambridge English, IELTS, and TOEFL iBT"
@@ -485,12 +507,259 @@ public struct AIClientService: Sendable {
         case .reading:
             return "Act as a \(langName) \(level.rawValue) Reading Coach aligned with \(examBoard). Generate authentic \(level.rawValue) passages, explain tricky grammar, and ask 2–3 exam-style comprehension questions."
         case .listening:
-            return "Act as a \(langName) \(level.rawValue) Listening & Hearing Coach aligned with \(examBoard). Start every drill with an [AUDIO SCRIPT] block in natural spoken \(langName) (4–6 sentences for TTS playback), followed by [HEARING FOCUS] and 2 comprehension questions."
+            return """
+            Act as a \(langName) \(level.rawValue) Listening & Hearing Coach aligned with \(examBoard).
+            Start EVERY drill with an [AUDIO SCRIPT] block containing ONLY natural spoken \(langName) (4–7 sentences; for dialogues, write each turn on its own line as Name: sentence with NO markdown asterisks, NO stage directions, and NO English words mixed in so native multi-speaker TTS plays cleanly).
+            Then, on a new line, add [HEARING FOCUS] (key sounds/traps) and [QUESTIONS] (2 comprehension questions). Wait for the learner's answer before revealing the key.
+            """
         case .writing:
             return "Act as a certified \(examBoard) Writing Examiner for \(langName) \(level.rawValue). Provide exam tasks or grade drafts across Task Achievement, Coherence, Lexis, and Grammar with a 0–100 score, exact fixes, and a higher-band rewrite."
         case .speaking:
-            return "Act as a warm native \(langName) Speaking Examiner & Roleplay Partner at \(level.rawValue). Reply naturally in \(langName) (2–4 sentences suitable for native TTS audio), ask one follow-up question, and include a brief [COACH NOTE] with 1–2 fluency upgrades."
+            let noEnglishClause = languageId == "german"
+                ? " and NEVER mix English words, explanations, or translations into your spoken German reply."
+                : "."
+            return """
+            Act as a warm native \(langName) Speaking Examiner & Roleplay Partner at CEFR \(level.rawValue) aligned with \(examBoard).
+            CRITICAL AUDIO FORMAT RULES:
+            1. Write ONLY your spoken reply first in 100% pure, natural spoken \(langName) (2–4 sentences suitable for native TTS audio), ending with one engaging follow-up question in \(langName).
+            2. NEVER include role prefixes (never write "Examiner:", "**Examiner:**", "Prüfer:", or "Coach:"), NEVER use markdown formatting (**bold**, *italics*), NEVER add stage directions like *(smiles)*\(noEnglishClause)
+            3. After a blank line at the very end, put coaching feedback on a NEW LINE starting strictly with [COACH NOTE] (never inline inside a sentence) with 1–2 brief, actionable grammar, vocabulary, or phrasing fixes.
+            """
         }
+    }
+
+    /// Splits an AI Coach response into pure target-language TTS audio text, clean visual body,
+    /// optional extracted `[AUDIO SCRIPT]` (Listening), and separated `[COACH NOTE]` feedback so
+    /// text-to-speech never reads role labels (`**Examiner:**`), markdown, or English coaching notes
+    /// inside a non-English voice.
+    public static func parseCoachReply(_ raw: String, skill: SkillType) -> ParsedCoachReply {
+        let normalized = raw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalized.isEmpty else {
+            return ParsedCoachReply(spokenText: "", displayBody: "")
+        }
+
+        var working = normalized
+        var noteParts: [String] = []
+
+        let isAudioSkill = (skill == .speaking || skill == .listening)
+        let bracketNoteLabels = isAudioSkill
+            ? #"COACH(?:'S)?\s*NOTE|COACHING\s*NOTE|EXAMINER\s*NOTE|FEEDBACK|CORRECTIONS?|LANGUAGE\s*NOTE|GRAMMAR\s*NOTE|FLUENCY\s*(?:TIP|NOTE|UPGRADES?)|TIP|HINWEIS"#
+            : #"COACH(?:'S)?\s*NOTE|COACHING\s*NOTE|EXAMINER\s*NOTE"#
+        let headingNoteLabels = isAudioSkill
+            ? #"COACH(?:'S)?\s*NOTE|COACHING\s*NOTE|EXAMINER\s*NOTE|LANGUAGE\s*NOTE|GRAMMAR\s*NOTE|FLUENCY\s*(?:TIP|NOTE|UPGRADES?)|FEEDBACK|CORRECTIONS?"#
+            : #"COACH(?:'S)?\s*NOTE|COACHING\s*NOTE|EXAMINER\s*NOTE"#
+
+        // 1a. Inline self-contained bracket notes: [COACH NOTE: Replace "x" with "y".]
+        let inlineBracketPattern = #"\*{0,2}\[\s*(?:\#(bracketNoteLabels))\s*:\s*([^\]]+)\]\*{0,2}"#
+        let inlineExtracted = extractAndRemoveMatches(in: working, pattern: inlineBracketPattern, captureGroup: 1, replacement: " ")
+        working = inlineExtracted.remaining
+        for note in inlineExtracted.captured {
+            let cleaned = cleanCoachNoteText(note)
+            if !cleaned.isEmpty { noteParts.append(cleaned) }
+        }
+
+        // 1b. Section-header bracket notes: [COACH NOTE]\n... or unclosed [COACH NOTE: ...
+        let sectionBracketPattern = #"(?:^|\n|[ \t]+)(?:[-*_]{3,}[ \t]*\n[ \t]*)?\*{0,2}\[\s*(?:\#(bracketNoteLabels))\s*(?::[ \t]*|\])\*{0,2}[ \t]*:?[ \t]*([\s\S]*?)(?=\n[ \t]*\*{0,2}\[\s*(?:AUDIO\s*SCRIPT|HEARING\s*FOCUS|QUESTIONS?|COMPREHENSION|ANSWER\s*KEY)\b|\z)"#
+        let sectionExtracted = extractAndRemoveMatches(in: working, pattern: sectionBracketPattern, captureGroup: 1, replacement: "")
+        working = sectionExtracted.remaining
+        for note in sectionExtracted.captured {
+            let cleaned = cleanCoachNoteText(note)
+            if !cleaned.isEmpty { noteParts.append(cleaned) }
+        }
+
+        // 1c. Plain or markdown heading notes on their own line: **Coach Note:** ..., ### Feedback:
+        let headingNotePattern = #"(?:^|\n)[ \t]*(?:[-*_]{3,}[ \t]*\n[ \t]*)?(?:#{1,4}[ \t]*)?(?:[💡📝✅✏️📌][ \t]*)?\*{0,2}(?:\#(headingNoteLabels))(?::\*{0,2}|\*{0,2}:)[ \t]*([\s\S]*?)(?=\n[ \t]*\*{0,2}\[\s*(?:AUDIO\s*SCRIPT|HEARING\s*FOCUS|QUESTIONS?|COMPREHENSION|ANSWER\s*KEY)\b|\z)"#
+        let headingExtracted = extractAndRemoveMatches(in: working, pattern: headingNotePattern, captureGroup: 1, replacement: "")
+        working = headingExtracted.remaining
+        for note in headingExtracted.captured {
+            let cleaned = cleanCoachNoteText(note)
+            if !cleaned.isEmpty { noteParts.append(cleaned) }
+        }
+
+        // 1d. Trailing English translation block in Speaking mode (keep visible in note, exclude from TTS)
+        if skill == .speaking {
+            let translationPattern = #"(?:^|\n)[ \t]*(?:[-*_]{3,}[ \t]*\n[ \t]*)?\*{0,2}[\(\[]?(?:English\s+)?Translation(?::\*{0,2}|\*{0,2}:|\]:?)[ \t]*([\s\S]*)\z"#
+            let transExtracted = extractAndRemoveMatches(in: working, pattern: translationPattern, captureGroup: 1, replacement: "")
+            working = transExtracted.remaining
+            for tr in transExtracted.captured {
+                let cleaned = cleanCoachNoteText(tr.trimmingCharacters(in: CharacterSet(charactersIn: ")*] \t\n")))
+                if !cleaned.isEmpty {
+                    noteParts.append("Translation: \(cleaned)")
+                }
+            }
+        }
+
+        // Strip trailing horizontal dividers left behind after removing notes
+        working = regexReplace(working, pattern: #"(?:\n[ \t]*[-*_]{3,}[ \t]*)+\z"#, with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 2. Listening [AUDIO SCRIPT] extraction (preserves multi-speaker "Name: ..." turns for TTS)
+        var audioScript: String? = nil
+        if skill == .listening {
+            let inlineScriptPattern = #"\*{0,2}\[\s*AUDIO\s*SCRIPT\s*:\s*([^\]]+)\]\*{0,2}"#
+            let blockScriptPattern = #"(?:^|\n)[ \t]*\*{0,2}\[\s*AUDIO\s*SCRIPT\s*\]\*{0,2}[ \t]*:?[ \t]*\n?([\s\S]*?)(?=\n[ \t]*(?:\*{0,2}\[\s*(?:HEARING\s*FOCUS|QUESTIONS?|COMPREHENSION|COACH\s*NOTE|VOCABULARY|ANSWER\s*KEY|TIP)\b|(?:#{1,4}[ \t]*)?\*{0,2}(?:HEARING\s*FOCUS|COMPREHENSION\s*QUESTIONS?|QUESTIONS?|VOCABULARY|ANSWER\s*KEY)(?::\*{0,2}|\*{0,2}:))|\z)"#
+            let headingScriptPattern = #"(?:^|\n)[ \t]*(?:#{1,4}[ \t]*)?\*{0,2}AUDIO\s*SCRIPT(?::\*{0,2}|\*{0,2}:)[ \t]*\n?([\s\S]*?)(?=\n[ \t]*(?:\*{0,2}\[|(?:#{1,4}[ \t]*)?\*{0,2}(?:HEARING\s*FOCUS|COMPREHENSION\s*QUESTIONS?|QUESTIONS?|VOCABULARY|ANSWER\s*KEY)(?::\*{0,2}|\*{0,2}:))|\z)"#
+
+            if let rawScript = firstCapturedGroup(in: working, pattern: inlineScriptPattern)
+                ?? firstCapturedGroup(in: working, pattern: blockScriptPattern)
+                ?? firstCapturedGroup(in: working, pattern: headingScriptPattern) {
+                let sanitized = sanitizeForSpeech(rawScript, preserveSpeakerTurns: true)
+                if !sanitized.isEmpty {
+                    audioScript = sanitized
+                }
+            }
+        }
+
+        // 3. Strip leading speaker/role labels (**Examiner:**, Prüfer:, Coach:, [EXAMINER])
+        var speakerLabel: String? = nil
+        working = regexReplace(
+            working,
+            pattern: #"^\s*\*{0,2}\[\s*(?:EXAMINER|SPEAKING|RESPONSE|DIALOGUE|REPLY)\s*\]\*{0,2}\s*:?\s*"#,
+            with: ""
+        )
+
+        if skill == .speaking {
+            let rolePrefixPattern = #"^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*"#
+            if let capturedRole = firstCapturedGroup(in: working, pattern: rolePrefixPattern) {
+                speakerLabel = capturedRole.trimmingCharacters(in: .whitespacesAndNewlines)
+                working = regexReplace(working, pattern: rolePrefixPattern, with: "")
+            }
+            // Strip repeated role labels on subsequent lines within a single-speaker roleplay turn
+            let repeatedRolePattern = #"\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*"#
+            working = regexReplace(working, pattern: repeatedRolePattern, with: "\n")
+        }
+
+        let displayBody: String
+        if skill == .speaking {
+            displayBody = sanitizeForSpeech(working, preserveSpeakerTurns: false)
+        } else {
+            displayBody = regexReplace(working, pattern: #"[ \t]+([.,!?;:])"#, with: "$1")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let spokenText: String
+        if let script = audioScript, !script.isEmpty {
+            spokenText = script
+        } else {
+            spokenText = sanitizeForSpeech(working, preserveSpeakerTurns: skill == .listening)
+        }
+
+        let combinedNote = noteParts.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return ParsedCoachReply(
+            spokenText: spokenText,
+            displayBody: displayBody,
+            coachNote: combinedNote.isEmpty ? nil : combinedNote,
+            audioScript: audioScript,
+            speakerLabel: speakerLabel
+        )
+    }
+
+    private static func sanitizeForSpeech(_ text: String, preserveSpeakerTurns: Bool) -> String {
+        var s = text
+        // 1. Asterisk-wrapped stage directions: *(smiles warmly)*, **(laughs)**
+        s = regexReplace(s, pattern: #"\*{1,2}\([^)\n]{1,80}\)\*{1,2}"#, with: " ")
+        // 2. Action stage directions in parentheses or brackets: (lacht), [laughs], (smiles)
+        s = regexReplace(
+            s,
+            pattern: #"[\(\[]\s*(?:smiles?|smiling|laughs?|laughing|chuckles?|nods?|nodding|pauses?|sighs?|clears\s+throat|warmly|enthusiastically|cheerfully|encouragingly|softly|lächelt|lacht|nickt|pause|pausiert|seufzt|freundlich)[^)\]\n]{0,45}[\)\]]"#,
+            with: " "
+        )
+        // 3. Remaining bracketed section tags like [AUDIO SCRIPT], [HEARING FOCUS], [QUESTIONS]
+        s = regexReplace(s, pattern: #"\[\s*[A-ZÄÖÜ0-9 _/-]{2,32}\s*\]"#, with: " ")
+        // 4. Markdown headings & horizontal rules
+        s = regexReplace(s, pattern: #"(?m)^[ \t]*#{1,6}[ \t]+"#, with: "")
+        s = regexReplace(s, pattern: #"(?m)^[ \t]*[-*_]{3,}[ \t]*$"#, with: "")
+        // 5. Markdown emphasis & inline code
+        s = regexReplace(s, pattern: #"\*\*([^\n*]+?)\*\*"#, with: "$1")
+        s = regexReplace(s, pattern: #"__([^\n_]+?)__"#, with: "$1")
+        s = regexReplace(s, pattern: #"\*([^\n*]+?)\*"#, with: "$1")
+        s = regexReplace(s, pattern: #"`([^`\n]+?)`"#, with: "$1")
+        s = regexReplace(s, pattern: #"\*{1,}"#, with: "")
+        // 6. Bullet markers
+        s = regexReplace(s, pattern: #"(?m)^[ \t]*[-•][ \t]+"#, with: "")
+
+        if preserveSpeakerTurns {
+            let lines = s
+                .components(separatedBy: "\n")
+                .map { line -> String in
+                    var l = regexReplace(line, pattern: #"[ \t]{2,}"#, with: " ")
+                    l = regexReplace(l, pattern: #"[ \t]+([.,!?;:])"#, with: "$1")
+                    return l.trimmingCharacters(in: .whitespaces)
+                }
+                .filter { !$0.isEmpty }
+            return lines.joined(separator: "\n")
+        } else {
+            s = regexReplace(s, pattern: #"[\t\n ]+"#, with: " ")
+            s = regexReplace(s, pattern: #"[ \t]+([.,!?;:])"#, with: "$1")
+            return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private static func cleanCoachNoteText(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        while s.hasSuffix("]") && !s.contains("[") {
+            s.removeLast()
+            s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        s = regexReplace(s, pattern: #"\*\*([^\n*]+?)\*\*"#, with: "$1")
+        s = regexReplace(s, pattern: #"__([^\n_]+?)__"#, with: "$1")
+        s = regexReplace(s, pattern: #"\n{3,}"#, with: "\n\n")
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func extractAndRemoveMatches(
+        in text: String,
+        pattern: String,
+        captureGroup: Int,
+        replacement: String
+    ) -> (remaining: String, captured: [String]) {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return (text, [])
+        }
+        let nsText = text as NSString
+        let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsText.length))
+        guard !matches.isEmpty else { return (text, []) }
+
+        var captured: [String] = []
+        for match in matches {
+            let range = match.range(at: captureGroup)
+            if range.location != NSNotFound {
+                captured.append(nsText.substring(with: range))
+            }
+        }
+
+        let mutable = NSMutableString(string: text)
+        for match in matches.reversed() {
+            mutable.replaceCharacters(in: match.range, with: replacement)
+        }
+        return (String(mutable), captured)
+    }
+
+    private static func firstCapturedGroup(in text: String, pattern: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+        let nsText = text as NSString
+        guard let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: nsText.length)),
+              match.numberOfRanges > 1 else {
+            return nil
+        }
+        let range = match.range(at: 1)
+        guard range.location != NSNotFound else { return nil }
+        return nsText.substring(with: range)
+    }
+
+    private static func regexReplace(_ text: String, pattern: String, with template: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return text
+        }
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: template)
     }
 
     /// Deterministic offline CEFR rubric evaluator when no local/cloud AI model is active.

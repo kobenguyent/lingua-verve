@@ -1104,4 +1104,86 @@ final class AcademyAndAITests: XCTestCase {
         let decoded = try JSONDecoder().decode(AIProviderConfig.self, from: encoded)
         XCTAssertEqual(decoded.resolved(for: "german").model, "mistral-small3.1")
     }
+
+    func testCoachReplyParserSeparatesPureSpokenAudioFromCoachNotesAndRolePrefixes() {
+        // 1. Exact real-world mixed German/English Speaking Coach reply
+        let mixedSample = #"**Examiner:** Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden, als du angefangen hast zu sammeln? [COACH NOTE: Replace "Lieblingsmutter" with "Lieblingsmodell" for correct German. Consider replacing "Modemodell" with "Modell" for correct German.]"#
+
+        let parsedMixed = AIClientService.parseCoachReply(mixedSample, skill: .speaking)
+        XCTAssertEqual(parsedMixed.speakerLabel, "Examiner")
+        XCTAssertEqual(
+            parsedMixed.spokenText,
+            "Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden, als du angefangen hast zu sammeln?"
+        )
+        XCTAssertFalse(parsedMixed.spokenText.contains("Examiner"))
+        XCTAssertFalse(parsedMixed.spokenText.contains("COACH NOTE"))
+        XCTAssertFalse(parsedMixed.spokenText.contains("Replace"))
+        XCTAssertFalse(parsedMixed.spokenText.contains("*"))
+        XCTAssertEqual(parsedMixed.displayBody, parsedMixed.spokenText)
+        XCTAssertEqual(
+            parsedMixed.coachNote,
+            #"Replace "Lieblingsmutter" with "Lieblingsmodell" for correct German. Consider replacing "Modemodell" with "Modell" for correct German."#
+        )
+
+        // 2. Multiline [COACH NOTE] with stage direction & markdown bold
+        let multilineSample = """
+        **Prüferin:** *(lächelt freundlich)* Das klingt wirklich **spannend**! Seit wann sammelst du Oldtimer?
+
+        ---
+        [COACH NOTE]
+        - Use **"seit drei Jahren"** instead of "für drei Jahre".
+        """
+        let parsedMulti = AIClientService.parseCoachReply(multilineSample, skill: .speaking)
+        XCTAssertEqual(parsedMulti.speakerLabel, "Prüferin")
+        XCTAssertEqual(parsedMulti.spokenText, "Das klingt wirklich spannend! Seit wann sammelst du Oldtimer?")
+        XCTAssertTrue(parsedMulti.coachNote?.contains("seit drei Jahren") == true)
+        XCTAssertFalse(parsedMulti.coachNote?.contains("**") == true)
+
+        // 3. Heading-style **Coach Note:** plus English Translation block
+        let headingSample = """
+        Examiner: Hallo! Welche Musik hörst du gern?
+
+        Translation: Hello! What music do you like listening to?
+
+        **Coach Note:** Put the verb at the end after "weil".
+        """
+        let parsedHeading = AIClientService.parseCoachReply(headingSample, skill: .speaking)
+        XCTAssertEqual(parsedHeading.spokenText, "Hallo! Welche Musik hörst du gern?")
+        XCTAssertTrue(parsedHeading.coachNote?.contains("Put the verb at the end") == true)
+        XCTAssertTrue(parsedHeading.coachNote?.contains("Translation: Hello! What music do you like listening to?") == true)
+
+        // 4. Listening [AUDIO SCRIPT] keeps clean multi-speaker lines & excludes English focus/questions from TTS
+        let listeningSample = """
+        [AUDIO SCRIPT]
+        **Clara:** Hey Lukas, treffen wir uns um halb acht am Bahnhof?
+        **Lukas:** Halb acht wird knapp, mein Bus kommt erst um zwanzig vor acht an.
+
+        [HEARING FOCUS]
+        Notice "halb acht" (7:30) vs. "zwanzig vor acht" (7:40).
+
+        [QUESTIONS]
+        1. Wann schlägt Clara das Treffen vor?
+        """
+        let parsedListening = AIClientService.parseCoachReply(listeningSample, skill: .listening)
+        XCTAssertEqual(
+            parsedListening.audioScript,
+            "Clara: Hey Lukas, treffen wir uns um halb acht am Bahnhof?\nLukas: Halb acht wird knapp, mein Bus kommt erst um zwanzig vor acht an."
+        )
+        XCTAssertEqual(parsedListening.spokenText, parsedListening.audioScript)
+        XCTAssertFalse(parsedListening.spokenText.contains("HEARING FOCUS"))
+        XCTAssertFalse(parsedListening.spokenText.contains("Notice"))
+        XCTAssertTrue(parsedListening.displayBody.contains("[QUESTIONS]"))
+
+        // 5. Writing rubric headings like **Corrections:** remain untouched in writing mode
+        let writingSample = "**Score: 84/100**\n**Corrections:** Use \"weil\" with verb-final word order."
+        let parsedWriting = AIClientService.parseCoachReply(writingSample, skill: .writing)
+        XCTAssertTrue(parsedWriting.displayBody.contains("Corrections:"))
+        XCTAssertNil(parsedWriting.coachNote)
+
+        // 6. Speaking system prompt enforces pure spoken target language & separated [COACH NOTE]
+        let speakingPrompt = AIClientService.buildCoachSystemPrompt(languageId: "german", level: .B1, skill: .speaking)
+        XCTAssertTrue(speakingPrompt.contains("100% pure, natural spoken German"))
+        XCTAssertTrue(speakingPrompt.contains("NEVER include role prefixes"))
+        XCTAssertTrue(speakingPrompt.contains("[COACH NOTE]"))
+    }
 }

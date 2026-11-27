@@ -9,6 +9,8 @@ import {
   MicOff,
   Send,
   Volume2,
+  Square,
+  Lightbulb,
   Sparkles,
   Trash2,
   AlertCircle,
@@ -28,6 +30,7 @@ import {
   callAIProvider,
   evaluateWithAIOrFallback,
   isAIConfigReady,
+  parseCoachReply,
 } from '../utils/aiClient';
 import { resolveAIConfigForLanguage } from '../utils/aiModelAdvisor';
 import { soundEngine } from '../utils/audio';
@@ -130,8 +133,9 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
     };
   }, []);
 
-  const aiReady = isAIConfigReady(aiConfig);
-  const preset = AI_PROVIDER_PRESETS[aiConfig.provider];
+  const effectiveAIConfig = resolveAIConfigForLanguage(aiConfig, coachLang);
+  const aiReady = isAIConfigReady(effectiveAIConfig);
+  const preset = AI_PROVIDER_PRESETS[effectiveAIConfig.provider];
 
   const handleToggleMic = () => {
     if (isListeningMic) {
@@ -230,9 +234,10 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
       });
 
       if (autoSpeakReplies && (skill === 'listening' || skill === 'speaking')) {
-        const audioMatch = reply.match(/\[AUDIO SCRIPT\]([\s\S]*?)(\[|$)/i);
-        const textToSpeak = audioMatch ? audioMatch[1].trim() : reply.split('[COACH NOTE]')[0].trim();
-        soundEngine.speak(textToSpeak.slice(0, 420), coachLang, false);
+        const parsed = parseCoachReply(reply, skill);
+        if (parsed.spokenText) {
+          soundEngine.speak(parsed.spokenText.slice(0, 1200), coachLang, false);
+        }
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'AI request failed. Check your endpoint or API key.');
@@ -272,7 +277,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
           >
             <Cpu className="w-4 h-4" />
             <span>
-              {aiReady ? `${preset.label} · ${aiConfig.model}` : 'Configure Local / Cloud AI'}
+              {aiReady ? `${preset.label} · ${effectiveAIConfig.model}` : 'Configure Local / Cloud AI'}
             </span>
           </button>
         </div>
@@ -342,6 +347,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                 aria-pressed={active}
                 onClick={() => {
                   soundEngine.playClickSound();
+                  soundEngine.stopSpeech();
                   setSkill(tab.id);
                   setMessages([]);
                   setOfflineEval(null);
@@ -407,40 +413,86 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               </p>
               <p className="text-xs max-w-md mx-auto">
                 {aiReady
-                  ? `Connected to ${preset.label} (${aiConfig.model}). Click a Quick Prompt above or send your own ${langName} text/voice message.`
+                  ? `Connected to ${preset.label} (${effectiveAIConfig.model}). Click a Quick Prompt above or send your own ${langName} text/voice message.`
                   : 'For Writing & Speaking, paste a draft below for instant built-in CEFR rubric scoring — or click "Configure Local / Cloud AI" for full interactive AI coaching.'}
               </p>
             </div>
           )}
 
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          {messages.map((msg, idx) => {
+            const parsed = msg.role === 'assistant' ? parseCoachReply(msg.content, skill) : null;
+            return (
               <div
-                className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap space-y-2 ${
-                  msg.role === 'user'
-                    ? 'bg-slate-900 text-white dark:bg-sky-600'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700'
-                }`}
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div>{msg.content}</div>
-                {msg.role === 'assistant' && (
-                  <div className="pt-1 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => soundEngine.speak(msg.content.slice(0, 450), coachLang, false)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 text-[11px] font-semibold text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700"
-                    >
-                      <Volume2 className="w-3 h-3" />
-                      <span>Listen ({langName})</span>
-                    </button>
-                  </div>
-                )}
+                <div
+                  className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap space-y-2.5 ${
+                    msg.role === 'user'
+                      ? 'bg-slate-900 text-white dark:bg-sky-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {parsed ? (
+                    <>
+                      {parsed.speakerLabel && (
+                        <div className="text-[11px] font-mono font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {parsed.speakerLabel} · {langName}
+                        </div>
+                      )}
+                      {parsed.displayBody && <div>{parsed.displayBody}</div>}
+                      {parsed.spokenText && (
+                        <div className="pt-0.5 flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => soundEngine.speak(parsed.spokenText.slice(0, 1200), coachLang, false)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/90 dark:bg-slate-900 text-[11px] font-semibold text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700 hover:border-sky-400 transition-colors"
+                          >
+                            <Volume2 className="w-3 h-3" />
+                            <span>{parsed.audioScript ? `Listen Script (${langName})` : `Listen (${langName})`}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => soundEngine.speak(parsed.spokenText.slice(0, 1200), coachLang, true)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 text-[11px] font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-sky-400 transition-colors"
+                          >
+                            <span>0.8x Slow</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => soundEngine.stopSpeech()}
+                            title="Stop audio"
+                            aria-label="Stop audio"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900 text-[11px] font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:text-rose-600 transition-colors"
+                          >
+                            <Square className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                      {parsed.coachNote && (
+                        <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 space-y-1">
+                          <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-amber-800 dark:text-amber-300">
+                              <Lightbulb className="w-3.5 h-3.5" />
+                              Coach Note
+                            </span>
+                            <span className="text-[10px] font-mono text-amber-700/80 dark:text-amber-400/80">
+                              Written tip · skipped in audio
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                            {parsed.coachNote}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div>{msg.content}</div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Offline Heuristic Evaluation Card */}
           {offlineEval && (
@@ -480,7 +532,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
           {loading && (
             <div className="text-xs font-mono text-slate-500 animate-pulse">
-              {preset.label} ({aiConfig.model}) is thinking...
+              {preset.label} ({effectiveAIConfig.model}) is thinking...
             </div>
           )}
         </div>

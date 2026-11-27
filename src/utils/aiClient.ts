@@ -754,6 +754,14 @@ Return ONLY valid JSON matching this exact schema (no markdown fences):
   }
 }
 
+export interface ParsedCoachReply {
+  spokenText: string;
+  displayBody: string;
+  coachNote: string | null;
+  audioScript: string | null;
+  speakerLabel: string | null;
+}
+
 /**
  * Generates tailored system prompts for the 4-Skill AI Coaching Studio.
  */
@@ -768,12 +776,204 @@ export function buildSkillCoachSystemPrompt(params: {
       ? 'Goethe-Zertifikat, telc, and TestDaF'
       : 'Cambridge English, IELTS, and TOEFL iBT';
 
+  const noEnglishClause =
+    params.languageId === 'german'
+      ? ' and NEVER mix English words, explanations, or translations into your spoken German reply.'
+      : '.';
+
   const skillDirectives: Record<SkillType, string> = {
     reading: `Act as a ${langName} ${params.level} Reading Coach aligned with ${examRef}. Generate authentic ${params.level} passages, break down difficult syntax/vocabulary, and ask 2–3 exam-style comprehension questions (Richtig/Falsch or True/False/Not Given + inference).`,
-    listening: `Act as a ${langName} ${params.level} Listening & Hearing Coach aligned with ${examRef}. Start EVERY listening exercise with a clear [AUDIO SCRIPT] block in natural spoken ${langName} (4–7 sentences suitable for text-to-speech playback), followed by [HEARING FOCUS] (tricky sounds/reductions) and 2 comprehension questions. Wait for the user's answer before revealing the key.`,
+    listening: `Act as a ${langName} ${params.level} Listening & Hearing Coach aligned with ${examRef}. Start EVERY listening exercise with an [AUDIO SCRIPT] block containing ONLY natural spoken ${langName} (4–7 sentences; for dialogues, write each turn on its own line as Name: sentence with NO markdown asterisks, NO stage directions, and NO English words mixed in so multi-speaker TTS plays cleanly). Then, on a new line, add [HEARING FOCUS] (tricky sounds/reductions) and [QUESTIONS] (2 comprehension questions). Wait for the user's answer before revealing the key.`,
     writing: `Act as an official ${examRef} Writing Examiner for ${langName} ${params.level}. Give authentic exam writing prompts OR grade the user's text across Task Achievement, Coherence, Lexis, and Grammar with a 0–100 score, exact error corrections, and a higher-band model rewrite.`,
-    speaking: `Act as a friendly, realistic native ${langName} Speaking Examiner & Conversation Partner at CEFR ${params.level}. Respond naturally in ${langName} (2–4 sentences so it works smoothly with audio playback), ask one engaging follow-up question, and include a concise [COACH NOTE] highlighting 1–2 pronunciation, phrasing, or grammar upgrades.`,
+    speaking: `Act as a friendly, realistic native ${langName} Speaking Examiner & Conversation Partner at CEFR ${params.level} aligned with ${examRef}.
+CRITICAL AUDIO FORMAT RULES:
+1. Write ONLY your spoken reply first in 100% pure, natural spoken ${langName} (2–4 sentences suitable for native TTS audio), ending with one engaging follow-up question in ${langName}.
+2. NEVER include role prefixes (never write "Examiner:", "**Examiner:**", "Prüfer:", or "Coach:"), NEVER use markdown formatting (**bold**, *italics*), NEVER add stage directions like *(smiles)*${noEnglishClause}
+3. After a blank line at the very end, put coaching feedback on a NEW LINE starting strictly with [COACH NOTE] (never inline inside a sentence) with 1–2 brief, actionable grammar, vocabulary, or phrasing fixes.`,
   };
 
   return `${skillDirectives[params.skill]}\nKeep responses structured, practical, and calibrated strictly to CEFR ${params.level}.`;
+}
+
+function cleanCoachNoteText(raw: string): string {
+  let s = raw.trim();
+  while (s.endsWith(']') && !s.includes('[')) {
+    s = s.slice(0, -1).trim();
+  }
+  s = s.replace(/\*\*([^\n*]+?)\*\*/g, '$1');
+  s = s.replace(/__([^\n_]+?)__/g, '$1');
+  s = s.replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
+function sanitizeForSpeech(text: string, preserveSpeakerTurns: boolean): string {
+  let s = text;
+  // 1. Asterisk-wrapped stage directions: *(smiles warmly)*, **(laughs)**
+  s = s.replace(/\*{1,2}\([^)\n]{1,80}\)\*{1,2}/g, ' ');
+  // 2. Action stage directions in parens or brackets: (lacht), [laughs], (smiles)
+  s = s.replace(
+    /[([]\s*(?:smiles?|smiling|laughs?|laughing|chuckles?|nods?|nodding|pauses?|sighs?|clears\s+throat|warmly|enthusiastically|cheerfully|encouragingly|softly|lächelt|lacht|nickt|pause|pausiert|seufzt|freundlich)[^)\]\n]{0,45}[)\]]/gi,
+    ' '
+  );
+  // 3. Remaining bracketed section tags like [AUDIO SCRIPT], [HEARING FOCUS], [QUESTIONS]
+  s = s.replace(/\[\s*[A-ZÄÖÜ0-9 _/-]{2,32}\s*\]/gi, ' ');
+  // 4. Markdown headings & horizontal rules
+  s = s.replace(/^[ \t]*#{1,6}[ \t]+/gm, '');
+  s = s.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '');
+  // 5. Markdown emphasis & inline code
+  s = s.replace(/\*\*([^\n*]+?)\*\*/g, '$1');
+  s = s.replace(/__([^\n_]+?)__/g, '$1');
+  s = s.replace(/\*([^\n*]+?)\*/g, '$1');
+  s = s.replace(/`([^`\n]+?)`/g, '$1');
+  s = s.replace(/\*{1,}/g, '');
+  // 6. Bullet markers
+  s = s.replace(/^[ \t]*[-•][ \t]+/gm, '');
+
+  if (preserveSpeakerTurns) {
+    return s
+      .split('\n')
+      .map((line) =>
+        line
+          .replace(/[ \t]{2,}/g, ' ')
+          .replace(/[ \t]+([.,!?;:])/g, '$1')
+          .trim()
+      )
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return s
+    .replace(/[\t\n ]+/g, ' ')
+    .replace(/[ \t]+([.,!?;:])/g, '$1')
+    .trim();
+}
+
+/**
+ * Splits an AI Coach reply into pure target-language TTS audio text, clean visual body,
+ * optional extracted `[AUDIO SCRIPT]` (Listening), and separated `[COACH NOTE]` feedback so
+ * text-to-speech never reads role labels (`**Examiner:**`), markdown, or English coaching notes
+ * inside a non-English voice.
+ */
+export function parseCoachReply(raw: string, skill: SkillType): ParsedCoachReply {
+  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!normalized) {
+    return {
+      spokenText: '',
+      displayBody: '',
+      coachNote: null,
+      audioScript: null,
+      speakerLabel: null,
+    };
+  }
+
+  let working = normalized;
+  const noteParts: string[] = [];
+
+  const isAudioSkill = skill === 'speaking' || skill === 'listening';
+  const bracketNoteLabels = isAudioSkill
+    ? `COACH(?:'S)?\\s*NOTE|COACHING\\s*NOTE|EXAMINER\\s*NOTE|FEEDBACK|CORRECTIONS?|LANGUAGE\\s*NOTE|GRAMMAR\\s*NOTE|FLUENCY\\s*(?:TIP|NOTE|UPGRADES?)|TIP|HINWEIS`
+    : `COACH(?:'S)?\\s*NOTE|COACHING\\s*NOTE|EXAMINER\\s*NOTE`;
+  const headingNoteLabels = isAudioSkill
+    ? `COACH(?:'S)?\\s*NOTE|COACHING\\s*NOTE|EXAMINER\\s*NOTE|LANGUAGE\\s*NOTE|GRAMMAR\\s*NOTE|FLUENCY\\s*(?:TIP|NOTE|UPGRADES?)|FEEDBACK|CORRECTIONS?`
+    : `COACH(?:'S)?\\s*NOTE|COACHING\\s*NOTE|EXAMINER\\s*NOTE`;
+
+  // 1a. Inline self-contained bracket notes: [COACH NOTE: Replace "x" with "y".]
+  const inlineBracketRe = new RegExp(
+    `\\*{0,2}\\[\\s*(?:${bracketNoteLabels})\\s*:\\s*([^\\]]+)\\]\\*{0,2}`,
+    'gi'
+  );
+  working = working.replace(inlineBracketRe, (_full, note: string) => {
+    const cleaned = cleanCoachNoteText(note);
+    if (cleaned) noteParts.push(cleaned);
+    return ' ';
+  });
+
+  // 1b. Section-header bracket notes: [COACH NOTE]\n... or unclosed [COACH NOTE: ...
+  const sectionBracketRe = new RegExp(
+    `(?:^|\\n|[ \\t]+)(?:[-*_]{3,}[ \\t]*\\n[ \\t]*)?\\*{0,2}\\[\\s*(?:${bracketNoteLabels})\\s*(?::[ \\t]*|\\])\\*{0,2}[ \\t]*:?[ \\t]*([\\s\\S]*?)(?=\\n[ \\t]*\\*{0,2}\\[\\s*(?:AUDIO\\s*SCRIPT|HEARING\\s*FOCUS|QUESTIONS?|COMPREHENSION|ANSWER\\s*KEY)\\b|$)`,
+    'gi'
+  );
+  working = working.replace(sectionBracketRe, (_full, note: string) => {
+    const cleaned = cleanCoachNoteText(note);
+    if (cleaned) noteParts.push(cleaned);
+    return '';
+  });
+
+  // 1c. Plain or markdown heading notes on their own line: **Coach Note:** ..., ### Feedback:
+  const headingNoteRe = new RegExp(
+    `(?:^|\\n)[ \\t]*(?:[-*_]{3,}[ \\t]*\\n[ \\t]*)?(?:#{1,4}[ \\t]*)?(?:[💡📝✅✏️📌][ \\t]*)?\\*{0,2}(?:${headingNoteLabels})(?::\\*{0,2}|\\*{0,2}:)[ \\t]*([\\s\\S]*?)(?=\\n[ \\t]*\\*{0,2}\\[\\s*(?:AUDIO\\s*SCRIPT|HEARING\\s*FOCUS|QUESTIONS?|COMPREHENSION|ANSWER\\s*KEY)\\b|$)`,
+    'gi'
+  );
+  working = working.replace(headingNoteRe, (_full, note: string) => {
+    const cleaned = cleanCoachNoteText(note);
+    if (cleaned) noteParts.push(cleaned);
+    return '';
+  });
+
+  // 1d. Trailing English translation block in Speaking mode
+  if (skill === 'speaking') {
+    const translationRe =
+      /(?:^|\n)[ \t]*(?:[-*_]{3,}[ \t]*\n[ \t]*)?\*{0,2}[([]?(?:English\s+)?Translation(?::\*{0,2}|\*{0,2}:|\]:?)[ \t]*([\s\S]*)$/i;
+    working = working.replace(translationRe, (_full, tr: string) => {
+      const cleaned = cleanCoachNoteText(tr.replace(/[)*\] \t\n]+$/g, ''));
+      if (cleaned) noteParts.push(`Translation: ${cleaned}`);
+      return '';
+    });
+  }
+
+  working = working.replace(/(?:\n[ \t]*[-*_]{3,}[ \t]*)+$/g, '').trim();
+
+  // 2. Listening [AUDIO SCRIPT] extraction
+  let audioScript: string | null = null;
+  if (skill === 'listening') {
+    const inlineScriptMatch = working.match(/\*{0,2}\[\s*AUDIO\s*SCRIPT\s*:\s*([^\]]+)\]\*{0,2}/i);
+    const blockScriptMatch = working.match(
+      /(?:^|\n)[ \t]*\*{0,2}\[\s*AUDIO\s*SCRIPT\s*\]\*{0,2}[ \t]*:?[ \t]*\n?([\s\S]*?)(?=\n[ \t]*(?:\*{0,2}\[\s*(?:HEARING\s*FOCUS|QUESTIONS?|COMPREHENSION|COACH\s*NOTE|VOCABULARY|ANSWER\s*KEY|TIP)\b|(?:#{1,4}[ \t]*)?\*{0,2}(?:HEARING\s*FOCUS|COMPREHENSION\s*QUESTIONS?|QUESTIONS?|VOCABULARY|ANSWER\s*KEY)(?::\*{0,2}|\*{0,2}:))|$)/i
+    );
+    const headingScriptMatch = working.match(
+      /(?:^|\n)[ \t]*(?:#{1,4}[ \t]*)?\*{0,2}AUDIO\s*SCRIPT(?::\*{0,2}|\*{0,2}:)[ \t]*\n?([\s\S]*?)(?=\n[ \t]*(?:\*{0,2}\[|(?:#{1,4}[ \t]*)?\*{0,2}(?:HEARING\s*FOCUS|COMPREHENSION\s*QUESTIONS?|QUESTIONS?|VOCABULARY|ANSWER\s*KEY)(?::\*{0,2}|\*{0,2}:))|$)/i
+    );
+    const rawScript = inlineScriptMatch?.[1] ?? blockScriptMatch?.[1] ?? headingScriptMatch?.[1];
+    if (rawScript) {
+      const sanitized = sanitizeForSpeech(rawScript, true);
+      if (sanitized) audioScript = sanitized;
+    }
+  }
+
+  // 3. Strip leading role prefixes (**Examiner:**, Prüfer:, Coach:, [EXAMINER])
+  let speakerLabel: string | null = null;
+  working = working.replace(
+    /^\s*\*{0,2}\[\s*(?:EXAMINER|SPEAKING|RESPONSE|DIALOGUE|REPLY)\s*\]\*{0,2}\s*:?\s*/i,
+    ''
+  );
+
+  if (skill === 'speaking') {
+    const rolePrefixRe =
+      /^\s*\*{0,2}(Examiner|AI\s*Examiner|Speaking\s*Examiner|Coach|AI\s*Coach|Tutor|Teacher|Interviewer|Roleplay\s*Partner|Partner|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?|Lehrer(?:in)?|Moderator(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*/i;
+    const roleMatch = working.match(rolePrefixRe);
+    if (roleMatch) {
+      speakerLabel = roleMatch[1].trim();
+      working = working.replace(rolePrefixRe, '');
+    }
+    working = working.replace(
+      /\n[ \t]*\*{0,2}(?:Examiner|AI\s*Examiner|Coach|Tutor|Interviewer|Assistant|Prüfer(?:in)?|Gesprächspartner(?:in)?)(?::\*{0,2}|\*{0,2}:)[ \t]*/gi,
+      '\n'
+    );
+  }
+
+  const displayBody =
+    skill === 'speaking'
+      ? sanitizeForSpeech(working, false)
+      : working.replace(/[ \t]+([.,!?;:])/g, '$1').trim();
+
+  const spokenText = audioScript ?? sanitizeForSpeech(working, skill === 'listening');
+  const combinedNote = noteParts.join('\n\n').trim();
+
+  return {
+    spokenText,
+    displayBody,
+    coachNote: combinedNote || null,
+    audioScript,
+    speakerLabel,
+  };
 }

@@ -8,6 +8,7 @@ import {
   fetchAvailableModels,
   getDefaultAIConfig,
   isAIConfigReady,
+  parseCoachReply,
   resolveModelsEndpoints,
   testAIProviderConnection,
 } from '../utils/aiClient';
@@ -391,5 +392,79 @@ describe('Learner Progress, History & Test Results Store', () => {
 
     const afterDelete = deleteGeneratedExam(result.exam.id);
     expect(afterDelete.some((e) => e.id === result.exam.id)).toBe(false);
+  });
+
+  it('separates pure spoken target-language TTS from role prefixes, markdown, stage directions, and English [COACH NOTE] blocks', () => {
+    // 1. Exact real-world mixed German/English Speaking Coach output with inline [COACH NOTE: ...] and **Examiner:**
+    const mixedSample =
+      '**Examiner:** Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden, als du angefangen hast zu sammeln? [COACH NOTE: Replace "Lieblingsmutter" with "Lieblingsmodell" for correct German. Consider replacing "Modemodell" with "Modell" for correct German.]';
+
+    const parsedMixed = parseCoachReply(mixedSample, 'speaking');
+    expect(parsedMixed.speakerLabel).toBe('Examiner');
+    expect(parsedMixed.spokenText).toBe(
+      'Ah, der CMC Mercedes-Benz SLA 2003! Das ist ja ein schöner Klassiker. Warum hast du dich gerade für dieses Modell entschieden, als du angefangen hast zu sammeln?'
+    );
+    expect(parsedMixed.spokenText).not.toContain('Examiner');
+    expect(parsedMixed.spokenText).not.toContain('COACH NOTE');
+    expect(parsedMixed.spokenText).not.toContain('Replace');
+    expect(parsedMixed.spokenText).not.toContain('*');
+    expect(parsedMixed.displayBody).toBe(parsedMixed.spokenText);
+    expect(parsedMixed.coachNote).toBe(
+      'Replace "Lieblingsmutter" with "Lieblingsmodell" for correct German. Consider replacing "Modemodell" with "Modell" for correct German.'
+    );
+
+    // 2. Multiline [COACH NOTE] with stage direction & bold markdown
+    const multilineSample = `**Prüferin:** *(lächelt freundlich)* Das klingt wirklich **spannend**! Seit wann sammelst du Oldtimer?
+
+---
+[COACH NOTE]
+- Use **"seit drei Jahren"** instead of "für drei Jahre".`;
+    const parsedMulti = parseCoachReply(multilineSample, 'speaking');
+    expect(parsedMulti.speakerLabel).toBe('Prüferin');
+    expect(parsedMulti.spokenText).toBe('Das klingt wirklich spannend! Seit wann sammelst du Oldtimer?');
+    expect(parsedMulti.coachNote).toContain('seit drei Jahren');
+    expect(parsedMulti.coachNote).not.toContain('**');
+
+    // 3. Heading-style **Coach Note:** plus trailing English Translation block
+    const headingSample = `Examiner: Hallo! Welche Musik hörst du gern?
+
+Translation: Hello! What music do you like listening to?
+
+**Coach Note:** Put the verb at the end after "weil".`;
+    const parsedHeading = parseCoachReply(headingSample, 'speaking');
+    expect(parsedHeading.spokenText).toBe('Hallo! Welche Musik hörst du gern?');
+    expect(parsedHeading.coachNote).toContain('Put the verb at the end');
+    expect(parsedHeading.coachNote).toContain('Translation: Hello! What music do you like listening to?');
+
+    // 4. Listening [AUDIO SCRIPT] keeps clean multi-speaker lines & excludes English [HEARING FOCUS] / [QUESTIONS]
+    const listeningSample = `[AUDIO SCRIPT]
+**Clara:** Hey Lukas, treffen wir uns um halb acht am Bahnhof?
+**Lukas:** Halb acht wird knapp, mein Bus kommt erst um zwanzig vor acht an.
+
+[HEARING FOCUS]
+Notice "halb acht" (7:30) vs. "zwanzig vor acht" (7:40).
+
+[QUESTIONS]
+1. Wann schlägt Clara das Treffen vor?`;
+    const parsedListening = parseCoachReply(listeningSample, 'listening');
+    expect(parsedListening.audioScript).toBe(
+      'Clara: Hey Lukas, treffen wir uns um halb acht am Bahnhof?\nLukas: Halb acht wird knapp, mein Bus kommt erst um zwanzig vor acht an.'
+    );
+    expect(parsedListening.spokenText).toBe(parsedListening.audioScript);
+    expect(parsedListening.spokenText).not.toContain('HEARING FOCUS');
+    expect(parsedListening.spokenText).not.toContain('Notice');
+    expect(parsedListening.displayBody).toContain('[QUESTIONS]');
+
+    // 5. Writing rubric headings like **Corrections:** stay intact in writing mode
+    const writingSample = '**Score: 84/100**\n**Corrections:** Use "weil" with verb-final word order.';
+    const parsedWriting = parseCoachReply(writingSample, 'writing');
+    expect(parsedWriting.displayBody).toContain('Corrections:');
+    expect(parsedWriting.coachNote).toBeNull();
+
+    // 6. Speaking system prompt enforces pure spoken language & separated [COACH NOTE]
+    const speakingPrompt = buildSkillCoachSystemPrompt({ languageId: 'german', level: 'B1', skill: 'speaking' });
+    expect(speakingPrompt).toContain('100% pure, natural spoken German');
+    expect(speakingPrompt).toContain('NEVER include role prefixes');
+    expect(speakingPrompt).toContain('[COACH NOTE]');
   });
 });
