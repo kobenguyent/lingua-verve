@@ -2,28 +2,104 @@ name: Release Native Apple Apps
 
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release version tag (e.g. v1.1.0)"
-        required: true
-        default: "v1.1.0"
+        description: "Optional explicit tag (leave blank to auto-bump from latest v* tag)"
+        required: false
+        default: ""
         type: string
+      bump:
+        description: "Auto-bump strategy when tag is blank"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
       prerelease:
         description: "Mark as pre-release"
         required: false
         default: false
         type: boolean
 
+concurrency:
+  group: release-native-apple
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
+  plan-release:
+    name: Plan Automatic Semantic Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_release: ${{ steps.plan.outputs.should_release }}
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+      bump: ${{ steps.plan.outputs.bump }}
+      reason: ${{ steps.plan.outputs.reason }}
+
+    steps:
+      - name: Checkout Repository (Full History & Tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure All Remote Release Tags Are Fetched
+        run: git fetch --tags --force
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Compute Next Semantic Release Version
+        id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_BUMP: ${{ inputs.bump }}
+        run: node scripts/next-release-version.mjs --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish Release Plan Summary
+        env:
+          SHOULD_RELEASE: ${{ steps.plan.outputs.should_release }}
+          RELEASE_TAG: ${{ steps.plan.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          RELEASE_BUMP: ${{ steps.plan.outputs.bump }}
+          PREVIOUS_TAG: ${{ steps.plan.outputs.previous_tag }}
+          RELEASE_REASON: ${{ steps.plan.outputs.reason }}
+        run: |
+          if [ "${SHOULD_RELEASE}" = "true" ]; then
+            echo "## 🏷️ Release Planned: \`${RELEASE_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Version:** \`${RELEASE_VERSION}\` (\`${RELEASE_BUMP}\` bump from \`${PREVIOUS_TAG:-initial}\`)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Reason:** ${RELEASE_REASON}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ⏭️ Automatic Release Skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Reason:** ${RELEASE_REASON}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Tip:** Include \`[force release]\` in a commit message or run **Actions → Release Native Apple Apps** to publish manually." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   release:
     name: Build & Publish Native GitHub Release
+    needs: plan-release
+    if: needs.plan-release.outputs.should_release == 'true'
     runs-on: macos-26
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -51,26 +127,6 @@ jobs:
           restore-keys: |
             macos-26-spm-
 
-      - name: Resolve Release Version
-        id: meta
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW_TAG="${{ inputs.tag }}"
-          else
-            RAW_TAG="${GITHUB_REF_NAME}"
-          fi
-
-          if [[ "${RAW_TAG}" != v* ]]; then
-            TAG="v${RAW_TAG}"
-          else
-            TAG="${RAW_TAG}"
-          fi
-          VERSION="${TAG#v}"
-
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Resolved Release Tag: ${TAG} (Version: ${VERSION})"
-
       - name: Install Dependencies
         run: npm ci
 
@@ -81,12 +137,12 @@ jobs:
 
       - name: Verify Universal Apple Targets & Package iOS/iPadOS IPA
         env:
-          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION: ${{ needs.plan-release.outputs.version }}
         run: bash scripts/build-apple-apps.sh --package-ipa
 
       - name: Build Universal Native macOS App, DMG, ZIP & SHA256SUMS.txt
         env:
-          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION: ${{ needs.plan-release.outputs.version }}
         run: npm run macos:app
 
       - name: Verify All Release Assets & SHA-256 Checksums
@@ -105,7 +161,7 @@ jobs:
       - name: Upload Release Artifacts to Workflow Run
         uses: actions/upload-artifact@v4
         with:
-          name: LinguaVerve-${{ steps.meta.outputs.tag }}-Native-Apple
+          name: LinguaVerve-${{ needs.plan-release.outputs.tag }}-Native-Apple
           path: |
             dist-macos/LinguaVerve*.dmg
             dist-macos/LinguaVerve*.zip
@@ -143,29 +199,36 @@ jobs:
           LinguaVerve checks **GitHub Releases** automatically on launch (and every 6 hours) or anytime via **LinguaVerve → Check for Updates…** When a newer release is found, clicking **Download, Close & Update** downloads the release archive, verifies its SHA-256 digest against `SHA256SUMS.txt`, closes the running app cleanly, atomically swaps `LinguaVerve.app`, and relaunches the new version automatically.
           EOF
 
-      - name: Publish GitHub Release
+      - name: Publish GitHub Release (Auto-Creates Git Tag at Commit SHA)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: "LinguaVerve ${{ steps.meta.outputs.tag }}"
+          tag_name: ${{ needs.plan-release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: "LinguaVerve ${{ needs.plan-release.outputs.tag }}"
           body_path: dist-macos/RELEASE_HEADER.md
           generate_release_notes: true
           prerelease: ${{ inputs.prerelease == true }}
+          make_latest: ${{ inputs.prerelease == true && 'false' || 'true' }}
           draft: false
           files: |
             dist-macos/LinguaVerve.dmg
             dist-macos/LinguaVerve.zip
-            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.dmg
-            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-macOS-*.zip
+            dist-macos/LinguaVerve-${{ needs.plan-release.outputs.version }}-macOS-*.dmg
+            dist-macos/LinguaVerve-${{ needs.plan-release.outputs.version }}-macOS-*.zip
             dist-macos/LinguaVerve-iOS-iPadOS-unsigned.ipa
-            dist-macos/LinguaVerve-${{ steps.meta.outputs.version }}-iOS-iPadOS-unsigned.ipa
+            dist-macos/LinguaVerve-${{ needs.plan-release.outputs.version }}-iOS-iPadOS-unsigned.ipa
             dist-macos/SHA256SUMS.txt
 
       - name: Publish Release Step Summary
+        env:
+          RELEASE_TAG: ${{ needs.plan-release.outputs.tag }}
+          RELEASE_BUMP: ${{ needs.plan-release.outputs.bump }}
+          PREVIOUS_TAG: ${{ needs.plan-release.outputs.previous_tag }}
         run: |
-          echo "## 🚀 Published LinguaVerve ${{ steps.meta.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 🚀 Published LinguaVerve ${RELEASE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Download URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Release URL:** https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Bump:** \`${RELEASE_BUMP}\` (previous: \`${PREVIOUS_TAG:-none}\`)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### 🔐 SHA-256 Checksums" >> "$GITHUB_STEP_SUMMARY"
           echo '```text' >> "$GITHUB_STEP_SUMMARY"

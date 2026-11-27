@@ -19,7 +19,8 @@
     "macos:app:fast": "bash scripts/build-macos-app.sh --fast",
     "macos:launch": "npm run macos:app && bash scripts/launch-macos-app.sh",
     "macos:launch:fast": "npm run macos:app:fast && bash scripts/launch-macos-app.sh",
-    "macos:open": "bash scripts/launch-macos-app.sh"
+    "macos:open": "bash scripts/launch-macos-app.sh",
+    "release:next": "node scripts/next-release-version.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",
