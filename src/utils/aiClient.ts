@@ -9,6 +9,7 @@ import {
   OfficialRubricBreakdown,
   SkillType,
 } from '../types';
+import { resolveAIConfigForLanguage } from './aiModelAdvisor';
 
 export const AI_CONFIG_STORAGE_KEY = 'linguaverve_ai_provider_v1';
 
@@ -628,7 +629,8 @@ export async function evaluateWithAIOrFallback(params: {
   expectedKeywords: string[];
   fetchImpl?: typeof fetch;
 }): Promise<AIEvaluationResult> {
-  if (!isAIConfigReady(params.config) || !params.text.trim()) {
+  const effectiveConfig = resolveAIConfigForLanguage(params.config, params.languageId);
+  if (!isAIConfigReady(effectiveConfig) || !params.text.trim()) {
     return evaluateSubmissionOffline(params);
   }
 
@@ -659,7 +661,7 @@ Return ONLY valid JSON matching this exact schema (no markdown fences):
 
   try {
     const raw = await callAIProvider(
-      params.config,
+      effectiveConfig,
       [
         { role: 'system', content: systemPrompt },
         {
@@ -742,7 +744,7 @@ Return ONLY valid JSON matching this exact schema (no markdown fences):
       upgradedVersion: typeof parsed.upgradedVersion === 'string' ? parsed.upgradedVersion.trim() : '',
       examinerSummary: typeof parsed.examinerSummary === 'string' ? parsed.examinerSummary.trim() : raw.slice(0, 260),
       source: 'ai',
-      providerLabel: `${AI_PROVIDER_PRESETS[params.config.provider].label} (${params.config.model})`,
+      providerLabel: `${AI_PROVIDER_PRESETS[effectiveConfig.provider].label} (${effectiveConfig.model})`,
       rubric,
       suggestions,
       correctionItems,

@@ -23,6 +23,7 @@ import {
   evaluateWithAIOrFallback,
   isAIConfigReady,
 } from './aiClient';
+import { resolveAIConfigForLanguage } from './aiModelAdvisor';
 import {
   getExamListeningTracks,
   getExamReadingParts,
@@ -480,7 +481,8 @@ export async function assessFullExamWithAIOrFallback(params: {
   speakingEval?: AIEvaluationResult | null;
   fetchImpl?: typeof fetch;
 }): Promise<ExamAIAssessment> {
-  const { config, exam, attempt, fetchImpl } = params;
+  const { config: rawConfig, exam, attempt, fetchImpl } = params;
+  const config = resolveAIConfigForLanguage(rawConfig, attempt.languageId);
   let writingEvals = params.writingEvals ? [...params.writingEvals] : [];
   let speakingEval = params.speakingEval ?? null;
 
@@ -1044,7 +1046,8 @@ export async function analyzeExamHistoryReadinessWithAIOrFallback(params: {
   });
   if (!baseline) return null;
 
-  if (!isAIConfigReady(params.config)) {
+  const effectiveConfig = resolveAIConfigForLanguage(params.config, baseline.languageId);
+  if (!isAIConfigReady(effectiveConfig)) {
     return baseline;
   }
 
@@ -1078,7 +1081,7 @@ Return ONLY valid JSON (no markdown fences) matching this exact schema:
 
   try {
     const raw = await callAIProvider(
-      params.config,
+      effectiveConfig,
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: buildCompactHistoryDigest(params.attempts, baseline) },
@@ -1131,7 +1134,7 @@ Return ONLY valid JSON (no markdown fences) matching this exact schema:
       ...baseline,
       generatedAt: new Date().toISOString(),
       source: 'ai',
-      providerLabel: `${AI_PROVIDER_PRESETS[params.config.provider].label} (${params.config.model})`,
+      providerLabel: `${AI_PROVIDER_PRESETS[effectiveConfig.provider].label} (${effectiveConfig.model})`,
       verdict,
       readinessScore,
       confidence,

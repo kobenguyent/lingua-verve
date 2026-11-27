@@ -17,6 +17,7 @@ public struct ExamAssessmentService: Sendable {
         writingEvals: [AIEvaluationResult] = [],
         speakingEval: AIEvaluationResult? = nil
     ) async -> ExamAIAssessment {
+        let config = config.resolved(for: attempt.languageId)
         var resolvedWritingEvals = writingEvals
         var resolvedSpeakingEval = speakingEval
 
@@ -896,6 +897,7 @@ public struct ExamAssessmentService: Sendable {
             return nil
         }
 
+        let config = config.resolved(for: baseline.languageId)
         guard config.isReady else {
             return baseline
         }

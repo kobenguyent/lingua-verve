@@ -599,7 +599,8 @@ public struct AIClientService: Sendable {
         minWords: Int,
         expectedKeywords: [String]
     ) async -> AIEvaluationResult {
-        guard config.isReady, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let effectiveConfig = config.resolved(for: languageId)
+        guard effectiveConfig.isReady, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return Self.evaluateOffline(
                 text: text,
                 languageId: languageId,
@@ -631,7 +632,7 @@ public struct AIClientService: Sendable {
 
         do {
             let raw = try await chat(
-                config: config,
+                config: effectiveConfig,
                 messages: [
                     AIChatMessage(role: "system", content: sys),
                     AIChatMessage(role: "user", content: "Task:\n\(taskPrompt)\n\nResponse:\n\(text)")
@@ -710,7 +711,7 @@ public struct AIClientService: Sendable {
                         upgradedVersion: (parsed.upgradedVersion ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
                         examinerSummary: (parsed.examinerSummary ?? String(raw.prefix(240))).trimmingCharacters(in: .whitespacesAndNewlines),
                         source: "ai",
-                        providerLabel: "\(config.provider.label) (\(config.model))",
+                        providerLabel: "\(effectiveConfig.provider.label) (\(effectiveConfig.model))",
                         rubric: rubric,
                         suggestions: cleanedSuggestions.isEmpty ? nil : Array(cleanedSuggestions.prefix(4)),
                         correctionItems: items.isEmpty ? nil : items

@@ -12,6 +12,11 @@ import {
   Trash2,
   DownloadCloud,
   Search,
+  Sparkles,
+  Copy,
+  Check,
+  Pin,
+  AlertTriangle,
 } from 'lucide-react';
 import { AIModelInfo, AIProviderConfig, AIProviderType } from '../types';
 import {
@@ -20,6 +25,16 @@ import {
   getDefaultAIConfig,
   testAIProviderConnection,
 } from '../utils/aiClient';
+import {
+  getRecommendedModelsForLanguage,
+  isCodingSpecializedModel,
+  MODEL_LANGUAGE_OPTIONS,
+  ModelLanguageTarget,
+  normalizeModelLanguageTarget,
+  pickBestInstalledModel,
+  rankFetchedModelsForLanguage,
+  resolveAIConfigForLanguage,
+} from '../utils/aiModelAdvisor';
 import { soundEngine } from '../utils/audio';
 import { ModalDialog } from './ModalDialog';
 
@@ -28,6 +43,7 @@ interface AIProviderModalProps {
   onClose: () => void;
   config: AIProviderConfig;
   onSaveConfig: (config: AIProviderConfig) => void;
+  activeLanguageId?: string;
 }
 
 const LOCAL_PROVIDERS: AIProviderType[] = ['ollama', 'lmstudio'];
@@ -38,8 +54,12 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
   onClose,
   config,
   onSaveConfig,
+  activeLanguageId,
 }) => {
   const [draft, setDraft] = useState<AIProviderConfig>(config);
+  const [selectedLang, setSelectedLang] = useState<ModelLanguageTarget>(() =>
+    normalizeModelLanguageTarget(activeLanguageId)
+  );
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     ok: boolean;
@@ -52,38 +72,86 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
   const [availableModels, setAvailableModels] = useState<AIModelInfo[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [modelSearch, setModelSearch] = useState('');
+  const [copiedPullId, setCopiedPullId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setDraft(config);
+      setSelectedLang(normalizeModelLanguageTarget(activeLanguageId));
       setTestResult(null);
       setAvailableModels([]);
       setModelsError(null);
       setModelSearch('');
+      setCopiedPullId(null);
     }
-  }, [isOpen, config]);
+  }, [isOpen, config, activeLanguageId]);
+
+  const rankedFetchedModels = useMemo(
+    () => rankFetchedModelsForLanguage(availableModels, selectedLang),
+    [availableModels, selectedLang]
+  );
 
   const filteredFetchedModels = useMemo(() => {
     const q = modelSearch.trim().toLowerCase();
-    if (!q) return availableModels;
-    return availableModels.filter(
-      (m) =>
-        m.id.toLowerCase().includes(q) ||
-        (m.displayName && m.displayName.toLowerCase().includes(q))
+    if (!q) return rankedFetchedModels;
+    return rankedFetchedModels.filter(
+      (r) =>
+        r.model.id.toLowerCase().includes(q) ||
+        (r.model.displayName && r.model.displayName.toLowerCase().includes(q))
     );
-  }, [availableModels, modelSearch]);
+  }, [rankedFetchedModels, modelSearch]);
+
+  const recommendations = useMemo(
+    () => getRecommendedModelsForLanguage(draft.provider, selectedLang),
+    [draft.provider, selectedLang]
+  );
 
   if (!isOpen) return null;
 
   const preset = AI_PROVIDER_PRESETS[draft.provider];
+  const selectedLangOption =
+    MODEL_LANGUAGE_OPTIONS.find((opt) => opt.id === selectedLang) || MODEL_LANGUAGE_OPTIONS[0];
+  const pinnedForLang = selectedLang !== 'all' ? draft.languageModels?.[selectedLang] : undefined;
+  const bestInstalled = rankedFetchedModels[0] ?? null;
+  const codingWarning = isCodingSpecializedModel(draft.model);
+
+  const findInstalledMatch = (recommendedId: string): AIModelInfo | undefined => {
+    const targetLower = recommendedId.toLowerCase();
+    const exact = availableModels.find((m) => m.id.toLowerCase() === targetLower);
+    if (exact) return exact;
+    const prefix = targetLower.split(':')[0];
+    return availableModels.find((m) => {
+      const lower = m.id.toLowerCase();
+      return !isCodingSpecializedModel(lower) && (lower === prefix || lower.startsWith(`${prefix}:`));
+    });
+  };
+
+  const setPinnedModelForLang = (modelId: string | null) => {
+    if (selectedLang === 'all') return;
+    setDraft((prev) => {
+      const nextMap = { ...(prev.languageModels || {}) };
+      if (modelId && modelId.trim()) {
+        nextMap[selectedLang] = modelId.trim();
+      } else {
+        delete nextMap[selectedLang];
+      }
+      return {
+        ...prev,
+        languageModels: Object.keys(nextMap).length > 0 ? nextMap : undefined,
+      };
+    });
+  };
 
   const handleSelectProvider = (provider: AIProviderType) => {
     soundEngine.playClickSound();
     const defaults = getDefaultAIConfig(provider);
+    const topRec = getRecommendedModelsForLanguage(provider, selectedLang)[0];
     setDraft({
       ...defaults,
+      model: topRec?.modelId || defaults.model,
       enabled: true,
       apiKey: provider === config.provider ? config.apiKey : '',
+      languageModels: undefined,
     });
     setTestResult(null);
     setAvailableModels([]);
@@ -99,13 +167,15 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
       const models = await fetchAvailableModels(draft);
       setAvailableModels(models);
       setModelSearch('');
+      const best = pickBestInstalledModel(models, selectedLang);
       if (
-        models.length > 0 &&
+        best &&
         (!draft.model.trim() ||
           draft.model === 'local-model' ||
-          !models.some((m) => m.id === draft.model))
+          !models.some((m) => m.id === draft.model) ||
+          (isCodingSpecializedModel(draft.model) && !best.isCodingModel))
       ) {
-        setDraft((prev) => ({ ...prev, model: models[0].id }));
+        setDraft((prev) => ({ ...prev, model: best.model.id }));
       }
       soundEngine.playSuccessChime();
     } catch (err) {
@@ -120,7 +190,8 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
     soundEngine.playClickSound();
     setTesting(true);
     setTestResult(null);
-    const res = await testAIProviderConnection({ ...draft, enabled: true });
+    const effective = resolveAIConfigForLanguage({ ...draft, enabled: true }, selectedLang);
+    const res = await testAIProviderConnection(effective);
     setTesting(false);
     setTestResult(res);
     if (res.ok) {
@@ -290,13 +361,25 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                   className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
 
-                {/* Fetched Live Models Picker */}
+                {/* Fetched Live Models Picker (Ranked by Language Fit) */}
                 {availableModels.length > 0 && (
                   <div className="mt-2 p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-900 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-mono font-bold uppercase text-emerald-700 dark:text-emerald-300">
                         Available Models ({availableModels.length})
                       </span>
+                      {bestInstalled && !bestInstalled.isCodingModel && draft.model !== bestInstalled.model.id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playClickSound();
+                            setDraft({ ...draft, model: bestInstalled.model.id });
+                          }}
+                          className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white"
+                        >
+                          Auto-Pick Best ({bestInstalled.model.id})
+                        </button>
+                      )}
                       {availableModels.length > 8 && (
                         <div className="relative flex-1 max-w-[160px]">
                           <Search className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -315,7 +398,7 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                     <select
                       aria-label="Select fetched AI model"
                       value={
-                        filteredFetchedModels.some((m) => m.id === draft.model)
+                        filteredFetchedModels.some((r) => r.model.id === draft.model)
                           ? draft.model
                           : ''
                       }
@@ -326,19 +409,48 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                       }}
                       className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-white dark:bg-slate-950 border border-emerald-300 dark:border-emerald-800 text-slate-900 dark:text-slate-100"
                     >
-                      {!filteredFetchedModels.some((m) => m.id === draft.model) && (
+                      {!filteredFetchedModels.some((r) => r.model.id === draft.model) && (
                         <option value="">
                           {filteredFetchedModels.length > 0
                             ? `Choose from ${filteredFetchedModels.length} model(s)...`
                             : 'No matching models'}
                         </option>
                       )}
-                      {filteredFetchedModels.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.displayName ? `${m.id} — ${m.displayName}` : m.id}
-                        </option>
-                      ))}
+                      {filteredFetchedModels.map((r) => {
+                        const prefix = r.tier === 'ideal' ? '★ ' : r.isCodingModel ? '⚠ ' : '';
+                        const label = r.model.displayName
+                          ? `${r.model.id} — ${r.model.displayName}`
+                          : r.model.id;
+                        return (
+                          <option key={r.model.id} value={r.model.id}>
+                            {prefix}{label}
+                          </option>
+                        );
+                      })}
                     </select>
+                  </div>
+                )}
+
+                {codingWarning && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div>
+                        <strong>{draft.model}</strong> is coding-specialized — weaker for natural grammar, register, and CEFR exams.
+                      </div>
+                      {bestInstalled && !bestInstalled.isCodingModel && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playClickSound();
+                            setDraft({ ...draft, model: bestInstalled.model.id });
+                          }}
+                          className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px]"
+                        >
+                          Switch to {bestInstalled.model.id}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -348,19 +460,6 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                     <span className="break-words">{modelsError}</span>
                   </p>
                 )}
-
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {preset.suggestedModels.map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setDraft({ ...draft, model: m })}
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-sky-100 dark:hover:bg-sky-900"
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
@@ -383,6 +482,163 @@ export const AIProviderModal: React.FC<AIProviderModalProps> = ({
                   <span>Stored locally in your browser only. Direct client-to-provider calls.</span>
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Language-Matched Model Advisor */}
+          <div className="p-4 rounded-2xl bg-purple-500/[0.05] dark:bg-purple-950/20 border border-purple-500/25 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase text-purple-700 dark:text-purple-300">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Best Models by Language ({preset.label.split(' (')[0]})</span>
+              </div>
+              {pinnedForLang && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-mono text-purple-700 dark:text-purple-300">
+                  <Pin className="w-3 h-3" />
+                  Pinned for {selectedLangOption.shortLabel}: <strong>{pinnedForLang}</strong>
+                  <button
+                    type="button"
+                    onClick={() => setPinnedModelForLang(null)}
+                    className="ml-1 underline text-rose-600 dark:text-rose-400"
+                  >
+                    Clear
+                  </button>
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Choose target language for model suggestions">
+              {MODEL_LANGUAGE_OPTIONS.map((opt) => {
+                const active = selectedLang === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      soundEngine.playClickSound();
+                      setSelectedLang(opt.id);
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                      active
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-400'
+                    }`}
+                  >
+                    {opt.flag} {opt.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="space-y-2">
+              {recommendations.map((rec) => {
+                const installedMatch = findInstalledMatch(rec.modelId);
+                const resolvedId = installedMatch?.id || rec.modelId;
+                const isSelected = draft.model === resolvedId || draft.model === rec.modelId;
+                const isPinned = pinnedForLang === resolvedId;
+
+                return (
+                  <div
+                    key={rec.modelId}
+                    className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                      isSelected
+                        ? 'bg-sky-50/80 dark:bg-sky-950/30 border-sky-400 dark:border-sky-700'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white">
+                          {rec.modelId}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                            rec.isBestMatch
+                              ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                              : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                          }`}
+                        >
+                          {rec.badge}
+                        </span>
+                        {installedMatch && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                            Installed ✓
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">{rec.sizeHint}</span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {rec.reason}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClickSound();
+                          setDraft({ ...draft, model: resolvedId });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-900 hover:bg-slate-800 dark:bg-sky-500 dark:hover:bg-sky-400 text-white dark:text-slate-950'
+                        }`}
+                      >
+                        {isSelected ? 'Selected ✓' : `Pick ${rec.modelId}`}
+                      </button>
+
+                      {selectedLang !== 'all' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEngine.playClickSound();
+                            setPinnedModelForLang(isPinned ? null : resolvedId);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                            isPinned
+                              ? 'bg-purple-600 text-white border-purple-600'
+                              : 'bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+                          }`}
+                        >
+                          <Pin className="w-3 h-3" />
+                          <span>
+                            {isPinned
+                              ? `Pinned for ${selectedLangOption.shortLabel}`
+                              : `Pin for ${selectedLangOption.shortLabel}`}
+                          </span>
+                        </button>
+                      )}
+
+                      {rec.pullCommand && !installedMatch && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard?.writeText(rec.pullCommand!);
+                              soundEngine.playClickSound();
+                              setCopiedPullId(rec.modelId);
+                              setTimeout(() => setCopiedPullId(null), 2000);
+                            } catch {
+                              // Clipboard API may be unavailable in headless tests
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                        >
+                          {copiedPullId === rec.modelId ? (
+                            <Check className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                          <span>{copiedPullId === rec.modelId ? 'Copied!' : rec.pullCommand}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

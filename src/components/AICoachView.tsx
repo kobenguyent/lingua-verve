@@ -29,6 +29,7 @@ import {
   evaluateWithAIOrFallback,
   isAIConfigReady,
 } from '../utils/aiClient';
+import { resolveAIConfigForLanguage } from '../utils/aiModelAdvisor';
 import { soundEngine } from '../utils/audio';
 import {
   isSpeechRecognitionSupported,
@@ -209,7 +210,8 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
         skill,
       });
 
-      const reply = await callAIProvider(aiConfig, [
+      const effectiveConfig = resolveAIConfigForLanguage(aiConfig, coachLang);
+      const reply = await callAIProvider(effectiveConfig, [
         { role: 'system', content: systemPrompt },
         ...nextHistory.slice(-10),
       ]);
@@ -223,7 +225,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
         languageId: coachLang,
         level,
         skill,
-        provider: `${preset.label} (${aiConfig.model})`,
+        provider: `${preset.label} (${effectiveConfig.model})`,
         summary: promptText.slice(0, 75),
       });
 

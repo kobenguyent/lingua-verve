@@ -1064,4 +1064,44 @@ final class AcademyAndAITests: XCTestCase {
         let seed = ExamAssessmentService.buildCoachSeedPrompt(from: aiReport)
         XCTAssertTrue(seed.contains("Goethe-Zertifikat B1"))
     }
+
+    func testLanguageAwareAIModelAdvisorRankingAndPerLanguageModelResolution() throws {
+        // 1. Installed Ollama models: gemma4:latest must beat coding-specialized models
+        let installed = [
+            AIModelInfo(id: "deepseek-coder-v2:16b", ownedBy: "ollama"),
+            AIModelInfo(id: "gemma4:latest", ownedBy: "ollama"),
+            AIModelInfo(id: "qwen3-coder:latest", ownedBy: "ollama")
+        ]
+        let rankedGerman = AIModelAdvisor.rankFetchedModels(installed, for: .german)
+        XCTAssertEqual(rankedGerman.first?.model.id, "gemma4:latest")
+        XCTAssertEqual(rankedGerman.first?.tier, .ideal)
+        XCTAssertTrue(rankedGerman.last?.isCodingModel == true)
+        XCTAssertEqual(rankedGerman.last?.tier, .caution)
+
+        // 2. Language-specific recommendations adapt cleanly to German, Japanese & Polyglot
+        let deRecs = AIModelAdvisor.recommendedModels(for: .ollama, language: .german)
+        XCTAssertEqual(deRecs.first?.modelId, "mistral-small3.1")
+        XCTAssertEqual(deRecs.first?.pullCommand, "ollama pull mistral-small3.1")
+
+        let jpRecs = AIModelAdvisor.recommendedModels(for: .ollama, language: .japanese)
+        XCTAssertEqual(jpRecs.first?.modelId, "qwen3:14b")
+
+        let polyRecs = AIModelAdvisor.recommendedModels(for: .ollama, language: .all)
+        XCTAssertEqual(polyRecs.first?.modelId, "qwen3:14b")
+
+        // 3. Per-language pinned model overrides resolve automatically & persist via Codable
+        let cfg = AIProviderConfig(
+            provider: .ollama,
+            model: "gemma4:latest",
+            enabled: true,
+            languageModels: ["german": "mistral-small3.1", "japanese": "qwen3:14b"]
+        )
+        XCTAssertEqual(cfg.resolved(for: "german").model, "mistral-small3.1")
+        XCTAssertEqual(cfg.resolved(for: "japanese").model, "qwen3:14b")
+        XCTAssertEqual(cfg.resolved(for: "english").model, "gemma4:latest")
+
+        let encoded = try JSONEncoder().encode(cfg)
+        let decoded = try JSONDecoder().decode(AIProviderConfig.self, from: encoded)
+        XCTAssertEqual(decoded.resolved(for: "german").model, "mistral-small3.1")
+    }
 }

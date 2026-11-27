@@ -475,6 +475,60 @@ describe('AICoachView & AIProviderModal Components', () => {
     }
   });
 
+  it('suggests language-matched models, demotes coding-only models on Fetch Models, and pins per-language overrides', async () => {
+    const onSaveConfig = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'deepseek-coder-v2:16b', owned_by: 'ollama' },
+          { id: 'gemma4:latest', owned_by: 'ollama' },
+          { id: 'qwen3-coder:latest', owned_by: 'ollama' },
+        ],
+      }),
+    } as unknown as Response);
+
+    try {
+      render(
+        <AIProviderModal
+          isOpen={true}
+          onClose={vi.fn()}
+          config={{ ...getDefaultAIConfig('ollama'), model: 'deepseek-coder-v2:16b' }}
+          onSaveConfig={onSaveConfig}
+          activeLanguageId="german"
+        />
+      );
+
+      // Coding-model warning is shown for deepseek-coder-v2:16b
+      expect(screen.getByText(/is coding-specialized/i)).toBeInTheDocument();
+
+      // Fetching live models auto-picks gemma4:latest over coding models!
+      fireEvent.click(screen.getByText('Fetch Models'));
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Model Name/i)).toHaveValue('gemma4:latest');
+      });
+
+      // German recommendation shows mistral-small3.1; switch to Japanese and see qwen3:14b top pick
+      expect(screen.getByText('mistral-small3.1')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /🇯🇵 Japanese/i }));
+      expect(screen.getByText(/Best for CJK & Japanese/i)).toBeInTheDocument();
+
+      // Pin qwen3:14b for Japanese and save
+      fireEvent.click(screen.getAllByRole('button', { name: /Pin for Japanese/i })[0]);
+      fireEvent.click(screen.getByText(/Save & Enable AI/i));
+      expect(onSaveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'ollama',
+          model: 'gemma4:latest',
+          languageModels: { japanese: 'qwen3:14b' },
+          enabled: true,
+        })
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('evaluates writing offline in AICoachView when AI provider is not yet connected', async () => {
     const onLog = vi.fn();
     render(

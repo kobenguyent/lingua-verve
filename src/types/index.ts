@@ -539,6 +539,7 @@ export interface AIProviderConfig {
   apiKey: string;
   temperature: number;
   enabled: boolean;
+  languageModels?: Record<string, string>; // Optional per-language model override e.g. { german: 'mistral-small3.1', japanese: 'qwen3:14b' }
 }
 
 // ============================================================

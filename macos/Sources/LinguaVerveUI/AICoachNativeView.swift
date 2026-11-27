@@ -314,9 +314,10 @@ public struct AICoachNativeView: View {
             skill: store.aiCoachSkill
         )
 
+        let effectiveConfig = store.aiConfig.resolved(for: lang)
         do {
             let reply = try await AIClientService().chat(
-                config: store.aiConfig,
+                config: effectiveConfig,
                 messages: [AIChatMessage(role: "system", content: sysPrompt)] + messages.suffix(10)
             )
             messages.append(AIChatMessage(role: "assistant", content: reply))
@@ -325,7 +326,7 @@ public struct AICoachNativeView: View {
                     languageId: lang,
                     level: store.aiCoachLevel,
                     skill: store.aiCoachSkill,
-                    provider: "\(store.aiConfig.provider.label) (\(store.aiConfig.model))",
+                    provider: "\(effectiveConfig.provider.label) (\(effectiveConfig.model))",
                     summary: String(prompt.prefix(70))
                 )
             )

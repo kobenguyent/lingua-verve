@@ -9,6 +9,7 @@ import {
   WritingExamTask,
 } from '../types';
 import { AI_PROVIDER_PRESETS, callAIProvider, isAIConfigReady } from './aiClient';
+import { resolveAIConfigForLanguage } from './aiModelAdvisor';
 
 export const GENERATED_EXAMS_STORAGE_KEY = 'linguaverve_ai_generated_exams_v1';
 
@@ -361,7 +362,8 @@ export async function generateFreshMockExamWithAI(params: {
   onProgress?: (progress: ExamGenerationProgress) => void;
   fetchImpl?: typeof fetch;
 }): Promise<{ exam: MockExam; aiSkillsCount: number; theme: string }> {
-  const { config, baseExam, customTopic, avoidThemes = [], onProgress, fetchImpl = fetch } = params;
+  const { config: rawConfig, baseExam, customTopic, avoidThemes = [], onProgress, fetchImpl = fetch } = params;
+  const config = resolveAIConfigForLanguage(rawConfig, baseExam.languageId);
 
   if (!isAIConfigReady(config)) {
     throw new Error('Connect a Local (Ollama/LM Studio) or Cloud (OpenAI/Gemini/OpenRouter) AI provider first.');

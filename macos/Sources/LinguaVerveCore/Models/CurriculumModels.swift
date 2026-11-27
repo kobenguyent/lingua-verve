@@ -1466,6 +1466,11 @@ public struct AIProviderConfig: Codable, Equatable, Sendable {
     public var apiKey: String
     public var temperature: Double
     public var enabled: Bool
+    public var languageModels: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case provider, endpoint, model, apiKey, temperature, enabled, languageModels
+    }
 
     public init(
         provider: AIProviderType = .ollama,
@@ -1473,7 +1478,8 @@ public struct AIProviderConfig: Codable, Equatable, Sendable {
         model: String? = nil,
         apiKey: String = "",
         temperature: Double = 0.4,
-        enabled: Bool = false
+        enabled: Bool = false,
+        languageModels: [String: String]? = nil
     ) {
         self.provider = provider
         self.endpoint = endpoint ?? provider.defaultEndpoint
@@ -1481,6 +1487,33 @@ public struct AIProviderConfig: Codable, Equatable, Sendable {
         self.apiKey = apiKey
         self.temperature = temperature
         self.enabled = enabled
+        self.languageModels = languageModels
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let provider = try c.decodeIfPresent(AIProviderType.self, forKey: .provider) ?? .ollama
+        self.provider = provider
+        self.endpoint = try c.decodeIfPresent(String.self, forKey: .endpoint) ?? provider.defaultEndpoint
+        self.model = try c.decodeIfPresent(String.self, forKey: .model) ?? provider.defaultModel
+        self.apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        self.temperature = try c.decodeIfPresent(Double.self, forKey: .temperature) ?? 0.4
+        self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        self.languageModels = try c.decodeIfPresent([String: String].self, forKey: .languageModels)
+    }
+
+    /// Returns a copy of this configuration with any per-language pinned model applied.
+    public func resolved(for languageId: String?) -> AIProviderConfig {
+        guard let languageId, !languageId.isEmpty, let map = languageModels else { return self }
+        let key = ModelLanguageTarget.normalize(languageId).rawValue
+        guard let pinned = map[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !pinned.isEmpty,
+              pinned != model else {
+            return self
+        }
+        var copy = self
+        copy.model = pinned
+        return copy
     }
 
     public var isReady: Bool {

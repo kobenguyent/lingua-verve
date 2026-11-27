@@ -93,7 +93,8 @@ public struct AIExamGeneratorService: Sendable {
         avoidThemes: [String] = [],
         onProgress: (@Sendable (SkillType, SkillGenerationStatus) -> Void)? = nil
     ) async throws -> ExamGenerationResult {
-        guard config.isReady else {
+        let effectiveConfig = config.resolved(for: baseExam.languageId)
+        guard effectiveConfig.isReady else {
             throw AIExamGeneratorError.aiNotConfigured
         }
 
@@ -112,11 +113,11 @@ public struct AIExamGeneratorService: Sendable {
             ? ""
             : "Avoid repeating scenarios from these previous themes: \(avoidThemes.prefix(5).joined(separator: "; "))."
 
-        var mutableConfig = config
-        mutableConfig.temperature = max(0.65, min(0.95, config.temperature))
+        var mutableConfig = effectiveConfig
+        mutableConfig.temperature = max(0.65, min(0.95, effectiveConfig.temperature))
         let creativeConfig = mutableConfig
 
-        let runSequentially = config.provider.isLocal
+        let runSequentially = effectiveConfig.provider.isLocal
 
         let readRes: (ok: Bool, parts: [ReadingExamPart])
         let listenRes: (ok: Bool, tracks: [ListeningExamTrack])
@@ -168,7 +169,7 @@ public struct AIExamGeneratorService: Sendable {
             requireAllSkillsPass: baseExam.requireAllSkillsPass ?? true,
             aiGenerated: true,
             generatedTheme: chosenTheme,
-            generatedByModel: "\(config.provider.label) · \(config.model)",
+            generatedByModel: "\(effectiveConfig.provider.label) · \(effectiveConfig.model)",
             generatedAt: ISO8601DateFormatter().string(from: Date()),
             aiGeneratedSkills: aiSkills,
             reading: ReadingExamSection(

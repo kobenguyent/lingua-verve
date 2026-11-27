@@ -523,6 +523,7 @@ export const App: React.FC = () => {
         onClose={() => setIsAISettingsOpen(false)}
         config={aiConfig}
         onSaveConfig={handleSaveAIConfig}
+        activeLanguageId={activeLanguageId}
       />
 
       <VoiceSettingsModal
