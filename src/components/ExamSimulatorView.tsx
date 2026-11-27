@@ -55,6 +55,12 @@ import {
   SpeechRecorderHandle,
   startSpeechRecognition,
 } from '../utils/speechRecognition';
+import {
+  assessFullExamWithAIOrFallback,
+  buildCoachSeedFromAssessment,
+  buildOfflineExamAssessment,
+} from '../utils/examAssessment';
+import { ExamAIAssessmentPanel } from './ExamAIAssessmentPanel';
 
 interface ExamSimulatorViewProps {
   activeLanguageId: string;
@@ -63,6 +69,7 @@ interface ExamSimulatorViewProps {
   aiConfig: AIProviderConfig;
   onOpenAISettings: () => void;
   onCompleteExam: (record: ExamAttemptRecord) => void;
+  onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
 }
 
 const SECTION_ORDER: SkillType[] = ['reading', 'listening', 'writing', 'speaking'];
@@ -174,6 +181,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
   aiConfig,
   onOpenAISettings,
   onCompleteExam,
+  onLaunchAICoach,
 }) => {
   const examLang = activeLanguageId === 'german' ? 'german' : 'english';
   const availableExams = MOCK_EXAMS.filter((e) => e.languageId === examLang);
@@ -576,12 +584,36 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
     const labeledCombinedWriting = writingTasks
       .map((t, idx) => `[Task ${idx + 1} · ${t.weightPercent}%]\n${(writingResponses[t.id] || '').trim() || '(blank)'}`)
       .join('\n\n');
-    const writingRubric = computeRubricBreakdown({
-      text: rawCombinedWriting,
-      score: writingScore,
-      minWords: writingTasks.reduce((sum, t) => sum + t.minWords, 0),
-      expectedKeywords: writingTasks.flatMap((t) => t.keyRubricKeywords),
-    });
+    const aiWritingRubrics = writingEvals
+      .map((ev, idx) => (ev.rubric ? { rubric: ev.rubric, weight: writingTasks[idx].weightPercent } : null))
+      .filter((item): item is { rubric: OfficialRubricBreakdown; weight: number } => Boolean(item));
+    const writingRubric: OfficialRubricBreakdown =
+      aiWritingRubrics.length > 0
+        ? (() => {
+            const wSum = aiWritingRubrics.reduce((sum, item) => sum + item.weight, 0) || 100;
+            const weighted = (key: keyof OfficialRubricBreakdown) =>
+              Math.max(
+                0,
+                Math.min(
+                  100,
+                  Math.round(
+                    aiWritingRubrics.reduce((sum, item) => sum + item.rubric[key] * item.weight, 0) / wSum
+                  )
+                )
+              );
+            return {
+              taskFulfillment: weighted('taskFulfillment'),
+              coherenceCohesion: weighted('coherenceCohesion'),
+              lexicalRange: weighted('lexicalRange'),
+              grammaticalAccuracy: weighted('grammaticalAccuracy'),
+            };
+          })()
+        : computeRubricBreakdown({
+            text: rawCombinedWriting,
+            score: writingScore,
+            minWords: writingTasks.reduce((sum, t) => sum + t.minWords, 0),
+            expectedKeywords: writingTasks.flatMap((t) => t.keyRubricKeywords),
+          });
     const writingTaskSummary = writingEvals
       .map((ev, idx) => `T${idx + 1} (${writingTasks[idx].weightPercent}%): ${ev.score}%`)
       .join(' · ');
@@ -617,12 +649,14 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
         ? 1
         : 0.65 + 0.35 * (answeredParts / speakingParts.length);
     const speakingScore = Math.round(speakingEval.score * partCoverageFactor);
-    const speakingRubric = computeRubricBreakdown({
-      text: rawCombinedSpeaking,
-      score: speakingScore,
-      minWords: Math.max(35, Math.round(currentExam.writing.minWords * 0.85)),
-      expectedKeywords: speakingParts.flatMap((p) => p.keyRubricKeywords),
-    });
+    const speakingRubric =
+      speakingEval.rubric ||
+      computeRubricBreakdown({
+        text: rawCombinedSpeaking,
+        score: speakingScore,
+        minWords: Math.max(35, Math.round(currentExam.writing.minWords * 0.85)),
+        expectedKeywords: speakingParts.flatMap((p) => p.keyRubricKeywords),
+      });
 
     const overallScore = Math.round((readingScore + listeningScore + writingScore + speakingScore) / 4);
     const passMark = currentExam.passingScorePercent;
@@ -679,7 +713,7 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
     const writingNotes = writingEvals.flatMap((ev) => ev.corrections).slice(0, 6);
     const speakingNotes = speakingEval.corrections.slice(0, 6);
 
-    const record: ExamAttemptRecord = {
+    const draftRecord: ExamAttemptRecord = {
       id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: new Date().toISOString(),
       examId: currentExam.id,
@@ -723,6 +757,31 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
       questionReviews,
       writingNotes,
       speakingNotes,
+    };
+
+    // 5. Comprehensive 4-Skill AI Examiner Assessment (Reading, Listening, Writing, Speaking + Study Plan)
+    const aiAssessment = await assessFullExamWithAIOrFallback({
+      config: aiConfig,
+      exam: currentExam,
+      attempt: draftRecord,
+      writingEvals,
+      speakingEval,
+    });
+
+    const record: ExamAttemptRecord = {
+      ...draftRecord,
+      skills: {
+        ...draftRecord.skills,
+        reading: {
+          ...draftRecord.skills.reading,
+          aiGraded: aiAssessment.skillInsights.reading.aiAnalyzed || draftRecord.skills.reading.aiGraded,
+        },
+        listening: {
+          ...draftRecord.skills.listening,
+          aiGraded: aiAssessment.skillInsights.listening.aiAnalyzed || draftRecord.skills.listening.aiGraded,
+        },
+      },
+      aiAssessment,
     };
 
     setGradingDetails({
@@ -2046,6 +2105,28 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
                 );
               })}
             </div>
+
+            {/* Deep 4-Skill AI Examiner Assessment (Insights, Corrections, Suggestions & Study Plan) */}
+            <ExamAIAssessmentPanel
+              attempt={report}
+              assessment={
+                report.aiAssessment ||
+                buildOfflineExamAssessment({ exam: currentExam, attempt: report })
+              }
+              aiReady={aiReady}
+              onOpenAISettings={onOpenAISettings}
+              onPracticeSkillInCoach={
+                onLaunchAICoach
+                  ? (sk) =>
+                      onLaunchAICoach(
+                        report.languageId,
+                        report.level,
+                        sk,
+                        buildCoachSeedFromAssessment(report, sk)
+                      )
+                  : undefined
+              }
+            />
 
             {/* Model Answers, Multi-Accent Transcripts & Full 18-Item Key */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">

@@ -613,9 +613,20 @@ public struct AIClientService: Sendable {
         let langName = languageId == "german" ? "German" : "English"
         let examBoard = languageId == "german" ? "Goethe-Zertifikat / telc / TestDaF" : "Cambridge English / IELTS / TOEFL"
         let sys = """
-        You are a certified \(examBoard) examiner for \(langName) at CEFR \(level.rawValue).
-        Evaluate the candidate's \(skill.rawValue) submission. Return ONLY valid JSON:
-        {"score":0-100,"cefrEstimate":"\(level.rawValue)","strengths":["..."],"corrections":["..."],"upgradedVersion":"...","examinerSummary":"..."}
+        You are a strict, encouraging certified \(examBoard) examiner for \(langName) at CEFR \(level.rawValue).
+        Evaluate the candidate's \(skill.rawValue) submission thoroughly against official CEFR \(level.rawValue) criteria.
+        Return ONLY valid JSON (no markdown fences):
+        {
+          "score": 0-100,
+          "cefrEstimate": "\(level.rawValue)",
+          "rubric": {"taskFulfillment": 0-100, "coherenceCohesion": 0-100, "lexicalRange": 0-100, "grammaticalAccuracy": 0-100},
+          "strengths": ["specific strength citing candidate's phrasing"],
+          "corrections": ["erroneous phrase -> corrected phrase (short rule)"],
+          "correctionItems": [{"original": "exact phrase from candidate", "corrected": "natural corrected phrase", "explanation": "concise grammar/register reason"}],
+          "suggestions": ["concrete next-step improvement drill"],
+          "upgradedVersion": "natural \(level.rawValue)+ rewrite in \(langName) preserving the candidate's ideas",
+          "examinerSummary": "2-sentence official examiner diagnostic"
+        }
         """
 
         do {
@@ -630,25 +641,79 @@ public struct AIClientService: Sendable {
                let end = raw.lastIndex(of: "}"),
                start <= end {
                 let jsonSlice = String(raw[start...end])
+                struct PartialRubric: Decodable {
+                    let taskFulfillment: Int?
+                    let coherenceCohesion: Int?
+                    let lexicalRange: Int?
+                    let grammaticalAccuracy: Int?
+                }
+                struct PartialCorrection: Decodable {
+                    let original: String?
+                    let corrected: String?
+                    let explanation: String?
+                    let sectionTag: String?
+                }
                 struct PartialAI: Decodable {
                     let score: Int?
                     let cefrEstimate: String?
+                    let rubric: PartialRubric?
                     let strengths: [String]?
                     let corrections: [String]?
+                    let correctionItems: [PartialCorrection]?
+                    let suggestions: [String]?
                     let upgradedVersion: String?
                     let examinerSummary: String?
                 }
                 if let data = jsonSlice.data(using: .utf8),
                    let parsed = try? JSONDecoder().decode(PartialAI.self, from: data) {
+                    let score = max(0, min(100, parsed.score ?? 72))
+                    let rubric: OfficialRubricBreakdown? = parsed.rubric.map { r in
+                        OfficialRubricBreakdown(
+                            taskFulfillment: max(0, min(100, r.taskFulfillment ?? score)),
+                            coherenceCohesion: max(0, min(100, r.coherenceCohesion ?? score)),
+                            lexicalRange: max(0, min(100, r.lexicalRange ?? score)),
+                            grammaticalAccuracy: max(0, min(100, r.grammaticalAccuracy ?? score))
+                        )
+                    }
+                    let items: [ExamCorrectionItem] = (parsed.correctionItems ?? [])
+                        .compactMap { item -> ExamCorrectionItem? in
+                            let corr = (item.corrected ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !corr.isEmpty else { return nil }
+                            return ExamCorrectionItem(
+                                original: (item.original ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                                corrected: corr,
+                                explanation: (item.explanation ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                                sectionTag: item.sectionTag?.trimmingCharacters(in: .whitespacesAndNewlines)
+                            )
+                        }
+                        .prefix(6)
+                        .map { $0 }
+                    let cleanedCorrections = (parsed.corrections ?? [])
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                    let finalCorrections = !cleanedCorrections.isEmpty
+                        ? Array(cleanedCorrections.prefix(5))
+                        : items.map { item in
+                            item.original.isEmpty
+                                ? "\(item.corrected): \(item.explanation)"
+                                : "\"\(item.original)\" → \"\(item.corrected)\" (\(item.explanation))"
+                        }
+                    let cleanedSuggestions = (parsed.suggestions ?? [])
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+
                     return AIEvaluationResult(
-                        score: max(0, min(100, parsed.score ?? 72)),
+                        score: score,
                         cefrEstimate: CEFRLevel(rawValue: parsed.cefrEstimate ?? level.rawValue) ?? level,
-                        strengths: parsed.strengths ?? [],
-                        corrections: parsed.corrections ?? [],
-                        upgradedVersion: parsed.upgradedVersion ?? "",
-                        examinerSummary: parsed.examinerSummary ?? String(raw.prefix(240)),
+                        strengths: (parsed.strengths ?? []).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+                        corrections: finalCorrections,
+                        upgradedVersion: (parsed.upgradedVersion ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                        examinerSummary: (parsed.examinerSummary ?? String(raw.prefix(240))).trimmingCharacters(in: .whitespacesAndNewlines),
                         source: "ai",
-                        providerLabel: "\(config.provider.label) (\(config.model))"
+                        providerLabel: "\(config.provider.label) (\(config.model))",
+                        rubric: rubric,
+                        suggestions: cleanedSuggestions.isEmpty ? nil : Array(cleanedSuggestions.prefix(4)),
+                        correctionItems: items.isEmpty ? nil : items
                     )
                 }
             }

@@ -579,7 +579,7 @@ describe('ProgressDashboardView Component', () => {
     expect(screen.getByText(/Remember verb-final word order after "obwohl"./i)).toBeInTheDocument();
     expect(screen.getByText(/Question-by-Question Review \(1\/2 Correct\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Wann öffnet die Bibliothek\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/Von welchem Gleis fährt der Zug\?/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Von welchem Gleis fährt der Zug\?/i).length).toBeGreaterThanOrEqual(1);
 
     // Filter to Missed Only and verify only the missed listening item remains
     fireEvent.click(screen.getByRole('button', { name: 'Missed Only' }));
@@ -593,6 +593,192 @@ describe('ProgressDashboardView Component', () => {
     // Retake action works
     fireEvent.click(screen.getByRole('button', { name: /Retake B1/i }));
     expect(onLaunchExam).toHaveBeenCalledWith('german', 'B1');
+  });
+
+  it('runs AI 4-skill assessment retroactively on a past exam, shows per-skill insights/corrections/rewrites, and seeds AI Coach', async () => {
+    const onUpdateExamAssessment = vi.fn();
+    const onLaunchAICoach = vi.fn();
+
+    const writingResp = JSON.stringify({
+      score: 82,
+      cefrEstimate: 'B1',
+      rubric: { taskFulfillment: 86, coherenceCohesion: 80, lexicalRange: 79, grammaticalAccuracy: 83 },
+      strengths: ['Clear polite opening and structured request.'],
+      corrections: ['"ich gehe zu Arzt" -> "ich gehe zum Arzt" (zu + dem = zum)'],
+      correctionItems: [
+        {
+          original: 'ich gehe zu Arzt',
+          corrected: 'ich gehe zum Arzt',
+          explanation: 'Contract zu + dem to zum before masculine dative nouns.',
+        },
+      ],
+      suggestions: ['Add a clear closing timeline for your follow-up.'],
+      upgradedVersion: 'Sehr geehrte Damen und Herren, leider muss ich heute zum Arzt gehen und bitte um einen neuen Termin.',
+      examinerSummary: 'Solid B1 formal email with one minor preposition contraction fix.',
+    });
+
+    const speakingResp = JSON.stringify({
+      score: 79,
+      cefrEstimate: 'B1',
+      rubric: { taskFulfillment: 80, coherenceCohesion: 78, lexicalRange: 77, grammaticalAccuracy: 81 },
+      strengths: ['Natural sentence rhythm on everyday commuting.'],
+      corrections: ['"ich fahre mit S-Bahn" -> "ich fahre mit der S-Bahn" (keep feminine dative article)'],
+      correctionItems: [
+        {
+          original: 'ich fahre mit S-Bahn',
+          corrected: 'ich fahre mit der S-Bahn',
+          explanation: 'Use the feminine dative article der after mit.',
+        },
+      ],
+      suggestions: ['Add one contrasting argument with "andererseits".'],
+      upgradedVersion: 'Ich fahre meistens mit der S-Bahn ins Büro, weil ich dadurch im Berufsverkehr viel Zeit spare.',
+      examinerSummary: 'Confident B1 oral delivery with room for richer contrast markers.',
+    });
+
+    const fourSkillResp = JSON.stringify({
+      overallSummary: 'Strong B1 foundation overall; tighten Listening track 2 platform-change awareness and German dative contractions.',
+      readinessVerdict: 'Ready for Official B1 with Listening Polish',
+      reading: {
+        cefrEstimate: 'B2',
+        summary: 'High accuracy across Reading P1-P3 with strong detail scanning.',
+        strengths: ['Pinpointed opening hours accurately in Part 1.'],
+        weaknesses: ['Double-check subtle negation words in Part 3 Cloze.'],
+        corrections: [],
+        suggestions: ['Keep scanning for qualifiers like "erst" and "kaum".'],
+      },
+      listening: {
+        cefrEstimate: 'B1',
+        summary: 'Caught main gist but missed the platform reassignment on Track 2.',
+        strengths: ['Understood Track 1 everyday dialogue smoothly.'],
+        weaknesses: ['Missed mid-announcement correction from Gleis 2 to Gleis 5.'],
+        corrections: [
+          {
+            sectionTag: 'Listening T2',
+            original: 'Gleis 2',
+            corrected: 'Gleis 5',
+            explanation: 'Speaker revised the platform mid-sentence with "wurde verlegt".',
+          },
+        ],
+        suggestions: ['Shadow-read Austrian & Swiss announcements focusing on revised numbers.'],
+      },
+      writing: {
+        summary: 'Clear formal B1 register with one dative contraction slip.',
+        strengths: ['Polite register throughout.'],
+        weaknesses: ['Watch preposition + article contractions (zum/zur).'],
+        corrections: [],
+        suggestions: ['Review dative contractions before exam day.'],
+      },
+      speaking: {
+        summary: 'Clear everyday speech; enrich Part 2 with explicit pros/cons markers.',
+        strengths: ['Good pacing.'],
+        weaknesses: ['Missing feminine dative article after mit.'],
+        corrections: [],
+        suggestions: ['Practice 60-second structured contrasts using einerseits / andererseits.'],
+      },
+      studyPlan: [
+        {
+          priority: 1,
+          skill: 'listening',
+          title: 'Master Transit Self-Correction Traps',
+          action: 'Replay Track 2 twice without transcript and note every revised number.',
+          targetMinutes: 15,
+        },
+      ],
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const bodyStr = String(init?.body || '');
+      const content = bodyStr.includes('Chief Examiner')
+        ? fourSkillResp
+        : bodyStr.includes("candidate's speaking")
+        ? speakingResp
+        : writingResp;
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content } }] }),
+      } as unknown as Response;
+    });
+
+    try {
+      const state = {
+        ...createEmptyLearnerState(),
+        examHistory: [
+          {
+            id: 'attempt-ai-assess-1',
+            timestamp: '2026-11-27T09:00:00.000Z',
+            examId: 'exam-de-b1',
+            examTitle: 'Goethe-Zertifikat B1 Simulation',
+            alignedCertificate: 'Goethe-Zertifikat B1',
+            languageId: 'german',
+            level: 'B1' as const,
+            mode: 'strict' as const,
+            durationUsedSeconds: 1500,
+            overallScore: 81,
+            passed: true,
+            skills: {
+              reading: { score: 89, passed: true, feedback: '8/9 correct' },
+              listening: { score: 67, passed: true, feedback: '6/9 correct' },
+              writing: { score: 82, passed: true, feedback: 'Good draft' },
+              speaking: { score: 79, passed: true, feedback: 'Clear speech' },
+            },
+            writingSubmission: 'Sehr geehrte Damen und Herren, ich gehe zu Arzt heute.',
+            speakingTranscript: 'Ich fahre mit S-Bahn ins Büro.',
+            questionReviews: [
+              {
+                id: 'q-l2',
+                skill: 'listening' as const,
+                sectionTag: 'Listening T2',
+                prompt: 'Von welchem Gleis fährt der Zug?',
+                chosenOption: 'Gleis 2',
+                correctOption: 'Gleis 5',
+                isCorrect: false,
+                explanation: 'Der Zug wurde auf Gleis fünf verlegt.',
+              },
+            ],
+          },
+        ],
+      };
+
+      const activeAI = { ...getDefaultAIConfig('openai'), enabled: true, apiKey: 'sk-test-assess' };
+
+      render(
+        <ProgressDashboardView
+          learnerState={state}
+          masteredTipsCount={2}
+          onImportState={vi.fn()}
+          onResetProgress={vi.fn()}
+          onJumpToCourse={vi.fn()}
+          aiConfig={activeAI}
+          onUpdateExamAssessment={onUpdateExamAssessment}
+          onLaunchAICoach={onLaunchAICoach}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Goethe-Zertifikat B1 Simulation/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Run AI 4-Skill Analysis/i }));
+
+      await waitFor(() => {
+        expect(onUpdateExamAssessment).toHaveBeenCalledTimes(1);
+        expect(screen.getByText(/Ready for Official B1 with Listening Polish/i)).toBeInTheDocument();
+        expect(screen.getByText(/Master Transit Self-Correction Traps/i)).toBeInTheDocument();
+      });
+
+      // Switch to Writing tab and verify exact inline correction & higher-band rewrite appear
+      fireEvent.click(screen.getByRole('button', { name: /Writing 82%/i }));
+      expect(screen.getByText(/ich gehe zum Arzt/i)).toBeInTheDocument();
+      expect(screen.getByText(/AI Higher-Band Rewrite \(B1\+\)/i)).toBeInTheDocument();
+
+      // Click Drill Writing in AI Coach
+      fireEvent.click(screen.getByRole('button', { name: /Drill Writing in AI Coach/i }));
+      expect(onLaunchAICoach).toHaveBeenCalledWith(
+        'german',
+        'B1',
+        'writing',
+        expect.stringContaining('ich gehe zu Arzt → ich gehe zum Arzt')
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

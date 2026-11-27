@@ -20,27 +20,40 @@ import {
   Info,
 } from 'lucide-react';
 import {
+  AIProviderConfig,
   CEFRLevel,
+  ExamAIAssessment,
   ExamAttemptRecord,
   MockExam,
   OfficialRubricBreakdown,
   SkillType,
 } from '../types';
 import { MOCK_EXAMS } from '../data';
+import { isAIConfigReady } from '../utils/aiClient';
 import { loadGeneratedExams } from '../utils/aiExamGenerator';
 import { ACCENT_CATALOG, parseDialogueTurns, soundEngine } from '../utils/audio';
+import {
+  assessFullExamWithAIOrFallback,
+  buildCoachSeedFromAssessment,
+  buildOfflineExamAssessment,
+} from '../utils/examAssessment';
 import {
   computeOfficialGradeLabel,
   getExamListeningTracks,
   getExamSpeakingParts,
   getExamWritingTasks,
 } from '../utils/examScoring';
+import { ExamAIAssessmentPanel } from './ExamAIAssessmentPanel';
 
 interface ExamAttemptDetailModalProps {
   attempt: ExamAttemptRecord | null;
   onClose: () => void;
   onRetakeLevel?: (languageId: string, level: CEFRLevel) => void;
   onDeleteAttempt?: (attemptId: string) => void;
+  aiConfig?: AIProviderConfig;
+  onOpenAISettings?: () => void;
+  onUpdateAssessment?: (attemptId: string, assessment: ExamAIAssessment) => void;
+  onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
 }
 
 type ReviewFilter = 'all' | 'missed' | 'reading' | 'listening';
@@ -165,21 +178,29 @@ function DialogueTranscriptBlock({ script }: { script: string }) {
 }
 
 export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
-  attempt,
+  attempt: propAttempt,
   onClose,
   onRetakeLevel,
   onDeleteAttempt,
+  aiConfig,
+  onOpenAISettings,
+  onUpdateAssessment,
+  onLaunchAICoach,
 }) => {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all');
   const [copied, setCopied] = useState(false);
+  const [localAssessment, setLocalAssessment] = useState<ExamAIAssessment | null>(null);
+  const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
 
   useEffect(() => {
     setReviewFilter('all');
     setCopied(false);
-  }, [attempt?.id]);
+    setLocalAssessment(null);
+    setIsAnalyzingAI(false);
+  }, [propAttempt?.id]);
 
   useEffect(() => {
-    if (!attempt) return;
+    if (!propAttempt) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         soundEngine.stopSpeech();
@@ -191,7 +212,13 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
       window.removeEventListener('keydown', onKeyDown);
       soundEngine.stopSpeech();
     };
-  }, [attempt, onClose]);
+  }, [propAttempt, onClose]);
+
+  const attempt: ExamAttemptRecord | null = propAttempt
+    ? localAssessment
+      ? { ...propAttempt, aiAssessment: localAssessment }
+      : propAttempt
+    : null;
 
   const matchedExamInfo = useMemo(
     () => (attempt ? resolveExamForAttempt(attempt) : null),
@@ -199,6 +226,28 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
   );
 
   if (!attempt) return null;
+
+  const aiReady = Boolean(aiConfig && isAIConfigReady(aiConfig));
+  const resolvedAssessment =
+    attempt.aiAssessment ||
+    buildOfflineExamAssessment({ exam: matchedExamInfo?.exam, attempt });
+
+  const handleRunAIAnalysis = async () => {
+    if (!aiConfig || !isAIConfigReady(aiConfig) || isAnalyzingAI) return;
+    setIsAnalyzingAI(true);
+    try {
+      const result = await assessFullExamWithAIOrFallback({
+        config: aiConfig,
+        exam: matchedExamInfo?.exam,
+        attempt,
+      });
+      setLocalAssessment(result);
+      onUpdateAssessment?.(attempt.id, result);
+      soundEngine.playSuccessChime();
+    } finally {
+      setIsAnalyzingAI(false);
+    }
+  };
 
   const gradeLabel = resolveOfficialGradeLabel(attempt);
   const allReviews = attempt.questionReviews || [];
@@ -243,6 +292,23 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
         return `${SKILL_META[sk].label}: ${s.score}% [${s.passed ? 'PASS' : 'FAIL'}] — ${s.feedback}${rubricText}`;
       }),
     ];
+    if (attempt.aiAssessment) {
+      lines.push(
+        '',
+        `--- 4-Skill Examiner Assessment (${attempt.aiAssessment.providerLabel}) ---`,
+        `Verdict: ${attempt.aiAssessment.readinessVerdict}`,
+        attempt.aiAssessment.overallSummary
+      );
+      (['reading', 'listening', 'writing', 'speaking'] as SkillType[]).forEach((sk) => {
+        const ins = attempt.aiAssessment?.skillInsights[sk];
+        if (!ins) return;
+        lines.push(`${SKILL_META[sk].label}: ${ins.summary}`);
+        ins.corrections.forEach((c) => {
+          lines.push(`  Fix: ${c.original ? `${c.original} -> ` : ''}${c.corrected} (${c.explanation})`);
+        });
+        ins.suggestions.forEach((tip) => lines.push(`  Tip: ${tip}`));
+      });
+    }
     if (writingText) {
       lines.push('', '--- Writing Submission ---', writingText);
     }
@@ -489,6 +555,30 @@ export const ExamAttemptDetailModal: React.FC<ExamAttemptDetailModalProps> = ({
               })}
             </div>
           </section>
+
+          {/* Deep 4-Skill AI Examiner Assessment (Insights, Corrections, Suggestions & Study Plan) */}
+          <ExamAIAssessmentPanel
+            attempt={attempt}
+            assessment={resolvedAssessment}
+            aiReady={aiReady}
+            isAnalyzing={isAnalyzingAI}
+            onRunAIAnalysis={aiReady ? () => void handleRunAIAnalysis() : undefined}
+            onOpenAISettings={onOpenAISettings}
+            onPracticeSkillInCoach={
+              onLaunchAICoach
+                ? (sk) => {
+                    soundEngine.stopSpeech();
+                    onClose();
+                    onLaunchAICoach(
+                      attempt.languageId,
+                      attempt.level,
+                      sk,
+                      buildCoachSeedFromAssessment(attempt, sk)
+                    );
+                  }
+                : undefined
+            }
+          />
 
           {/* Written & Spoken Submissions + Action Notes */}
           {(writingText || speakingText || writingNotes.length > 0 || speakingNotes.length > 0) && (

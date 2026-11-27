@@ -217,6 +217,33 @@ export function deleteExamAttempt(
   };
 }
 
+export function updateExamAttemptAssessment(
+  state: LearnerProgressState,
+  attemptId: string,
+  assessment: NonNullable<ExamAttemptRecord['aiAssessment']>
+): LearnerProgressState {
+  return {
+    ...state,
+    examHistory: state.examHistory.map((item) => {
+      if (item.id !== attemptId) return item;
+      const updatedSkills = { ...item.skills };
+      (['reading', 'listening', 'writing', 'speaking'] as SkillType[]).forEach((sk) => {
+        if (updatedSkills[sk] && assessment.skillInsights[sk]?.aiAnalyzed) {
+          updatedSkills[sk] = {
+            ...updatedSkills[sk],
+            aiGraded: true,
+          };
+        }
+      });
+      return {
+        ...item,
+        skills: updatedSkills,
+        aiAssessment: assessment,
+      };
+    }),
+  };
+}
+
 export function recordAISession(
   state: LearnerProgressState,
   session: AISessionRecord

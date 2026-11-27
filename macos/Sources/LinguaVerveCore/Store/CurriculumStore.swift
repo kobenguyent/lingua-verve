@@ -637,6 +637,54 @@ public final class CurriculumStore {
         persistLearnerState()
     }
 
+    @discardableResult
+    public func updateExamAttemptAssessment(
+        attemptId: String,
+        assessment: ExamAIAssessment
+    ) -> ExamAttemptRecord? {
+        guard let idx = learnerState.examHistory.firstIndex(where: { $0.id == attemptId }) else {
+            return nil
+        }
+        let existing = learnerState.examHistory[idx]
+        var updatedSkills = existing.skills
+        for sk in SkillType.allCases {
+            if let currentSkill = updatedSkills[sk.rawValue],
+               assessment.insight(for: sk)?.aiAnalyzed == true {
+                updatedSkills[sk.rawValue] = SkillExamScore(
+                    score: currentSkill.score,
+                    passed: currentSkill.passed,
+                    feedback: currentSkill.feedback,
+                    aiGraded: true,
+                    rubric: currentSkill.rubric
+                )
+            }
+        }
+        let updated = ExamAttemptRecord(
+            id: existing.id,
+            timestamp: existing.timestamp,
+            examId: existing.examId,
+            examTitle: existing.examTitle,
+            alignedCertificate: existing.alignedCertificate,
+            languageId: existing.languageId,
+            level: existing.level,
+            mode: existing.mode,
+            durationUsedSeconds: existing.durationUsedSeconds,
+            overallScore: existing.overallScore,
+            passed: existing.passed,
+            officialGradeLabel: existing.officialGradeLabel,
+            skills: updatedSkills,
+            writingSubmission: existing.writingSubmission,
+            speakingTranscript: existing.speakingTranscript,
+            questionReviews: existing.questionReviews,
+            writingNotes: existing.writingNotes,
+            speakingNotes: existing.speakingNotes,
+            aiAssessment: assessment
+        )
+        learnerState.examHistory[idx] = updated
+        persistLearnerState()
+        return updated
+    }
+
     public func recordAISession(_ session: AISessionRecord) {
         learnerState.aiSessionHistory.insert(session, at: 0)
         if learnerState.aiSessionHistory.count > 60 {

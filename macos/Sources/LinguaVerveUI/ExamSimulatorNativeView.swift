@@ -1098,6 +1098,14 @@ public struct ExamSimulatorNativeView: View {
                             HStack {
                                 Text(sk.shortName.uppercased()).scaledFont(.caption, weight: .bold, design: .monospaced)
                                 Spacer()
+                                if s.aiGraded {
+                                    Text("AI")
+                                        .scaledFont(size: 9, weight: .bold, design: .monospaced)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(Color.purple.opacity(0.18)))
+                                        .foregroundStyle(.purple)
+                                }
                                 Text(s.passed ? "PASS" : "FAIL")
                                     .scaledFont(size: 9.5, weight: .bold, design: .monospaced)
                                     .padding(.horizontal, 5)
@@ -1123,6 +1131,24 @@ public struct ExamSimulatorNativeView: View {
                     }
                 }
             }
+
+            // Deep 4-Skill AI Examiner Insights, Corrections, Suggestions & Study Plan
+            let assessment = report.aiAssessment ?? ExamAssessmentService.buildOfflineAssessment(exam: exam, attempt: report)
+            ExamAIAssessmentPanelView(
+                store: store,
+                attempt: report,
+                assessment: assessment,
+                onOpenAISettings: { showAISettingsSheet = true },
+                onPracticeSkillInCoach: { sk in
+                    stopAudioAndMic()
+                    store.openAICoach(
+                        languageId: report.languageId,
+                        level: report.level,
+                        skill: sk,
+                        seedPrompt: ExamAssessmentService.buildCoachSeedPrompt(attempt: report, skill: sk)
+                    )
+                }
+            )
 
             // Unlocked Multi-Accent Transcripts + Full 18-Item Answer Key
             DisclosureGroup("Unlocked Multi-Accent Transcripts & Answer Key (\(readingParts.reduce(0) { $0 + $1.questions.count } + listeningTracks.reduce(0) { $0 + $1.questions.count }) Items)") {
@@ -1436,12 +1462,31 @@ public struct ExamSimulatorNativeView: View {
             let txt = (writingByTask[t.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return "[Task \(idx + 1) · \(t.weightPercent)%]\n\(txt.isEmpty ? "(blank)" : txt)"
         }.joined(separator: "\n\n")
-        let writeRubric = OfficialRubricBreakdown.compute(
-            text: rawWriting,
-            score: writePct,
-            minWords: writingTasks.reduce(0) { $0 + $1.minWords },
-            expectedKeywords: writingTasks.flatMap(\.keyRubricKeywords)
-        )
+        let writeRubric: OfficialRubricBreakdown = {
+            let aiRubrics = zip(writeEvals, writingTasks).compactMap { pair -> (OfficialRubricBreakdown, Int)? in
+                guard let r = pair.0.rubric else { return nil }
+                return (r, pair.1.weightPercent)
+            }
+            if !aiRubrics.isEmpty {
+                let wSum = max(1, aiRubrics.reduce(0) { $0 + $1.1 })
+                func avg(_ kp: KeyPath<OfficialRubricBreakdown, Int>) -> Int {
+                    let total = aiRubrics.reduce(0) { $0 + $1.0[keyPath: kp] * $1.1 }
+                    return max(0, min(100, Int((Double(total) / Double(wSum)).rounded())))
+                }
+                return OfficialRubricBreakdown(
+                    taskFulfillment: avg(\.taskFulfillment),
+                    coherenceCohesion: avg(\.coherenceCohesion),
+                    lexicalRange: avg(\.lexicalRange),
+                    grammaticalAccuracy: avg(\.grammaticalAccuracy)
+                )
+            }
+            return OfficialRubricBreakdown.compute(
+                text: rawWriting,
+                score: writePct,
+                minWords: writingTasks.reduce(0) { $0 + $1.minWords },
+                expectedKeywords: writingTasks.flatMap(\.keyRubricKeywords)
+            )
+        }()
         let writeTaskSummary = zip(writeEvals, writingTasks).enumerated().map { idx, pair in
             "T\(idx + 1) (\(pair.1.weightPercent)%): \(pair.0.score)%"
         }.joined(separator: " · ")
@@ -1466,7 +1511,7 @@ public struct ExamSimulatorNativeView: View {
         )
         let partCoverage: Double = answeredParts == 0 ? 0 : (speakingParts.count <= 1 ? 1.0 : (0.65 + 0.35 * (Double(answeredParts) / Double(speakingParts.count))))
         let speakPct = Int((Double(speakEval.score) * partCoverage).rounded())
-        let speakRubric = OfficialRubricBreakdown.compute(
+        let speakRubric = speakEval.rubric ?? OfficialRubricBreakdown.compute(
             text: rawSpeaking,
             score: speakPct,
             minWords: speakMinWords,
@@ -1528,7 +1573,7 @@ public struct ExamSimulatorNativeView: View {
         let capturedWritingNotes = Array(writeEvals.flatMap(\.corrections).prefix(6))
         let capturedSpeakingNotes = Array(speakEval.corrections.prefix(6))
 
-        let rec = ExamAttemptRecord(
+        let draftRec = ExamAttemptRecord(
             id: "exam-\(UUID().uuidString.prefix(8))",
             timestamp: ISO8601DateFormatter().string(from: Date()),
             examId: exam.id,
@@ -1572,6 +1617,51 @@ public struct ExamSimulatorNativeView: View {
             questionReviews: reviews,
             writingNotes: capturedWritingNotes,
             speakingNotes: capturedSpeakingNotes
+        )
+
+        // 5. Comprehensive 4-Skill AI Examiner Assessment (Reading, Listening, Writing, Speaking + Study Plan)
+        let assessment = await ExamAssessmentService(aiClient: ai).assessFullExam(
+            config: store.aiConfig,
+            exam: exam,
+            attempt: draftRec,
+            writingEvals: writeEvals,
+            speakingEval: speakEval
+        )
+
+        var enrichedSkills = draftRec.skills
+        for sk in [SkillType.reading, .listening] {
+            if let existing = enrichedSkills[sk.rawValue],
+               assessment.insight(for: sk)?.aiAnalyzed == true {
+                enrichedSkills[sk.rawValue] = SkillExamScore(
+                    score: existing.score,
+                    passed: existing.passed,
+                    feedback: existing.feedback,
+                    aiGraded: true,
+                    rubric: existing.rubric
+                )
+            }
+        }
+
+        let rec = ExamAttemptRecord(
+            id: draftRec.id,
+            timestamp: draftRec.timestamp,
+            examId: draftRec.examId,
+            examTitle: draftRec.examTitle,
+            alignedCertificate: draftRec.alignedCertificate,
+            languageId: draftRec.languageId,
+            level: draftRec.level,
+            mode: draftRec.mode,
+            durationUsedSeconds: draftRec.durationUsedSeconds,
+            overallScore: draftRec.overallScore,
+            passed: draftRec.passed,
+            officialGradeLabel: draftRec.officialGradeLabel,
+            skills: enrichedSkills,
+            writingSubmission: draftRec.writingSubmission,
+            speakingTranscript: draftRec.speakingTranscript,
+            questionReviews: draftRec.questionReviews,
+            writingNotes: draftRec.writingNotes,
+            speakingNotes: draftRec.speakingNotes,
+            aiAssessment: assessment
         )
 
         writingNotes = capturedWritingNotes

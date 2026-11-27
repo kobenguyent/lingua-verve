@@ -695,4 +695,112 @@ final class AcademyAndAITests: XCTestCase {
         restored.deleteExamAttempt(id: richAttempt.id)
         XCTAssertTrue(restored.learnerState.examHistory.isEmpty)
     }
+
+    func testFourSkillAIExamAssessmentWithConfiguredProviderOfflineFallbackAndPersistence() async throws {
+        let store = makeTestStore()
+        guard let deB1 = store.mockExam(for: "german", level: .B1) else {
+            XCTFail("Expected German B1 exam")
+            return
+        }
+
+        let attempt = ExamAttemptRecord(
+            id: "attempt-4skill-1",
+            timestamp: "2026-11-27T09:15:00Z",
+            examId: deB1.id,
+            examTitle: deB1.title,
+            alignedCertificate: deB1.alignedCertificate,
+            languageId: "german",
+            level: .B1,
+            mode: "strict",
+            durationUsedSeconds: 1620,
+            overallScore: 76,
+            passed: true,
+            officialGradeLabel: "Goethe/telc: befriedigend (76/100)",
+            skills: [
+                SkillType.reading.rawValue: SkillExamScore(score: 89, passed: true, feedback: "8/9 correct"),
+                SkillType.listening.rawValue: SkillExamScore(score: 56, passed: false, feedback: "5/9 correct"),
+                SkillType.writing.rawValue: SkillExamScore(score: 80, passed: true, feedback: "Clear B1 email"),
+                SkillType.speaking.rawValue: SkillExamScore(score: 79, passed: true, feedback: "Structured talk")
+            ],
+            writingSubmission: "Sehr geehrte Damen und Herren, ich gehe heute zu Arzt.",
+            speakingTranscript: "Ich fahre jeden Tag mit S-Bahn zur Arbeit.",
+            questionReviews: [
+                ExamQuestionReview(
+                    id: "q-l2",
+                    skill: "listening",
+                    sectionTag: "Listening T2",
+                    prompt: "Welcher Bahnsteig?",
+                    chosenOption: "Gleis 1",
+                    correctOption: "Gleis 3",
+                    isCorrect: false,
+                    explanation: "Der Zug wurde auf Gleis drei verlegt."
+                )
+            ]
+        )
+
+        // 1. Offline fallback when AI provider is disabled
+        let offline = await ExamAssessmentService().assessFullExam(
+            config: AIProviderConfig(provider: .ollama, enabled: false),
+            exam: deB1,
+            attempt: attempt
+        )
+        XCTAssertEqual(offline.source, "offline-rubric")
+        XCTAssertEqual(offline.strongestSkill, .reading)
+        XCTAssertEqual(offline.prioritySkill, .listening)
+        XCTAssertEqual(offline.insight(for: .listening)?.corrections.first?.corrected, "Gleis 3")
+        XCTAssertFalse(offline.studyPlan.isEmpty)
+
+        // 2. Live AI 4-skill assessment via configured provider (mocked transport)
+        let writingJSON = """
+        {"score":82,"cefrEstimate":"B1","rubric":{"taskFulfillment":85,"coherenceCohesion":80,"lexicalRange":78,"grammaticalAccuracy":84},"strengths":["Polite B1 greeting"],"corrections":["zu Arzt -> zum Arzt"],"correctionItems":[{"original":"ich gehe heute zu Arzt","corrected":"ich gehe heute zum Arzt","explanation":"Use dative contraction zum (zu + dem)."}],"suggestions":["Add a clear alternative date."],"upgradedVersion":"Sehr geehrte Damen und Herren, leider muss ich heute zum Arzt gehen.","examinerSummary":"Solid B1 message with one preposition fix."}
+        """
+        let speakingJSON = """
+        {"score":80,"cefrEstimate":"B1","rubric":{"taskFulfillment":82,"coherenceCohesion":79,"lexicalRange":78,"grammaticalAccuracy":81},"strengths":["Natural rhythm"],"corrections":["mit S-Bahn -> mit der S-Bahn"],"correctionItems":[{"original":"mit S-Bahn","corrected":"mit der S-Bahn","explanation":"Keep feminine dative article der after mit."}],"suggestions":["Add einerseits/andererseits contrast."],"upgradedVersion":"Ich fahre jeden Tag mit der S-Bahn zur Arbeit, weil es sehr zuverlässig ist.","examinerSummary":"Clear B1 oral fluency."}
+        """
+        let holisticJSON = """
+        {"overallSummary":"Strong reading and writing; focus next on Listening Track 2 platform corrections.","readinessVerdict":"Strong Progress — Focus on Listening","reading":{"cefrEstimate":"B2","summary":"Accurate detail scanning across passages.","strengths":["Strong comprehension"],"weaknesses":[],"corrections":[],"suggestions":["Keep drilling C1 connectors."]},"listening":{"cefrEstimate":"A2","summary":"Missed mid-announcement platform switch in Track 2.","strengths":["Understood main context"],"weaknesses":["Missed Gleis 1 -> Gleis 3 self-correction"],"corrections":[{"sectionTag":"Listening T2","original":"Gleis 1","corrected":"Gleis 3","explanation":"Listen for verlegt/geändert revision cues."}],"suggestions":["Shadow-read DACH transit dialogues."]},"writing":{"summary":"Solid formal register with minor dative contraction slip.","strengths":["Clear task coverage"],"weaknesses":["Dative contraction zum/zur"],"corrections":[],"suggestions":["Proofread preposition contractions."]},"speaking":{"summary":"Confident daily speech with minor article omission.","strengths":["Good pacing"],"weaknesses":["Article after mit"],"corrections":[],"suggestions":["Practice 60s structured contrasts."]},"studyPlan":[{"priority":1,"skill":"listening","title":"Drill Transit Corrections","action":"Replay Track 2 without transcript and log every changed detail.","targetMinutes":20}]}
+        """
+
+        let transport = MockAITransport { request in
+            let reqBody = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+            let payload: String
+            if reqBody.contains("Chief Examiner") {
+                payload = holisticJSON
+            } else if reqBody.contains("candidate's speaking") {
+                payload = speakingJSON
+            } else {
+                payload = writingJSON
+            }
+            let escaped = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": payload]]]])
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (escaped, resp)
+        }
+
+        let service = ExamAssessmentService(aiClient: AIClientService(transport: transport))
+        let aiCfg = AIProviderConfig(provider: .openai, apiKey: "sk-test-4skill", enabled: true)
+        let aiAssessment = await service.assessFullExam(config: aiCfg, exam: deB1, attempt: attempt)
+
+        XCTAssertEqual(aiAssessment.source, "ai")
+        XCTAssertEqual(aiAssessment.readinessVerdict, "Strong Progress — Focus on Listening")
+        XCTAssertEqual(aiAssessment.insight(for: .reading)?.aiAnalyzed, true)
+        XCTAssertEqual(aiAssessment.insight(for: .listening)?.corrections.first?.corrected, "Gleis 3")
+        XCTAssertEqual(aiAssessment.insight(for: .writing)?.corrections.first?.corrected, "ich gehe heute zum Arzt")
+        XCTAssertEqual(aiAssessment.insight(for: .writing)?.upgradedVersion, "Sehr geehrte Damen und Herren, leider muss ich heute zum Arzt gehen.")
+        XCTAssertEqual(aiAssessment.insight(for: .speaking)?.upgradedVersion, "Ich fahre jeden Tag mit der S-Bahn zur Arbeit, weil es sehr zuverlässig ist.")
+        XCTAssertEqual(aiAssessment.studyPlan.first?.skill, .listening)
+
+        // 3. Persist updated AI assessment onto existing history attempt & round-trip via JSON backup
+        store.recordExamAttempt(attempt)
+        let updated = store.updateExamAttemptAssessment(attemptId: attempt.id, assessment: aiAssessment)
+        XCTAssertEqual(updated?.aiAssessment?.readinessVerdict, "Strong Progress — Focus on Listening")
+        XCTAssertEqual(updated?.skills[SkillType.listening.rawValue]?.aiGraded, true)
+
+        let seed = ExamAssessmentService.buildCoachSeedPrompt(attempt: try XCTUnwrap(updated), skill: .listening)
+        XCTAssertTrue(seed.contains("Gleis 1 → Gleis 3"))
+
+        let backup = store.exportProgressJSON()
+        let restored = makeTestStore()
+        try restored.importProgressJSON(backup)
+        XCTAssertEqual(restored.learnerState.examHistory.first?.aiAssessment?.studyPlan.first?.title, "Drill Transit Corrections")
+    }
 }

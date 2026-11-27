@@ -1035,6 +1035,121 @@ public struct ExamQuestionReview: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+public struct ExamCorrectionItem: Codable, Identifiable, Equatable, Sendable {
+    public var id: String { "\(sectionTag ?? "gen")|\(original)|\(corrected)" }
+    public let original: String
+    public let corrected: String
+    public let explanation: String
+    public let sectionTag: String?
+
+    public init(
+        original: String,
+        corrected: String,
+        explanation: String,
+        sectionTag: String? = nil
+    ) {
+        self.original = original
+        self.corrected = corrected
+        self.explanation = explanation
+        self.sectionTag = sectionTag
+    }
+}
+
+public struct ExamSkillInsight: Codable, Equatable, Sendable {
+    public let skill: SkillType
+    public let cefrEstimate: CEFRLevel?
+    public let summary: String
+    public let strengths: [String]
+    public let weaknesses: [String]
+    public let corrections: [ExamCorrectionItem]
+    public let suggestions: [String]
+    public let upgradedVersion: String?
+    public let aiAnalyzed: Bool
+
+    public init(
+        skill: SkillType,
+        cefrEstimate: CEFRLevel? = nil,
+        summary: String,
+        strengths: [String] = [],
+        weaknesses: [String] = [],
+        corrections: [ExamCorrectionItem] = [],
+        suggestions: [String] = [],
+        upgradedVersion: String? = nil,
+        aiAnalyzed: Bool = false
+    ) {
+        self.skill = skill
+        self.cefrEstimate = cefrEstimate
+        self.summary = summary
+        self.strengths = strengths
+        self.weaknesses = weaknesses
+        self.corrections = corrections
+        self.suggestions = suggestions
+        self.upgradedVersion = upgradedVersion
+        self.aiAnalyzed = aiAnalyzed
+    }
+}
+
+public struct ExamStudyPlanItem: Codable, Identifiable, Equatable, Sendable {
+    public var id: String { "\(priority)-\(skill.rawValue)-\(title)" }
+    public let priority: Int
+    public let skill: SkillType
+    public let title: String
+    public let action: String
+    public let targetMinutes: Int
+
+    public init(
+        priority: Int,
+        skill: SkillType,
+        title: String,
+        action: String,
+        targetMinutes: Int
+    ) {
+        self.priority = priority
+        self.skill = skill
+        self.title = title
+        self.action = action
+        self.targetMinutes = targetMinutes
+    }
+}
+
+public struct ExamAIAssessment: Codable, Equatable, Sendable {
+    public let generatedAt: String
+    public let source: String // "ai" | "offline-rubric"
+    public let providerLabel: String
+    public let overallSummary: String
+    public let readinessVerdict: String
+    public let strongestSkill: SkillType
+    public let prioritySkill: SkillType
+    public let skillInsights: [String: ExamSkillInsight]
+    public let studyPlan: [ExamStudyPlanItem]
+
+    public init(
+        generatedAt: String = ISO8601DateFormatter().string(from: Date()),
+        source: String,
+        providerLabel: String,
+        overallSummary: String,
+        readinessVerdict: String,
+        strongestSkill: SkillType,
+        prioritySkill: SkillType,
+        skillInsights: [String: ExamSkillInsight],
+        studyPlan: [ExamStudyPlanItem]
+    ) {
+        self.generatedAt = generatedAt
+        self.source = source
+        self.providerLabel = providerLabel
+        self.overallSummary = overallSummary
+        self.readinessVerdict = readinessVerdict
+        self.strongestSkill = strongestSkill
+        self.prioritySkill = prioritySkill
+        self.skillInsights = skillInsights
+        self.studyPlan = studyPlan
+    }
+
+    public func insight(for skill: SkillType) -> ExamSkillInsight? {
+        skillInsights[skill.rawValue]
+    }
+}
+
 public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let id: String
     public let timestamp: String
@@ -1054,6 +1169,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
     public let questionReviews: [ExamQuestionReview]?
     public let writingNotes: [String]?
     public let speakingNotes: [String]?
+    public let aiAssessment: ExamAIAssessment?
 
     public init(
         id: String,
@@ -1073,7 +1189,8 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         speakingTranscript: String? = nil,
         questionReviews: [ExamQuestionReview]? = nil,
         writingNotes: [String]? = nil,
-        speakingNotes: [String]? = nil
+        speakingNotes: [String]? = nil,
+        aiAssessment: ExamAIAssessment? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -1093,6 +1210,7 @@ public struct ExamAttemptRecord: Codable, Identifiable, Equatable, Sendable {
         self.questionReviews = questionReviews
         self.writingNotes = writingNotes
         self.speakingNotes = speakingNotes
+        self.aiAssessment = aiAssessment
     }
 }
 
@@ -1286,6 +1404,35 @@ public struct AIEvaluationResult: Codable, Equatable, Sendable {
     public let examinerSummary: String
     public let source: String // "ai" | "offline-rubric"
     public let providerLabel: String
+    public let rubric: OfficialRubricBreakdown?
+    public let suggestions: [String]?
+    public let correctionItems: [ExamCorrectionItem]?
+
+    public init(
+        score: Int,
+        cefrEstimate: CEFRLevel,
+        strengths: [String],
+        corrections: [String],
+        upgradedVersion: String,
+        examinerSummary: String,
+        source: String,
+        providerLabel: String,
+        rubric: OfficialRubricBreakdown? = nil,
+        suggestions: [String]? = nil,
+        correctionItems: [ExamCorrectionItem]? = nil
+    ) {
+        self.score = score
+        self.cefrEstimate = cefrEstimate
+        self.strengths = strengths
+        self.corrections = corrections
+        self.upgradedVersion = upgradedVersion
+        self.examinerSummary = examinerSummary
+        self.source = source
+        self.providerLabel = providerLabel
+        self.rubric = rubric
+        self.suggestions = suggestions
+        self.correctionItems = correctionItems
+    }
 }
 
 public struct AISessionRecord: Codable, Identifiable, Equatable, Sendable {

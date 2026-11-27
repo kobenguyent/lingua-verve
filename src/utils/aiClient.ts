@@ -5,6 +5,8 @@ import {
   AIProviderConfig,
   AIProviderType,
   CEFRLevel,
+  ExamCorrectionItem,
+  OfficialRubricBreakdown,
   SkillType,
 } from '../types';
 
@@ -634,14 +636,25 @@ export async function evaluateWithAIOrFallback(params: {
   const examBoard = params.languageId === 'german' ? 'Goethe-Zertifikat / telc / TestDaF' : 'Cambridge English / IELTS / TOEFL';
 
   const systemPrompt = `You are a strict, encouraging certified ${examBoard} examiner for ${langName} at CEFR ${params.level}.
-Evaluate the candidate's ${params.skill} response. Return ONLY valid JSON matching this exact schema:
+Evaluate the candidate's ${params.skill} response thoroughly against official CEFR ${params.level} criteria.
+Return ONLY valid JSON matching this exact schema (no markdown fences):
 {
   "score": <number 0-100>,
   "cefrEstimate": "<A1|A2|B1|B2|C1|C2>",
-  "strengths": ["<point 1>", "<point 2>"],
-  "corrections": ["<specific error -> fix 1>", "<specific error -> fix 2>"],
-  "upgradedVersion": "<natural ${params.level}+ rewrite in ${langName}>",
-  "examinerSummary": "<2-sentence official examiner feedback>"
+  "rubric": {
+    "taskFulfillment": <0-100>,
+    "coherenceCohesion": <0-100>,
+    "lexicalRange": <0-100>,
+    "grammaticalAccuracy": <0-100>
+  },
+  "strengths": ["<specific strength citing candidate's wording>", "<strength 2>"],
+  "corrections": ["<specific error -> exact fix + short rule>", "<fix 2>"],
+  "correctionItems": [
+    {"original": "<exact erroneous phrase from candidate>", "corrected": "<natural corrected phrase>", "explanation": "<concise grammar/register reason>"}
+  ],
+  "suggestions": ["<targeted next-step practice tip 1>", "<tip 2>"],
+  "upgradedVersion": "<natural ${params.level}+ rewrite in ${langName} preserving the candidate's ideas>",
+  "examinerSummary": "<2-sentence official examiner diagnostic>"
 }`;
 
   try {
@@ -659,21 +672,80 @@ Evaluate the candidate's ${params.skill} response. Return ONLY valid JSON matchi
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Non-JSON AI response');
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<AIEvaluationResult>;
+    const parsed = JSON.parse(jsonMatch[0]) as Omit<
+      Partial<AIEvaluationResult>,
+      'rubric' | 'correctionItems' | 'suggestions'
+    > & {
+      rubric?: Partial<OfficialRubricBreakdown>;
+      correctionItems?: unknown[];
+      suggestions?: unknown[];
+    };
     const validLevels: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
     const cefrEstimate = validLevels.includes(parsed.cefrEstimate as CEFRLevel)
       ? (parsed.cefrEstimate as CEFRLevel)
       : params.level;
 
+    const clamp = (val: unknown, fallback: number) => {
+      const n = Number(val);
+      return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : fallback;
+    };
+
+    const score = clamp(parsed.score, 70);
+    const rubric: OfficialRubricBreakdown | undefined =
+      parsed.rubric && typeof parsed.rubric === 'object'
+        ? {
+            taskFulfillment: clamp(parsed.rubric.taskFulfillment, score),
+            coherenceCohesion: clamp(parsed.rubric.coherenceCohesion, score),
+            lexicalRange: clamp(parsed.rubric.lexicalRange, score),
+            grammaticalAccuracy: clamp(parsed.rubric.grammaticalAccuracy, score),
+          }
+        : undefined;
+
+    const correctionItems: ExamCorrectionItem[] = Array.isArray(parsed.correctionItems)
+      ? parsed.correctionItems
+          .filter(
+            (item): item is Partial<ExamCorrectionItem> =>
+              Boolean(
+                item &&
+                  typeof item === 'object' &&
+                  'corrected' in item &&
+                  typeof (item as Record<string, unknown>).corrected === 'string'
+              )
+          )
+          .map((item) => ({
+            original: typeof item.original === 'string' ? item.original.trim() : '',
+            corrected: (item.corrected || '').trim(),
+            explanation: typeof item.explanation === 'string' ? item.explanation.trim() : '',
+            sectionTag: typeof item.sectionTag === 'string' ? item.sectionTag.trim() : undefined,
+          }))
+          .filter((item) => item.corrected.length > 0)
+          .slice(0, 6)
+      : [];
+
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).slice(0, 4)
+      : [];
+
+    const corrections = Array.isArray(parsed.corrections)
+      ? parsed.corrections.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 5)
+      : correctionItems.map((ci) =>
+          ci.original ? `"${ci.original}" → "${ci.corrected}" (${ci.explanation})` : `${ci.corrected}: ${ci.explanation}`
+        );
+
     return {
-      score: Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 70))),
+      score,
       cefrEstimate,
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
-      corrections: Array.isArray(parsed.corrections) ? parsed.corrections.slice(0, 5) : [],
-      upgradedVersion: typeof parsed.upgradedVersion === 'string' ? parsed.upgradedVersion : '',
-      examinerSummary: typeof parsed.examinerSummary === 'string' ? parsed.examinerSummary : raw.slice(0, 260),
+      strengths: Array.isArray(parsed.strengths)
+        ? parsed.strengths.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).slice(0, 4)
+        : [],
+      corrections,
+      upgradedVersion: typeof parsed.upgradedVersion === 'string' ? parsed.upgradedVersion.trim() : '',
+      examinerSummary: typeof parsed.examinerSummary === 'string' ? parsed.examinerSummary.trim() : raw.slice(0, 260),
       source: 'ai',
       providerLabel: `${AI_PROVIDER_PRESETS[params.config.provider].label} (${params.config.model})`,
+      rubric,
+      suggestions,
+      correctionItems,
     };
   } catch {
     return evaluateSubmissionOffline(params);

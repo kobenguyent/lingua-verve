@@ -31,6 +31,7 @@ import {
   saveLearnerState,
   saveUnitProgressInState,
   toggleModuleCompletionInState,
+  updateExamAttemptAssessment,
 } from './utils/progressStore';
 import { Navbar } from './components/Navbar';
 import { WorkspaceTabs } from './components/WorkspaceTabs';
@@ -431,6 +432,7 @@ export const App: React.FC = () => {
             aiConfig={aiConfig}
             onOpenAISettings={() => setIsAISettingsOpen(true)}
             onCompleteExam={handleCompleteExam}
+            onLaunchAICoach={handleLaunchAICoach}
           />
         </main>
       )}
@@ -464,6 +466,12 @@ export const App: React.FC = () => {
             onDeleteExamAttempt={(attemptId) =>
               setLearnerState((prev) => deleteExamAttempt(prev, attemptId))
             }
+            aiConfig={aiConfig}
+            onOpenAISettings={() => setIsAISettingsOpen(true)}
+            onUpdateExamAssessment={(attemptId, assessment) =>
+              setLearnerState((prev) => updateExamAttemptAssessment(prev, attemptId, assessment))
+            }
+            onLaunchAICoach={handleLaunchAICoach}
           />
         </main>
       )}

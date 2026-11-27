@@ -419,6 +419,45 @@ export interface ExamQuestionReview {
   explanation: string;
 }
 
+export interface ExamCorrectionItem {
+  original: string;
+  corrected: string;
+  explanation: string;
+  sectionTag?: string;
+}
+
+export interface ExamSkillInsight {
+  skill: SkillType;
+  cefrEstimate?: CEFRLevel;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  corrections: ExamCorrectionItem[];
+  suggestions: string[];
+  upgradedVersion?: string;
+  aiAnalyzed: boolean;
+}
+
+export interface ExamStudyPlanItem {
+  priority: number;
+  skill: SkillType;
+  title: string;
+  action: string;
+  targetMinutes: number;
+}
+
+export interface ExamAIAssessment {
+  generatedAt: string;
+  source: 'ai' | 'offline-rubric';
+  providerLabel: string;
+  overallSummary: string;
+  readinessVerdict: string;
+  strongestSkill: SkillType;
+  prioritySkill: SkillType;
+  skillInsights: Record<SkillType, ExamSkillInsight>;
+  studyPlan: ExamStudyPlanItem[];
+}
+
 export interface ExamAttemptRecord {
   id: string;
   timestamp: string;
@@ -438,6 +477,7 @@ export interface ExamAttemptRecord {
   questionReviews?: ExamQuestionReview[];
   writingNotes?: string[];
   speakingNotes?: string[];
+  aiAssessment?: ExamAIAssessment;
 }
 
 // ============================================================
@@ -514,6 +554,9 @@ export interface AIEvaluationResult {
   examinerSummary: string;
   source: 'ai' | 'offline-rubric';
   providerLabel: string;
+  rubric?: OfficialRubricBreakdown;
+  suggestions?: string[];
+  correctionItems?: ExamCorrectionItem[];
 }
 
 export interface AISessionRecord {

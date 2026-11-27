@@ -12,18 +12,22 @@ private enum ReviewFilterMode: String, CaseIterable, Identifiable {
 
 public struct ExamAttemptDetailSheetView: View {
     @Bindable var store: CurriculumStore
-    let attempt: ExamAttemptRecord
+    @State private var currentAttempt: ExamAttemptRecord
     @Environment(\.dismiss) private var dismiss
 
     @State private var reviewFilter: ReviewFilterMode = .all
     @State private var copiedSummary = false
     @State private var showDeleteConfirm = false
     @State private var showReferenceBenchmarks = false
+    @State private var isAnalyzingAI = false
+    @State private var showAISettingsSheet = false
 
     public init(store: CurriculumStore, attempt: ExamAttemptRecord) {
         self.store = store
-        self.attempt = attempt
+        self._currentAttempt = State(initialValue: attempt)
     }
+
+    private var attempt: ExamAttemptRecord { currentAttempt }
 
     private var resolvedGradeLabel: String {
         if let label = attempt.officialGradeLabel, !label.isEmpty {
@@ -64,6 +68,7 @@ public struct ExamAttemptDetailSheetView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     heroHeaderCard
                     skillsScorecardSection
+                    aiAssessmentSection
                     submissionsSection
                     questionReviewSection
                     referenceBenchmarksSection
@@ -119,6 +124,10 @@ public struct ExamAttemptDetailSheetView: View {
         #endif
         .onDisappear {
             NativeAudioEngine.shared.stopSpeech()
+        }
+        .sheet(isPresented: $showAISettingsSheet) {
+            AIProviderSheetView(store: store)
+                .applyAppFontScale(store)
         }
         .confirmationDialog("Delete this exam record from history?", isPresented: $showDeleteConfirm) {
             Button("Delete Exam Record", role: .destructive) {
@@ -313,6 +322,71 @@ public struct ExamAttemptDetailSheetView: View {
             ProgressView(value: Double(value), total: 100.0)
                 .tint(value >= 75 ? BrandTheme.emeraldMint : value >= 60 ? BrandTheme.celestialSky : .orange)
         }
+    }
+
+    // MARK: - AI 4-Skill Examiner Assessment Section
+
+    private var aiAssessmentSection: some View {
+        let resolved = currentAttempt.aiAssessment
+            ?? ExamAssessmentService.buildOfflineAssessment(exam: matchedExamInfo?.exam, attempt: currentAttempt)
+        return ExamAIAssessmentPanelView(
+            store: store,
+            attempt: currentAttempt,
+            assessment: resolved,
+            isAnalyzing: isAnalyzingAI,
+            onRunAIAnalysis: {
+                Task { await runRetroactiveAIAnalysis() }
+            },
+            onOpenAISettings: { showAISettingsSheet = true },
+            onPracticeSkillInCoach: { sk in
+                NativeAudioEngine.shared.stopSpeech()
+                dismiss()
+                store.openAICoach(
+                    languageId: currentAttempt.languageId,
+                    level: currentAttempt.level,
+                    skill: sk,
+                    seedPrompt: ExamAssessmentService.buildCoachSeedPrompt(attempt: currentAttempt, skill: sk)
+                )
+            }
+        )
+    }
+
+    @MainActor
+    private func runRetroactiveAIAnalysis() async {
+        guard !isAnalyzingAI else { return }
+        isAnalyzingAI = true
+        let assessment = await ExamAssessmentService().assessFullExam(
+            config: store.aiConfig,
+            exam: matchedExamInfo?.exam,
+            attempt: currentAttempt
+        )
+        if let updated = store.updateExamAttemptAssessment(attemptId: currentAttempt.id, assessment: assessment) {
+            currentAttempt = updated
+        } else {
+            currentAttempt = ExamAttemptRecord(
+                id: currentAttempt.id,
+                timestamp: currentAttempt.timestamp,
+                examId: currentAttempt.examId,
+                examTitle: currentAttempt.examTitle,
+                alignedCertificate: currentAttempt.alignedCertificate,
+                languageId: currentAttempt.languageId,
+                level: currentAttempt.level,
+                mode: currentAttempt.mode,
+                durationUsedSeconds: currentAttempt.durationUsedSeconds,
+                overallScore: currentAttempt.overallScore,
+                passed: currentAttempt.passed,
+                officialGradeLabel: currentAttempt.officialGradeLabel,
+                skills: currentAttempt.skills,
+                writingSubmission: currentAttempt.writingSubmission,
+                speakingTranscript: currentAttempt.speakingTranscript,
+                questionReviews: currentAttempt.questionReviews,
+                writingNotes: currentAttempt.writingNotes,
+                speakingNotes: currentAttempt.speakingNotes,
+                aiAssessment: assessment
+            )
+        }
+        isAnalyzingAI = false
+        NativeAudioEngine.shared.playSuccessChime()
     }
 
     // MARK: - Written & Spoken Submissions
@@ -704,6 +778,23 @@ public struct ExamAttemptDetailSheetView: View {
                 lines.append("\(skill.displayName): \(s.score)% [\(s.passed ? "PASS" : "FAIL")] — \(s.feedback)")
                 if let r = s.rubric {
                     lines.append("  Rubric: Task \(r.taskFulfillment)% | Coherence \(r.coherenceCohesion)% | Lexical \(r.lexicalRange)% | Grammar \(r.grammaticalAccuracy)%")
+                }
+            }
+        }
+        if let ai = attempt.aiAssessment {
+            lines.append("")
+            lines.append("--- 4-Skill Examiner Assessment (\(ai.providerLabel)) ---")
+            lines.append("Verdict: \(ai.readinessVerdict)")
+            lines.append(ai.overallSummary)
+            for sk in SkillType.allCases {
+                if let insight = ai.insight(for: sk) {
+                    lines.append("\(sk.displayName): \(insight.summary)")
+                    for corr in insight.corrections {
+                        lines.append("  Fix: \(corr.original.isEmpty ? "" : "\(corr.original) -> ")\(corr.corrected) (\(corr.explanation))")
+                    }
+                    for tip in insight.suggestions {
+                        lines.append("  Tip: \(tip)")
+                    }
                 }
             }
         }

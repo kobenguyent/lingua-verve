@@ -16,7 +16,14 @@ import {
   CheckCircle2,
   ChevronRight,
 } from 'lucide-react';
-import { CEFRLevel, ExamAttemptRecord, LearnerProgressState, SkillType } from '../types';
+import {
+  AIProviderConfig,
+  CEFRLevel,
+  ExamAIAssessment,
+  ExamAttemptRecord,
+  LearnerProgressState,
+  SkillType,
+} from '../types';
 import { INTENSIVE_COURSES } from '../data';
 import {
   computeSkillAverages,
@@ -39,6 +46,10 @@ interface ProgressDashboardViewProps {
   onJumpToCourse: (languageId: string, level: CEFRLevel) => void;
   onLaunchExam?: (languageId: string, level: CEFRLevel) => void;
   onDeleteExamAttempt?: (attemptId: string) => void;
+  aiConfig?: AIProviderConfig;
+  onOpenAISettings?: () => void;
+  onUpdateExamAssessment?: (attemptId: string, assessment: ExamAIAssessment) => void;
+  onLaunchAICoach?: (languageId: string, level: CEFRLevel, skill: SkillType, seedPrompt?: string) => void;
 }
 
 const SKILL_META: Record<SkillType, { label: string; icon: React.ComponentType<{ className?: string }>; barClass: string }> = {
@@ -56,6 +67,10 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
   onJumpToCourse,
   onLaunchExam,
   onDeleteExamAttempt,
+  aiConfig,
+  onOpenAISettings,
+  onUpdateExamAssessment,
+  onLaunchAICoach,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -474,6 +489,10 @@ export const ProgressDashboardView: React.FC<ProgressDashboardViewProps> = ({
         onClose={() => setSelectedAttempt(null)}
         onRetakeLevel={onLaunchExam}
         onDeleteAttempt={onDeleteExamAttempt}
+        aiConfig={aiConfig}
+        onOpenAISettings={onOpenAISettings}
+        onUpdateAssessment={onUpdateExamAssessment}
+        onLaunchAICoach={onLaunchAICoach}
       />
     </div>
   );
