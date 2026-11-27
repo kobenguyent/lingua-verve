@@ -71,13 +71,13 @@ function getSafeLocalStorage(): Storage | null {
 
 export function loadGeneratedExams(): MockExam[] {
   const storage = getSafeLocalStorage();
-  if (!storage) return inMemoryGeneratedExams;
+  if (!storage) return inMemoryGeneratedExams.map((e) => repairExamClozeParts(e));
   try {
     const raw = storage.getItem(GENERATED_EXAMS_STORAGE_KEY);
-    if (!raw) return inMemoryGeneratedExams;
+    if (!raw) return inMemoryGeneratedExams.map((e) => repairExamClozeParts(e));
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      inMemoryGeneratedExams = parsed as MockExam[];
+      inMemoryGeneratedExams = (parsed as MockExam[]).map((e) => repairExamClozeParts(e));
       return inMemoryGeneratedExams;
     }
     return inMemoryGeneratedExams;
@@ -172,6 +172,127 @@ function sanitizeQuestions(
     });
   }
   return results;
+}
+
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Guarantees that a Cloze (Sprachbausteine / Use of English) reading passage actually contains
+ * visible numbered gap markers `[1]`, `[2]`, ..., `[N]` matching its questions.
+ * 1. Normalizes variant LLM gap syntax (`___(1)___`, `(1)`, `{{1}}`, `[Gap 1]`, `[Lücke 1]`, `___1___`).
+ * 2. Converts unnumbered blank placeholders (`___`, `____`, `[___]`, `[...]`) sequentially into missing `[n]`.
+ * 3. If the LLM accidentally wrote the correct answer word directly in the text without blanking it,
+ *    auto-blanks each missing question's exact answer word (in reading order, with Unicode word boundaries) into `[n]`.
+ */
+export function repairClozePassage(
+  rawPassage: string,
+  questions: ExamObjectiveQuestion[]
+): { passage: string; hasAllGaps: boolean } {
+  const count = questions.length;
+  if (count === 0) return { passage: rawPassage, hasAllGaps: true };
+
+  let text = rawPassage;
+
+  // Step 1: Normalize variant numbered markers to canonical [n]
+  for (let n = 1; n <= count; n++) {
+    const canonical = `[${n}]`;
+    if (text.includes(canonical)) continue;
+    const patterns = [
+      new RegExp(`_{1,}\\s*[(\\[{<]?\\s*(?:gap|lücke|luecke|blank)?\\s*#?${n}\\s*[)\\]}>]?\\s*_{0,}`, 'i'),
+      new RegExp(`[\\[{<]\\s*(?:gap|lücke|luecke|blank)?\\s*#?${n}\\s*[\\]}>]`, 'i'),
+      new RegExp(`\\(\\s*(?:gap|lücke|luecke|blank)?\\s*#?${n}\\s*\\)`, 'i'),
+      new RegExp(`\\b(?:gap|lücke|luecke|blank)\\s*#?${n}\\b`, 'i'),
+    ];
+    for (const pat of patterns) {
+      if (pat.test(text)) {
+        text = text.replace(pat, canonical);
+        break;
+      }
+    }
+  }
+
+  // Step 2: Convert unnumbered blank placeholders (___, [___], [...]) into missing [n] tokens
+  for (let n = 1; n <= count; n++) {
+    const canonical = `[${n}]`;
+    if (text.includes(canonical)) continue;
+    const blankPat = /\[\s*(?:_{2,}|\.{3,})\s*\]|_{3,}/;
+    if (blankPat.test(text)) {
+      text = text.replace(blankPat, canonical);
+    }
+  }
+
+  // Step 3: Auto-blank exact correct answer words left inside the text by the LLM
+  let cursor = 0;
+  for (let i = 0; i < count; i++) {
+    const n = i + 1;
+    const canonical = `[${n}]`;
+    const existingIdx = text.indexOf(canonical);
+    if (existingIdx !== -1) {
+      cursor = existingIdx + canonical.length;
+      continue;
+    }
+    const q = questions[i];
+    const answer = (q.options[q.correctIndex] || '').trim();
+    if (!answer) continue;
+
+    const wordRegex = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(answer)}(?![\\p{L}\\p{N}])`, 'iu');
+    const tail = text.slice(cursor);
+    const tailMatch = wordRegex.exec(tail);
+    if (tailMatch && typeof tailMatch.index === 'number') {
+      const absStart = cursor + tailMatch.index;
+      const absEnd = absStart + tailMatch[0].length;
+      text = text.slice(0, absStart) + canonical + text.slice(absEnd);
+      cursor = absStart + canonical.length;
+    } else {
+      const fullMatch = wordRegex.exec(text);
+      if (fullMatch && typeof fullMatch.index === 'number') {
+        const absStart = fullMatch.index;
+        const absEnd = absStart + fullMatch[0].length;
+        text = text.slice(0, absStart) + canonical + text.slice(absEnd);
+      }
+    }
+  }
+
+  const hasAllGaps = Array.from({ length: count }, (_, idx) => text.includes(`[${idx + 1}]`)).every(Boolean);
+  return { passage: text, hasAllGaps };
+}
+
+/**
+ * Repairs any cloze Reading parts in an exam (including previously saved AI exams in localStorage).
+ */
+export function repairExamClozeParts(exam: MockExam, fallbackBase?: MockExam): MockExam {
+  const parts = exam.reading.parts;
+  if (!parts || parts.length === 0) return exam;
+  const baseParts = fallbackBase?.reading.parts || [];
+  let changed = false;
+
+  const repairedParts = parts.map((part, idx) => {
+    if (part.format !== 'cloze') return part;
+    const check = repairClozePassage(part.passage, part.questions);
+    if (check.hasAllGaps) {
+      if (check.passage !== part.passage) {
+        changed = true;
+        return { ...part, passage: check.passage };
+      }
+      return part;
+    }
+    if (baseParts[idx]) {
+      changed = true;
+      return baseParts[idx];
+    }
+    return part;
+  });
+
+  if (!changed) return exam;
+  return {
+    ...exam,
+    reading: {
+      ...exam.reading,
+      parts: repairedParts,
+    },
+  };
 }
 
 function getTargetAccents(languageId: string, seed: number): [string, string, string] {
@@ -276,7 +397,12 @@ export async function generateFreshMockExamWithAI(params: {
   // --- 1. READING PROMPT (3 Parts · 9 Questions) ---
   const generateReading = async (): Promise<{ ok: boolean; parts: ReadingExamPart[] }> => {
     emitProgress('reading', 'loading');
+    const clozeExample = isGerman
+      ? 'Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe.'
+      : 'I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget.';
+    const gapWord = isGerman ? 'Lücke' : 'Gap';
     const sys = `You are a certified ${baseExam.alignedCertificate} exam author creating brand-new CEFR ${baseExam.level} ${langName} Reading exam content.
+CRITICAL FOR PART 3 (format: "cloze"): The passage MUST contain the literal numbered blank markers [1], [2], and [3] IN PLACE OF the missing answer words — NEVER write the answer words inside the passage! Example Part 3 passage: "${clozeExample}".
 Return ONLY valid JSON with this exact shape:
 {
   "parts": [
@@ -309,26 +435,27 @@ Return ONLY valid JSON with this exact shape:
       "format": "cloze",
       "instruction": "<instruction in ${langName}>",
       "passageTitle": "<title in ${langName}>",
-      "passage": "<short ${langName} text with gaps [1], [2], [3]>",
+      "passage": "<70-120 word ${langName} text containing exact markers [1], [2], and [3] where words are missing>",
       "questions": [
-        {"prompt":"<Gap [1] prompt>","options":["...","...","...","..."],"correctIndex":0,"explanation":"..."},
-        {"prompt":"<Gap [2] prompt>","options":["...","...","...","..."],"correctIndex":1,"explanation":"..."},
-        {"prompt":"<Gap [3] prompt>","options":["...","...","...","..."],"correctIndex":2,"explanation":"..."}
+        {"prompt":"${gapWord} [1]","options":["...","...","...","..."],"correctIndex":0,"explanation":"..."},
+        {"prompt":"${gapWord} [2]","options":["...","...","...","..."],"correctIndex":1,"explanation":"..."},
+        {"prompt":"${gapWord} [3]","options":["...","...","...","..."],"correctIndex":2,"explanation":"..."}
       ]
     }
   ]
 }`;
-    const user = `Generate a completely fresh, original CEFR ${baseExam.level} ${langName} Reading section (3 parts, 3 questions each = 9 questions total) themed around: "${chosenTheme}". Variation seed: ${seed}. ${avoidNote} All passages, questions, and options must be strictly calibrated to CEFR ${baseExam.level} in ${langName}.`;
+    const user = `Generate a completely fresh, original CEFR ${baseExam.level} ${langName} Reading section (3 parts, 3 questions each = 9 questions total) themed around: "${chosenTheme}". Remember: Part 3 MUST be a real cloze gap-fill text with literal [1], [2], [3] blanks replacing the 3 correct answer words. Variation seed: ${seed}. ${avoidNote} All passages, questions, and options must be strictly calibrated to CEFR ${baseExam.level} in ${langName}.`;
 
     const raw = await callJsonWithRetry<{ parts?: Array<Record<string, unknown>> }>(config, sys, user, fetchImpl);
     const rawParts = Array.isArray(raw?.parts) ? raw!.parts : [];
     const formats: Array<ReadingExamPart['format']> = ['comprehension', 'true-false', 'cloze'];
+    const baseParts = baseExam.reading.parts || [];
 
     const validated: ReadingExamPart[] = [];
     for (let i = 0; i < Math.min(3, rawParts.length); i++) {
       const rp = rawParts[i];
       if (!rp || typeof rp !== 'object') continue;
-      const passage = pickString(rp.passage, '');
+      let passage = pickString(rp.passage, '');
       const qs = sanitizeQuestions(rp.questions, `ai-${stamp}-r-p${i + 1}`, 3);
       if (passage.length < 30 || qs.length < 2) continue;
       const rawFmt = typeof rp.format === 'string' ? rp.format : formats[i];
@@ -336,6 +463,20 @@ Return ONLY valid JSON with this exact shape:
         rawFmt === 'true-false' || rawFmt === 'tfng' || rawFmt === 'cloze' || rawFmt === 'matching'
           ? rawFmt
           : formats[i];
+
+      if (fmt === 'cloze') {
+        const repaired = repairClozePassage(passage, qs);
+        if (repaired.hasAllGaps) {
+          passage = repaired.passage;
+        } else if (baseParts[i]) {
+          // Never serve an unanswerable gap-less Part 3 cloze passage
+          validated.push(baseParts[i]);
+          continue;
+        } else {
+          passage = repaired.passage;
+        }
+      }
+
       validated.push({
         id: `ai-${stamp}-read-p${i + 1}`,
         partLabel: pickString(rp.partLabel, `Reading · Part ${i + 1}`),
@@ -349,7 +490,6 @@ Return ONLY valid JSON with this exact shape:
 
     if (validated.length >= 2) {
       // Pad to 3 parts using base exam part if AI only returned 2
-      const baseParts = baseExam.reading.parts || [];
       while (validated.length < 3 && baseParts[validated.length]) {
         validated.push(baseParts[validated.length]);
       }

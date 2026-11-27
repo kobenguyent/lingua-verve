@@ -39,6 +39,8 @@ import {
   ExamGenerationProgress,
   generateFreshMockExamWithAI,
   loadGeneratedExams,
+  repairClozePassage,
+  repairExamClozeParts,
   saveGeneratedExam,
 } from '../utils/aiExamGenerator';
 import { ACCENT_CATALOG, parseDialogueTurns, soundEngine } from '../utils/audio';
@@ -110,6 +112,46 @@ function getReadingFormatLabel(format: string): string {
     default:
       return 'Comprehension';
   }
+}
+
+function ClozePassageText({
+  part,
+  answers,
+}: {
+  part: { passage: string; questions: Array<{ id: string; options: string[]; correctIndex: number; prompt: string; explanation: string }> };
+  answers: Record<string, number>;
+}) {
+  const displayPassage = repairClozePassage(part.passage, part.questions).passage;
+  const segments = displayPassage.split(/(\[\d+\])/g);
+
+  return (
+    <>
+      {segments.map((seg, idx) => {
+        const match = seg.match(/^\[(\d+)\]$/);
+        if (!match) {
+          return <React.Fragment key={idx}>{seg}</React.Fragment>;
+        }
+        const num = Number(match[1]);
+        const q = part.questions[num - 1];
+        const chosenIdx = q ? answers[q.id] : undefined;
+        const chosenWord =
+          q && typeof chosenIdx === 'number' && q.options[chosenIdx] ? q.options[chosenIdx] : null;
+
+        return (
+          <span
+            key={idx}
+            className={`inline-flex items-center px-2 py-0.5 mx-0.5 rounded-md font-mono text-xs sm:text-sm font-bold border align-baseline ${
+              chosenWord
+                ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/35'
+                : 'bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-500/35'
+            }`}
+          >
+            [{num}: {chosenWord ?? '_____'}]
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 function TranscriptDisplay({ script }: { script: string }) {
@@ -273,8 +315,11 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
     (e) => e.languageId === examLang && e.level === selectedLevel
   );
 
-  const currentExam: MockExam =
+  const rawCurrentExam: MockExam =
     levelGeneratedExams.find((e) => e.id === selectedExamId) || baseExam;
+  const currentExam: MockExam = rawCurrentExam.aiGenerated
+    ? repairExamClozeParts(rawCurrentExam, baseExam)
+    : rawCurrentExam;
 
   const themeOptions = AI_EXAM_THEMES[examLang];
 
@@ -1406,7 +1451,11 @@ export const ExamSimulatorView: React.FC<ExamSimulatorViewProps> = ({
               </div>
 
               <div className="p-5 rounded-xl bg-[#FAF9F6] dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm sm:text-[15px] text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-line">
-                {activeReadingPart.passage}
+                {activeReadingPart.format === 'cloze' ? (
+                  <ClozePassageText part={activeReadingPart} answers={readingAnswers} />
+                ) : (
+                  activeReadingPart.passage
+                )}
               </div>
 
               <div className="space-y-4">

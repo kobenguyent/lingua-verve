@@ -803,4 +803,74 @@ final class AcademyAndAITests: XCTestCase {
         try restored.importProgressJSON(backup)
         XCTAssertEqual(restored.learnerState.examHistory.first?.aiAssessment?.studyPlan.first?.title, "Drill Transit Corrections")
     }
+
+    func testClozeGapAutoRepairAndFallbackForAIGeneratedReadingPart3() async throws {
+        let questions = [
+            ExamObjectiveQuestion(id: "q1", prompt: "Lücke [1]", options: ["am", "im", "um", "auf"], correctIndex: 0, explanation: "am Montag"),
+            ExamObjectiveQuestion(id: "q2", prompt: "Lücke [2]", options: ["bei", "aus", "nach", "über"], correctIndex: 0, explanation: "bei Dr. Weber"),
+            ExamObjectiveQuestion(id: "q3", prompt: "Lücke [3]", options: ["obwohl", "aber", "oder", "denn"], correctIndex: 0, explanation: "obwohl")
+        ]
+
+        // 1. Plain text where LLM forgot to blank the answer words
+        let plain = AIExamGeneratorService.repairClozePassage(
+            "Guten Tag, ich möchte am Montag einen Termin bei Dr. Weber vereinbaren, obwohl ich wenig Zeit habe.",
+            questions: questions
+        )
+        XCTAssertTrue(plain.hasAllGaps)
+        XCTAssertTrue(plain.passage.contains("[1]"))
+        XCTAssertTrue(plain.passage.contains("[2]"))
+        XCTAssertTrue(plain.passage.contains("[3]"))
+        XCTAssertFalse(plain.passage.contains(" obwohl "))
+
+        // 2. Alternate blank markers (1), ___(2)___, and anonymous ____
+        let alt = AIExamGeneratorService.repairClozePassage(
+            "Guten Tag, ich möchte (1) Montag einen Termin ___(2)___ Dr. Weber vereinbaren, ____ ich wenig Zeit habe.",
+            questions: questions
+        )
+        XCTAssertTrue(alt.hasAllGaps)
+        XCTAssertEqual(
+            alt.passage,
+            "Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich wenig Zeit habe."
+        )
+
+        // 3. Unrecoverable gap-less Part 3 in an AI exam falls back to verified base exam Cloze part
+        let store = makeTestStore()
+        guard let baseExam = store.mockExam(for: "german", level: .B1) else {
+            XCTFail("Expected German B1 base exam")
+            return
+        }
+        let brokenPart3 = ReadingExamPart(
+            id: "broken-p3",
+            partLabel: "Broken Cloze",
+            format: "cloze",
+            instruction: "Ergänzen Sie.",
+            passageTitle: "Unrelated Text",
+            passage: "Heute scheint die Sonne sehr hell über den Bergen im Süden und das Wetter bleibt freundlich.",
+            questions: questions
+        )
+        let brokenExam = MockExam(
+            id: "ai-broken-cloze",
+            languageId: baseExam.languageId,
+            level: baseExam.level,
+            title: "AI Broken Cloze",
+            alignedCertificate: baseExam.alignedCertificate,
+            passingScorePercent: baseExam.passingScorePercent,
+            totalMinutes: baseExam.totalMinutes,
+            reading: ReadingExamSection(
+                title: baseExam.reading.title,
+                durationMinutes: baseExam.reading.durationMinutes,
+                passageTitle: baseExam.reading.passageTitle,
+                passage: baseExam.reading.passage,
+                questions: baseExam.reading.questions,
+                parts: [baseExam.reading.resolvedParts[0], baseExam.reading.resolvedParts[1], brokenPart3]
+            ),
+            listening: baseExam.listening,
+            writing: baseExam.writing,
+            speaking: baseExam.speaking
+        )
+        let fixedExam = AIExamGeneratorService.repairExamClozeParts(brokenExam, fallbackBase: baseExam)
+        let fixedPart3 = fixedExam.reading.resolvedParts[2]
+        XCTAssertEqual(fixedPart3.id, baseExam.reading.resolvedParts[2].id)
+        XCTAssertTrue(fixedPart3.passage.contains("[1]"))
+    }
 }

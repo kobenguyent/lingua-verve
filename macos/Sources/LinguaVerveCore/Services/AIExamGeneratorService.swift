@@ -289,27 +289,48 @@ public struct AIExamGeneratorService: Sendable {
     ) async -> (ok: Bool, parts: [ReadingExamPart]) {
         onProgress?(.reading, .loading)
         let tfOptions = isGerman ? #"["Richtig","Falsch","Steht nicht im Text"]"# : #"["True","False","Not Given"]"#
+        let clozeExample = isGerman
+            ? #"Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich starke Kopfschmerzen habe."#
+            : #"I am writing [1] confirm our meeting [2] Tuesday, [3] we need to finalize the project budget."#
+        let gapWord = isGerman ? "Lücke" : "Gap"
         let sys = """
         You are a certified \(baseExam.alignedCertificate) Reading exam author creating brand-new CEFR \(baseExam.level.rawValue) \(langName) content.
+        CRITICAL FOR PART 3 (format: "cloze"): The passage MUST contain the literal numbered blank markers [1], [2], and [3] IN PLACE OF the missing answer words — NEVER leave the answer word inside the passage! Example Part 3 passage: "\(clozeExample)".
         Return ONLY valid JSON matching:
-        {"parts":[{"partLabel":"<Part 1>","format":"comprehension","instruction":"<instruction>","passageTitle":"<title>","passage":"<85-150 word \(langName) passage>","questions":[{"prompt":"<Q1>","options":["A","B","C","D"],"correctIndex":0,"explanation":"<why>"},{"prompt":"<Q2>","options":["A","B","C","D"],"correctIndex":1,"explanation":"<why>"},{"prompt":"<Q3>","options":["A","B","C","D"],"correctIndex":2,"explanation":"<why>"}]},{"partLabel":"<Part 2>","format":"true-false","instruction":"<instruction>","passageTitle":"<title>","passage":"<80-140 word text>","questions":[{"prompt":"<statement 1>","options":\(tfOptions),"correctIndex":0,"explanation":"<why>"},{"prompt":"<statement 2>","options":\(tfOptions),"correctIndex":1,"explanation":"<why>"},{"prompt":"<statement 3>","options":\(tfOptions),"correctIndex":2,"explanation":"<why>"}]},{"partLabel":"<Part 3 Cloze>","format":"cloze","instruction":"<instruction>","passageTitle":"<title>","passage":"<short text with gaps [1], [2], [3]>","questions":[{"prompt":"Gap [1]","options":["a","b","c","d"],"correctIndex":0,"explanation":"<why>"},{"prompt":"Gap [2]","options":["a","b","c","d"],"correctIndex":1,"explanation":"<why>"},{"prompt":"Gap [3]","options":["a","b","c","d"],"correctIndex":2,"explanation":"<why>"}]}]}
+        {"parts":[{"partLabel":"<Part 1>","format":"comprehension","instruction":"<instruction>","passageTitle":"<title>","passage":"<85-150 word \(langName) passage>","questions":[{"prompt":"<Q1>","options":["A","B","C","D"],"correctIndex":0,"explanation":"<why>"},{"prompt":"<Q2>","options":["A","B","C","D"],"correctIndex":1,"explanation":"<why>"},{"prompt":"<Q3>","options":["A","B","C","D"],"correctIndex":2,"explanation":"<why>"}]},{"partLabel":"<Part 2>","format":"true-false","instruction":"<instruction>","passageTitle":"<title>","passage":"<80-140 word text>","questions":[{"prompt":"<statement 1>","options":\(tfOptions),"correctIndex":0,"explanation":"<why>"},{"prompt":"<statement 2>","options":\(tfOptions),"correctIndex":1,"explanation":"<why>"},{"prompt":"<statement 3>","options":\(tfOptions),"correctIndex":2,"explanation":"<why>"}]},{"partLabel":"<Part 3 Cloze>","format":"cloze","instruction":"<instruction>","passageTitle":"<title>","passage":"<70-120 word \(langName) text containing exact markers [1], [2], and [3] where words are missing>","questions":[{"prompt":"\(gapWord) [1]","options":["a","b","c","d"],"correctIndex":0,"explanation":"<why>"},{"prompt":"\(gapWord) [2]","options":["a","b","c","d"],"correctIndex":1,"explanation":"<why>"},{"prompt":"\(gapWord) [3]","options":["a","b","c","d"],"correctIndex":2,"explanation":"<why>"}]}]}
         """
-        let user = "Create a brand-new CEFR \(baseExam.level.rawValue) \(langName) Reading section (3 parts, 3 questions each = 9 total) themed around: \"\(theme)\". Seed: \(seed). \(avoidNote)"
+        let user = "Create a brand-new CEFR \(baseExam.level.rawValue) \(langName) Reading section (3 parts, 3 questions each = 9 total) themed around: \"\(theme)\". Remember: Part 3 MUST be a real cloze gap-fill text with literal [1], [2], [3] blanks replacing the 3 correct answers. Seed: \(seed). \(avoidNote)"
 
         if let parsed: RawReadingPayload = await requestJSON(config: config, system: sys, user: user),
            let rawParts = parsed.parts {
             let formats = ["comprehension", "true-false", "cloze"]
+            let baseParts = baseExam.reading.resolvedParts
             var validated: [ReadingExamPart] = []
             for (idx, rp) in rawParts.prefix(3).enumerated() {
-                let passage = (rp.passage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                var passage = (rp.passage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let qs = sanitizeQuestions(rp.questions, prefix: "ai-\(stamp)-r-p\(idx + 1)", limit: 3)
                 guard passage.count >= 30, qs.count >= 2 else { continue }
-                let fmt = rp.format?.trimmingCharacters(in: .whitespacesAndNewlines) ?? formats[idx]
+                let rawFmt = rp.format?.trimmingCharacters(in: .whitespacesAndNewlines) ?? formats[idx]
+                let fmt = ["comprehension", "true-false", "tfng", "cloze", "matching"].contains(rawFmt) ? rawFmt : formats[idx]
+
+                if fmt == "cloze" {
+                    let repaired = Self.repairClozePassage(passage, questions: qs)
+                    if repaired.hasAllGaps {
+                        passage = repaired.passage
+                    } else if baseParts.indices.contains(idx) {
+                        // Never serve an unanswerable gap-less Part 3 cloze passage
+                        validated.append(baseParts[idx])
+                        continue
+                    } else {
+                        passage = repaired.passage
+                    }
+                }
+
                 validated.append(
                     ReadingExamPart(
                         id: "ai-\(stamp)-read-p\(idx + 1)",
                         partLabel: nonEmpty(rp.partLabel, fallback: "Reading · Part \(idx + 1)"),
-                        format: ["comprehension", "true-false", "tfng", "cloze", "matching"].contains(fmt) ? fmt : formats[idx],
+                        format: fmt,
                         instruction: nonEmpty(rp.instruction, fallback: isGerman ? "Lesen Sie den Text und wählen Sie die beste Antwort." : "Read the passage carefully and choose the best answer."),
                         passageTitle: nonEmpty(rp.passageTitle, fallback: theme),
                         passage: passage,
@@ -318,7 +339,6 @@ public struct AIExamGeneratorService: Sendable {
                 )
             }
             if validated.count >= 2 {
-                let baseParts = baseExam.reading.resolvedParts
                 while validated.count < 3 && validated.count < baseParts.count {
                     validated.append(baseParts[validated.count])
                 }
@@ -626,5 +646,143 @@ public struct AIExamGeneratorService: Sendable {
             ["en-GB", "en-US", "en-AU"]
         ]
         return sets[seed % sets.count]
+    }
+
+    // MARK: - Cloze Gap Validation & Auto-Repair
+
+    /// Ensures a Cloze (Sprachbausteine / Use of English) reading passage actually contains
+    /// visible numbered gap markers `[1]`, `[2]`, ..., `[N]` matching its questions.
+    /// 1. Normalizes variant LLM blank styles like `___(1)___`, `(1)`, `{{1}}`, `[Gap 1]`, `[Lücke 1]`, `___1___`.
+    /// 2. Converts anonymous blank placeholders (`___`, `____`, `[___]`, `[...]`) sequentially into missing `[n]` tokens.
+    /// 3. If the LLM accidentally wrote the correct answer words straight into the passage without blanking them,
+    ///    auto-blanks each missing question's exact answer word (in reading order, respecting word boundaries) into `[n]`.
+    public static func repairClozePassage(
+        _ rawPassage: String,
+        questions: [ExamObjectiveQuestion]
+    ) -> (passage: String, hasAllGaps: Bool) {
+        let count = questions.count
+        guard count > 0 else { return (rawPassage, true) }
+
+        var text = rawPassage
+
+        // Step 1: Normalize variant numbered markers into canonical [n]
+        for n in 1...count {
+            let canonical = "[\(n)]"
+            if text.contains(canonical) { continue }
+            let patterns = [
+                #"(?i)_{1,}\s*[\(\[\{\<]?\s*(?:gap|lücke|luecke|blank)?\s*#?"# + "\(n)" + #"\s*[\)\]\}\>]?\s*_{0,}"#,
+                #"(?i)[\[\{\<]\s*(?:gap|lücke|luecke|blank)?\s*#?"# + "\(n)" + #"\s*[\]\}\>]"#,
+                #"(?i)\(\s*(?:gap|lücke|luecke|blank)?\s*#?"# + "\(n)" + #"\s*\)"#,
+                #"(?i)\b(?:gap|lücke|luecke|blank)\s*#?"# + "\(n)" + #"\b"#
+            ]
+            for pattern in patterns {
+                if let range = text.range(of: pattern, options: .regularExpression) {
+                    text.replaceSubrange(range, with: canonical)
+                    break
+                }
+            }
+        }
+
+        // Step 2: Convert unnumbered blank placeholders (___, [___], [...]) into missing [n] tokens
+        for n in 1...count {
+            let canonical = "[\(n)]"
+            if text.contains(canonical) { continue }
+            let blankPattern = #"\[\s*(?:_{2,}|\.{3,})\s*\]|_{3,}"#
+            if let range = text.range(of: blankPattern, options: .regularExpression) {
+                text.replaceSubrange(range, with: canonical)
+            }
+        }
+
+        // Step 3: Auto-blank exact correct answer words accidentally left inside the passage
+        var searchCursor = text.startIndex
+        for (idx, q) in questions.enumerated() {
+            let n = idx + 1
+            let canonical = "[\(n)]"
+            if let existing = text.range(of: canonical) {
+                searchCursor = existing.upperBound
+                continue
+            }
+            guard q.options.indices.contains(q.correctIndex) else { continue }
+            let answer = q.options[q.correctIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !answer.isEmpty else { continue }
+
+            let escaped = NSRegularExpression.escapedPattern(for: answer)
+            // Use Unicode letter/digit lookarounds so German umlauts (ä, ö, ü, ß) respect full word boundaries
+            let wordPattern = "(?<![\\p{L}\\p{N}])\(escaped)(?![\\p{L}\\p{N}])"
+
+            // First try searching after the previous gap so [1], [2], [3] stay in natural reading order
+            if let match = text.range(of: wordPattern, options: [.regularExpression, .caseInsensitive], range: searchCursor..<text.endIndex) {
+                text.replaceSubrange(match, with: canonical)
+                if let inserted = text.range(of: canonical, range: match.lowerBound..<text.endIndex) {
+                    searchCursor = inserted.upperBound
+                }
+            } else if let match = text.range(of: wordPattern, options: [.regularExpression, .caseInsensitive]) {
+                text.replaceSubrange(match, with: canonical)
+            }
+        }
+
+        let allPresent = (1...count).allSatisfy { text.contains("[\($0)]") }
+        return (text, allPresent)
+    }
+
+    /// Repairs any cloze Reading parts in an exam (including previously saved AI exams in UserDefaults).
+    public static func repairExamClozeParts(_ exam: MockExam, fallbackBase: MockExam? = nil) -> MockExam {
+        let resolvedParts = exam.reading.resolvedParts
+        let baseParts = fallbackBase?.reading.resolvedParts ?? []
+        var changed = false
+
+        let repairedParts: [ReadingExamPart] = resolvedParts.enumerated().map { idx, part in
+            guard part.format == "cloze" else { return part }
+            let check = repairClozePassage(part.passage, questions: part.questions)
+            if check.hasAllGaps {
+                if check.passage != part.passage {
+                    changed = true
+                    return ReadingExamPart(
+                        id: part.id,
+                        partLabel: part.partLabel,
+                        format: part.format,
+                        instruction: part.instruction,
+                        passageTitle: part.passageTitle,
+                        passage: check.passage,
+                        questions: part.questions
+                    )
+                }
+                return part
+            }
+            if baseParts.indices.contains(idx) {
+                changed = true
+                return baseParts[idx]
+            }
+            return part
+        }
+
+        guard changed else { return exam }
+        let firstRead = repairedParts.first
+        return MockExam(
+            id: exam.id,
+            languageId: exam.languageId,
+            level: exam.level,
+            title: exam.title,
+            alignedCertificate: exam.alignedCertificate,
+            passingScorePercent: exam.passingScorePercent,
+            totalMinutes: exam.totalMinutes,
+            requireAllSkillsPass: exam.requireAllSkillsPass,
+            aiGenerated: exam.aiGenerated,
+            generatedTheme: exam.generatedTheme,
+            generatedByModel: exam.generatedByModel,
+            generatedAt: exam.generatedAt,
+            aiGeneratedSkills: exam.aiGeneratedSkills,
+            reading: ReadingExamSection(
+                title: firstRead?.partLabel ?? exam.reading.title,
+                durationMinutes: exam.reading.durationMinutes,
+                passageTitle: firstRead?.passageTitle ?? exam.reading.passageTitle,
+                passage: firstRead?.passage ?? exam.reading.passage,
+                questions: firstRead?.questions ?? exam.reading.questions,
+                parts: repairedParts
+            ),
+            listening: exam.listening,
+            writing: exam.writing,
+            speaking: exam.speaking
+        )
     }
 }

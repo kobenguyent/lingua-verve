@@ -159,7 +159,10 @@ public final class CurriculumStore {
 
         if let genData = defaults.data(forKey: generatedExamsKey),
            let decodedGen = try? JSONDecoder().decode([MockExam].self, from: genData) {
-            self.generatedExams = decodedGen
+            self.generatedExams = decodedGen.map { exam in
+                let fallback = loaded.mockExams.first { $0.languageId == exam.languageId && $0.level == exam.level }
+                return AIExamGeneratorService.repairExamClozeParts(exam, fallbackBase: fallback)
+            }
         } else {
             self.generatedExams = []
         }

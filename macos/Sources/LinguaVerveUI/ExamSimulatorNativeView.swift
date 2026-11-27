@@ -676,12 +676,7 @@ public struct ExamSimulatorNativeView: View {
             Text(part.passageTitle).scaledFont(.headline)
             Text(part.instruction).scaledFont(.caption).foregroundStyle(.secondary)
 
-            Text(part.passage)
-                .scaledFont(.subheadline)
-                .lineSpacing(4)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+            readingPassageView(part: part)
 
             ForEach(Array(part.questions.enumerated()), id: \.element.id) { idx, q in
                 questionPicker(index: safeIdx * 3 + idx + 1, question: q, selection: readingAnswers[q.id]) { chosen in
@@ -1276,6 +1271,74 @@ public struct ExamSimulatorNativeView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func readingPassageView(part: ReadingExamPart) -> some View {
+        let displayPassage = part.format == "cloze"
+            ? AIExamGeneratorService.repairClozePassage(part.passage, questions: part.questions).passage
+            : part.passage
+
+        if part.format == "cloze" {
+            Text(clozeAttributedPassage(passage: displayPassage, questions: part.questions))
+                .scaledFont(.subheadline)
+                .lineSpacing(5)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+        } else {
+            Text(displayPassage)
+                .scaledFont(.subheadline)
+                .lineSpacing(4)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+        }
+    }
+
+    private func clozeAttributedPassage(passage: String, questions: [ExamObjectiveQuestion]) -> AttributedString {
+        guard let regex = try? NSRegularExpression(pattern: #"\[(\d+)\]"#) else {
+            return AttributedString(passage)
+        }
+        let nsRange = NSRange(passage.startIndex..., in: passage)
+        let matches = regex.matches(in: passage, range: nsRange)
+        if matches.isEmpty {
+            return AttributedString(passage)
+        }
+
+        var result = AttributedString()
+        var cursor = passage.startIndex
+
+        for match in matches {
+            guard let fullRange = Range(match.range, in: passage),
+                  let numRange = Range(match.range(at: 1), in: passage) else {
+                continue
+            }
+            if cursor < fullRange.lowerBound {
+                result += AttributedString(String(passage[cursor..<fullRange.lowerBound]))
+            }
+            let numStr = String(passage[numRange])
+            let gapIdx = (Int(numStr) ?? 1) - 1
+            var chosenWord: String? = nil
+            if questions.indices.contains(gapIdx) {
+                let q = questions[gapIdx]
+                if let sel = readingAnswers[q.id], q.options.indices.contains(sel) {
+                    chosenWord = q.options[sel]
+                }
+            }
+            let chipText = chosenWord != nil ? " [\(numStr): \(chosenWord!)] " : " [\(numStr): _____] "
+            var chip = AttributedString(chipText)
+            chip.inlinePresentationIntent = .stronglyEmphasized
+            chip.foregroundColor = chosenWord != nil ? BrandTheme.emeraldMint : BrandTheme.celestialSky
+            chip.backgroundColor = (chosenWord != nil ? BrandTheme.emeraldMint : BrandTheme.celestialSky).opacity(0.16)
+            result += chip
+            cursor = fullRange.upperBound
+        }
+
+        if cursor < passage.endIndex {
+            result += AttributedString(String(passage[cursor..<passage.endIndex]))
+        }
+        return result
     }
 
     private func rubricBarRow(_ title: String, value: Int) -> some View {

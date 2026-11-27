@@ -8,6 +8,7 @@ import { AIProviderModal } from '../components/AIProviderModal';
 import { VoiceSettingsModal } from '../components/VoiceSettingsModal';
 import { ProgressDashboardView } from '../components/ProgressDashboardView';
 import { getDefaultAIConfig } from '../utils/aiClient';
+import { repairClozePassage } from '../utils/aiExamGenerator';
 import { getDefaultVoiceSettings } from '../utils/audio';
 import { createEmptyLearnerState } from '../utils/progressStore';
 
@@ -364,9 +365,53 @@ describe('ExamSimulatorView Component', () => {
       // Start the newly crafted AI exam and verify fresh passage appears!
       fireEvent.click(screen.getByRole('button', { name: /Begin A1 Simulated Exam/i }));
       expect(screen.getByRole('heading', { name: /Neue Hausarztpraxis am Markt/i })).toBeInTheDocument();
+
+      // Switch to Reading Part 3 (Cloze) and verify visual inline gaps render & update live when answered!
+      fireEvent.click(screen.getByRole('button', { name: /^Part 3/i }));
+      expect(screen.getByText('[1: _____]')).toBeInTheDocument();
+      expect(screen.getByText('[2: _____]')).toBeInTheDocument();
+      expect(screen.getByText('[3: _____]')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /A\.\s*am/i }));
+      expect(screen.getByText('[1: am]')).toBeInTheDocument();
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+
+  it('auto-repairs AI Reading Part 3 cloze passages missing literal [1], [2], [3] markers', () => {
+    const questions = [
+      { id: 'q1', prompt: 'Lücke [1]', options: ['am', 'im', 'um', 'auf'], correctIndex: 0, explanation: 'am Montag' },
+      { id: 'q2', prompt: 'Lücke [2]', options: ['bei', 'aus', 'nach', 'über'], correctIndex: 0, explanation: 'bei Dr. Weber' },
+      { id: 'q3', prompt: 'Lücke [3]', options: ['obwohl', 'aber', 'oder', 'denn'], correctIndex: 0, explanation: 'obwohl' },
+    ];
+
+    // Case 1: LLM wrote plain text with NO gaps, leaving exact answer words inside the text
+    const plainRes = repairClozePassage(
+      'Guten Tag, ich möchte am Montag einen Termin bei Dr. Weber vereinbaren, obwohl ich wenig Zeit habe.',
+      questions
+    );
+    expect(plainRes.hasAllGaps).toBe(true);
+    expect(plainRes.passage).toContain('[1]');
+    expect(plainRes.passage).toContain('[2]');
+    expect(plainRes.passage).toContain('[3]');
+    expect(plainRes.passage).not.toContain(' obwohl ');
+
+    // Case 2: LLM used alternate blank syntax like (1), ___(2)___, and anonymous ____
+    const altRes = repairClozePassage(
+      'Guten Tag, ich möchte (1) Montag einen Termin ___(2)___ Dr. Weber vereinbaren, ____ ich wenig Zeit habe.',
+      questions
+    );
+    expect(altRes.hasAllGaps).toBe(true);
+    expect(altRes.passage).toBe(
+      'Guten Tag, ich möchte [1] Montag einen Termin [2] Dr. Weber vereinbaren, [3] ich wenig Zeit habe.'
+    );
+
+    // Case 3: Unrecoverable passage with neither blanks nor answer words reports hasAllGaps=false
+    const brokenRes = repairClozePassage(
+      'Heute scheint die Sonne sehr hell über den Bergen im Süden.',
+      questions
+    );
+    expect(brokenRes.hasAllGaps).toBe(false);
   });
 });
 
