@@ -43,15 +43,8 @@ public struct ExamAIAssessmentPanelView: View {
                 studyPlanSection
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.indigo.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.indigo.opacity(0.22), lineWidth: 1)
-                )
-        )
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     // MARK: - Executive Header
@@ -99,10 +92,10 @@ public struct ExamAIAssessmentPanelView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: assessment.source == "ai" ? "sparkles" : "chart.bar.doc.horizontal")
-                    .foregroundStyle(assessment.source == "ai" ? .purple : BrandTheme.celestialSky)
-                Text(assessment.source == "ai" ? "AI 4-SKILL EXAMINER ASSESSMENT" : "4-SKILL DIAGNOSTIC ASSESSMENT")
-                    .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                    .foregroundStyle(assessment.source == "ai" ? .purple : BrandTheme.celestialSky)
+                    .foregroundStyle(BrandTheme.editorialBlue)
+                Text(assessment.source == "ai" ? "AI 4-Skill Examiner Assessment" : "4-Skill Diagnostic Assessment")
+                    .scaledFont(.footnote, weight: .semibold)
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
             Text("Evaluated by: \(assessment.providerLabel)")
                 .scaledFont(.caption2, design: .monospaced)
@@ -116,13 +109,13 @@ public struct ExamAIAssessmentPanelView: View {
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Analyzing 4 skills with AI...")
+                Text("Analyzing 4 skills with AI…")
                     .scaledFont(.caption, weight: .semibold)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.purple.opacity(0.14)))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .goldenGateGlassPill(isSelected: true, accent: BrandTheme.editorialBlue)
         } else if store.aiConfig.isReady, let onRunAIAnalysis {
             Button {
                 NativeAudioEngine.shared.playClickSound()
@@ -133,9 +126,7 @@ public struct ExamAIAssessmentPanelView: View {
                     systemImage: "sparkles"
                 )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
-            .controlSize(.small)
+            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.editorialBlue))
         } else if !store.aiConfig.isReady, let onOpenAISettings {
             Button {
                 NativeAudioEngine.shared.playClickSound()
@@ -143,15 +134,14 @@ public struct ExamAIAssessmentPanelView: View {
             } label: {
                 Label("Connect AI for Deeper Analysis", systemImage: "cpu")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(GoldenGateGlassPillButtonStyle())
         }
     }
 
     private func badgePill(icon: String, text: String, tint: Color) -> some View {
         Label(text, systemImage: icon)
             .scaledFont(.caption2, weight: .bold, design: .monospaced)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(Capsule().fill(tint.opacity(0.14)))
             .foregroundStyle(tint)
@@ -160,7 +150,7 @@ public struct ExamAIAssessmentPanelView: View {
     // MARK: - 4-Skill Selector Tabs
 
     private var skillTabsSelector: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 10)], spacing: 10) {
             ForEach(SkillType.allCases) { sk in
                 let isSelected = selectedSkill == sk
                 let sc = attempt.skills[sk.rawValue]?.score ?? 0
@@ -169,34 +159,38 @@ public struct ExamAIAssessmentPanelView: View {
 
                 Button {
                     NativeAudioEngine.shared.playClickSound()
-                    selectedSkill = sk
+                    withAnimation(GoldenGateMetrics.snappySpring) {
+                        selectedSkill = sk
+                    }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: sk.systemImage)
                             .scaledFont(.caption)
-                        VStack(alignment: .leading, spacing: 1) {
+                            .foregroundStyle(isSelected ? BrandTheme.editorialBlue : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
                                 Text(sk.shortName)
                                     .scaledFont(.caption, weight: .bold)
                                 if aiDone {
                                     Image(systemName: "sparkles")
                                         .scaledFont(.caption2)
+                                        .foregroundStyle(BrandTheme.editorialBlue)
                                 }
                             }
                             Text("\(sc)% · \(passedSkill ? "PASS" : "FOCUS")")
-                                .scaledFont(size: 10, weight: .semibold, design: .monospaced)
-                                .opacity(0.85)
+                                .scaledFont(.caption2, weight: .semibold, design: .monospaced, monospacedDigit: true)
+                                .foregroundStyle(.secondary)
                         }
                         Spacer()
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(isSelected ? Color.indigo : Color.primary.opacity(0.05))
+                    .goldenGateSurface(
+                        cornerRadius: GoldenGateMetrics.nestedCornerRadius,
+                        tint: isSelected ? BrandTheme.editorialBlue : nil,
+                        interactive: true
                     )
-                    .foregroundStyle(isSelected ? Color.white : Color.primary)
                 }
                 .buttonStyle(.plain)
             }
@@ -249,7 +243,7 @@ public struct ExamAIAssessmentPanelView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Targeted Corrections (\(insight.corrections.count))", systemImage: "wand.and.stars")
                         .scaledFont(.caption, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(BrandTheme.editorialBlue)
 
                     ForEach(insight.corrections) { item in
                         correctionRow(item)
@@ -262,7 +256,7 @@ public struct ExamAIAssessmentPanelView: View {
                 bulletBox(
                     title: "Actionable Suggestions for \(insight.skill.shortName)",
                     icon: "lightbulb.fill",
-                    tint: BrandTheme.celestialSky,
+                    tint: BrandTheme.editorialBlue,
                     items: insight.suggestions
                 )
             }
@@ -273,30 +267,30 @@ public struct ExamAIAssessmentPanelView: View {
                 upgradedRewriteBox(skill: insight.skill, text: upgraded)
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
     }
 
     private func skillCardHeading(_ insight: ExamSkillInsight) -> some View {
         HStack(spacing: 8) {
             Label("\(insight.skill.displayName) Insights", systemImage: insight.skill.systemImage)
-                .scaledFont(.headline, weight: .bold)
+                .scaledFont(.headline, weight: .bold, design: .serif)
             if let cefr = insight.cefrEstimate {
                 Text("Est. \(cefr.rawValue)")
-                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                    .scaledFont(.caption2, weight: .bold, design: .monospaced)
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.18)))
-                    .foregroundStyle(BrandTheme.celestialSky)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
             if insight.aiAnalyzed {
                 Text("AI Analyzed")
-                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                    .scaledFont(.caption2, weight: .bold, design: .monospaced)
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.purple.opacity(0.18)))
-                    .foregroundStyle(.purple)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.indigo.opacity(0.14)))
+                    .foregroundStyle(.indigo)
             }
         }
     }
@@ -310,8 +304,7 @@ public struct ExamAIAssessmentPanelView: View {
             } label: {
                 Label("Drill \(skill.shortName) in AI Coach", systemImage: "bubble.left.and.text.bubble.right.fill")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(GoldenGateGlassPillButtonStyle())
         }
     }
 
@@ -330,42 +323,32 @@ public struct ExamAIAssessmentPanelView: View {
                 }
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.08)))
+        .goldenGateSurface(cornerRadius: 10, tint: tint)
     }
 
     private func correctionRow(_ item: ExamCorrectionItem) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             if let tag = item.sectionTag, !tag.isEmpty {
                 Text(tag)
-                    .scaledFont(size: 9.5, weight: .bold, design: .monospaced)
-                    .padding(.horizontal, 6)
+                    .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.purple.opacity(0.16)))
-                    .foregroundStyle(.purple)
+                    .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
             if !item.original.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Text("✗")
-                        .scaledFont(.caption, weight: .bold)
-                        .foregroundStyle(.red)
-                    Text(item.original)
-                        .scaledFont(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Label(item.original, systemImage: "xmark.circle.fill")
+                    .scaledFont(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !item.corrected.isEmpty {
-                HStack(alignment: .top, spacing: 6) {
-                    Text("✓")
-                        .scaledFont(.caption, weight: .bold)
-                        .foregroundStyle(BrandTheme.emeraldMint)
-                    Text(item.corrected)
-                        .scaledFont(.caption, weight: .semibold)
-                        .foregroundStyle(BrandTheme.emeraldMint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Label(item.corrected, systemImage: "checkmark.circle.fill")
+                    .scaledFont(.caption, weight: .semibold)
+                    .foregroundStyle(BrandTheme.emeraldMint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !item.explanation.isEmpty {
                 Text(item.explanation)
@@ -374,20 +357,13 @@ public struct ExamAIAssessmentPanelView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 9)
-                .fill(Color.primary.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9)
-                        .stroke(Color.purple.opacity(0.18), lineWidth: 1)
-                )
-        )
+        .goldenGateSurface(cornerRadius: 10)
     }
 
     private func upgradedRewriteBox(skill: SkillType, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label("AI Higher-Band Rewrite (\(attempt.level.rawValue)+)", systemImage: "sparkles")
                     .scaledFont(.caption, weight: .bold)
@@ -399,8 +375,7 @@ public struct ExamAIAssessmentPanelView: View {
                     } label: {
                         Label("Hear Rewrite", systemImage: "speaker.wave.2.fill")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle())
                 }
                 Button {
                     PlatformClipboard.copy(text)
@@ -410,32 +385,24 @@ public struct ExamAIAssessmentPanelView: View {
                 } label: {
                     Label(copiedUpgrade ? "Copied" : "Copy", systemImage: copiedUpgrade ? "checkmark" : "doc.on.doc")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: copiedUpgrade, accent: BrandTheme.emeraldMint))
             }
             Text(text)
-                .scaledFont(.caption)
+                .scaledFont(.subheadline)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(BrandTheme.emeraldMint.opacity(0.09))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(BrandTheme.emeraldMint.opacity(0.25), lineWidth: 1)
-                )
-        )
+        .goldenGateSurface(cornerRadius: 10, tint: BrandTheme.emeraldMint)
     }
 
     // MARK: - Prioritized Study Plan
 
     private var studyPlanSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("PRIORITIZED STUDY ACTION PLAN")
-                .scaledFont(size: 11, weight: .bold, design: .monospaced)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Prioritized Study Action Plan")
+                .scaledFont(.subheadline, weight: .semibold)
                 .foregroundStyle(.secondary)
 
             ForEach(assessment.studyPlan) { step in
@@ -443,15 +410,15 @@ public struct ExamAIAssessmentPanelView: View {
                     Text("#\(step.priority)")
                         .scaledFont(.caption, weight: .bold, design: .monospaced)
                         .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.indigo.opacity(0.16)))
-                        .foregroundStyle(.indigo)
+                        .background(Circle().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                        .foregroundStyle(BrandTheme.editorialBlue)
 
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(step.title)
-                                .scaledFont(.caption, weight: .bold)
+                                .scaledFont(.subheadline, weight: .semibold)
                             Text("· \(step.targetMinutes)m")
-                                .scaledFont(.caption2, design: .monospaced)
+                                .scaledFont(.caption2, design: .monospaced, monospacedDigit: true)
                                 .foregroundStyle(.secondary)
                         }
                         Text(step.action)
@@ -467,15 +434,14 @@ public struct ExamAIAssessmentPanelView: View {
                             NativeAudioEngine.shared.playClickSound()
                             onPracticeSkillInCoach(step.skill)
                         } label: {
-                            Label("Drill", systemImage: "arrow.right.circle.fill")
+                            Label("Drill", systemImage: "arrow.right")
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                        .buttonStyle(GoldenGateGlassPillButtonStyle())
                     }
                 }
-                .padding(10)
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
             }
         }
     }

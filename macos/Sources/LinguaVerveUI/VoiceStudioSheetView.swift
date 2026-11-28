@@ -6,6 +6,33 @@ import AppKit
 #endif
 
 public struct VoiceStudioSheetView: View {
+    private enum VoiceLanguageTab: String, CaseIterable, Identifiable, Hashable {
+        case english
+        case german
+        case french
+        case japanese
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .english: return "🇬🇧 EN (6)"
+            case .german: return "🇩🇪 DE (3)"
+            case .french: return "🇫🇷 FR (3)"
+            case .japanese: return "🇯🇵 JA"
+            }
+        }
+
+        static func resolve(_ raw: String) -> VoiceLanguageTab {
+            switch LearningLanguage.normalize(raw) {
+            case "german": return .german
+            case "french": return .french
+            case "japanese": return .japanese
+            default: return .english
+            }
+        }
+    }
+
     @Bindable var store: CurriculumStore
     @Environment(\.dismiss) private var dismiss
 
@@ -49,17 +76,22 @@ public struct VoiceStudioSheetView: View {
 
     public var body: some View {
         let installedHumanVoices = NativeAudioEngine.humanSystemVoices(for: selectedAccentCode)
+        let languageTabBinding = Binding<VoiceLanguageTab>(
+            get: { VoiceLanguageTab.resolve(accentLanguageTab) },
+            set: { accentLanguageTab = $0.rawValue }
+        )
 
         NavigationStack {
             Form {
                 Section("1. Target Accents (EN · DE · FR · JA)") {
-                    Picker("Language", selection: $accentLanguageTab) {
-                        Text("🇬🇧 EN (6)").tag("english")
-                        Text("🇩🇪 DE (3)").tag("german")
-                        Text("🇫🇷 FR (3)").tag("french")
-                        Text("🇯🇵 JA").tag("japanese")
+                    GoldenGateSegmentedControl(
+                        items: VoiceLanguageTab.allCases,
+                        selection: languageTabBinding,
+                        allowHorizontalScroll: true
+                    ) { option, selected in
+                        Text(option.title)
+                            .scaledFont(.footnote, weight: selected ? .semibold : .medium)
                     }
-                    .pickerStyle(.segmented)
 
                     ForEach(accentsForTab) { acc in
                         let isSelected = selectedAccentCode == acc.code
@@ -102,10 +134,17 @@ public struct VoiceStudioSheetView: View {
                 }
 
                 Section("2. Human Voice Model Engine") {
-                    Picker("Voice Engine", selection: $draft.provider) {
-                        ForEach(VoiceProviderType.allCases) { p in
-                            Text(p.label).tag(p)
-                        }
+                    LabeledContent("Voice Engine") {
+                        GoldenGateDropdownMenu(
+                            title: "Voice Engine",
+                            leadingIcon: "waveform.circle.fill",
+                            options: VoiceProviderType.allCases.map { p in
+                                GoldenGateDropdownOption(value: p, title: p.label)
+                            },
+                            selection: $draft.provider,
+                            fullWidth: true
+                        )
+                        .frame(maxWidth: 320, alignment: .trailing)
                     }
                     .onChange(of: draft.provider) { _, newProvider in
                         if !newProvider.defaultEndpoint.isEmpty {
@@ -193,12 +232,27 @@ public struct VoiceStudioSheetView: View {
                             get: { draft.preferredSystemVoices[selectedAccentCode] ?? "" },
                             set: { draft.preferredSystemVoices[selectedAccentCode] = $0 }
                         )
-                        Picker("Installed Human Voice", selection: voiceBinding) {
-                            Text("✨ Auto-Pick Best Siri / Neural / Premium Voice").tag("")
-                            ForEach(installedHumanVoices, id: \.identifier) { voice in
-                                Text("\(NativeAudioEngine.friendlyDisplayName(for: voice)) (\(voice.language))")
-                                    .tag(voice.identifier)
-                            }
+                        let systemVoiceOptions = [
+                            GoldenGateDropdownOption(
+                                value: "",
+                                title: "Auto-Pick Best Siri / Neural / Premium Voice",
+                                icon: "sparkles"
+                            )
+                        ] + installedHumanVoices.map { voice in
+                            GoldenGateDropdownOption(
+                                value: voice.identifier,
+                                title: "\(NativeAudioEngine.friendlyDisplayName(for: voice)) (\(voice.language))"
+                            )
+                        }
+                        LabeledContent("Installed Human Voice") {
+                            GoldenGateDropdownMenu(
+                                title: "Installed Human Voice",
+                                leadingIcon: "person.wave.2",
+                                options: systemVoiceOptions,
+                                selection: voiceBinding,
+                                fullWidth: true
+                            )
+                            .frame(maxWidth: 320, alignment: .trailing)
                         }
 
                         Text("Legacy robotic/Eloquence voices are automatically hidden. Neural & Premium voices are prioritized over 22kHz compact voices and spoken with uninterrupted prosody.")
@@ -292,10 +346,17 @@ public struct VoiceStudioSheetView: View {
                             }
                         }
 
-                        Picker("Human Voice Persona", selection: $draft.neuralVoice) {
-                            ForEach(neuralPresets) { vp in
-                                Text("\(vp.label) — \(vp.note)").tag(vp.id)
-                            }
+                        LabeledContent("Human Voice Persona") {
+                            GoldenGateDropdownMenu(
+                                title: "Human Voice Persona",
+                                leadingIcon: "person.fill.checkmark",
+                                options: neuralPresets.map { vp in
+                                    GoldenGateDropdownOption(value: vp.id, title: vp.label, subtitle: vp.note)
+                                },
+                                selection: $draft.neuralVoice,
+                                fullWidth: true
+                            )
+                            .frame(maxWidth: 320, alignment: .trailing)
                         }
 
                         TextField("Custom Voice ID", text: $draft.neuralVoice)
@@ -304,10 +365,17 @@ public struct VoiceStudioSheetView: View {
                 }
 
                 Section("3. Speaking Style & Natural Pace") {
-                    Picker("Expressive Style", selection: $draft.speakingStyle) {
-                        ForEach(VoiceSpeakingStyle.allCases) { st in
-                            Text(st.label).tag(st)
-                        }
+                    LabeledContent("Expressive Style") {
+                        GoldenGateDropdownMenu(
+                            title: "Expressive Style",
+                            leadingIcon: "theatermasks",
+                            options: VoiceSpeakingStyle.allCases.map { st in
+                                GoldenGateDropdownOption(value: st, title: st.label)
+                            },
+                            selection: $draft.speakingStyle,
+                            fullWidth: true
+                        )
+                        .frame(maxWidth: 320, alignment: .trailing)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {

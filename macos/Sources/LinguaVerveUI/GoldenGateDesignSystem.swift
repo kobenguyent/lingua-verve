@@ -423,32 +423,41 @@ public struct GoldenGateSegmentedControl<Item: Hashable & Identifiable, LabelCon
     public let items: [Item]
     @Binding public var selection: Item
     public let accent: Color
+    public let allowHorizontalScroll: Bool
     @ViewBuilder public let label: (Item, Bool) -> LabelContent
 
     @Namespace private var pillNamespace
     @Environment(\.colorScheme) private var colorScheme
+    @State private var hoveredItem: Item? = nil
 
     public init(
         items: [Item],
         selection: Binding<Item>,
         accent: Color = BrandTheme.editorialBlue,
+        allowHorizontalScroll: Bool = false,
         @ViewBuilder label: @escaping (Item, Bool) -> LabelContent
     ) {
         self.items = items
         self._selection = selection
         self.accent = accent
+        self.allowHorizontalScroll = allowHorizontalScroll
         self.label = label
     }
 
     public var body: some View {
         let isDark = colorScheme == .dark
-        ViewThatFits(in: .horizontal) {
+        if allowHorizontalScroll {
+            ViewThatFits(in: .horizontal) {
+                segmentedCapsule(isDark: isDark)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    segmentedCapsule(isDark: isDark)
+                }
+            }
+        } else {
             segmentedCapsule(isDark: isDark)
                 .fixedSize(horizontal: true, vertical: false)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                segmentedCapsule(isDark: isDark)
-            }
         }
     }
 
@@ -456,6 +465,7 @@ public struct GoldenGateSegmentedControl<Item: Hashable & Identifiable, LabelCon
         HStack(spacing: 3) {
             ForEach(items) { item in
                 let selected = item == selection
+                let hovered = hoveredItem == item && !selected
                 Button {
                     NativeAudioEngine.shared.playClickSound()
                     withAnimation(GoldenGateMetrics.snappySpring) {
@@ -463,20 +473,31 @@ public struct GoldenGateSegmentedControl<Item: Hashable & Identifiable, LabelCon
                     }
                 } label: {
                     label(item, selected)
-                        .foregroundStyle(selected ? Color.primary : Color.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .foregroundStyle(selected ? Color.primary : (hovered ? Color.primary.opacity(0.88) : Color.secondary))
                         .padding(.horizontal, 13)
                         .padding(.vertical, 7)
                         .background {
                             if selected {
                                 activePillBackground(isDark: isDark)
                                     .matchedGeometryEffect(id: "ActiveSegmentPill", in: pillNamespace)
+                            } else if hovered {
+                                Capsule()
+                                    .fill(Color.primary.opacity(0.055))
                             }
                         }
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                #if os(macOS)
+                .onHover { isHovering in
+                    hoveredItem = isHovering ? item : (hoveredItem == item ? nil : hoveredItem)
+                }
+                #endif
             }
         }
+        .animation(GoldenGateMetrics.snappySpring, value: hoveredItem)
         .padding(3.5)
         .background {
             Capsule()
@@ -627,5 +648,150 @@ public struct GoldenGateAudioWaveView: View {
         .onChange(of: isAnimating) { _, active in
             phase = active
         }
+    }
+}
+
+// MARK: - Editorial Glass Dropdown Menu
+
+/// Option descriptor rendered inside `GoldenGateDropdownMenu`.
+public struct GoldenGateDropdownOption<Value: Hashable>: Identifiable {
+    public let id: String
+    public let value: Value
+    public let title: String
+    public let subtitle: String?
+    public let icon: String?
+
+    public init(
+        id: String? = nil,
+        value: Value,
+        title: String,
+        subtitle: String? = nil,
+        icon: String? = nil
+    ) {
+        self.id = id ?? "\(title)-\(String(describing: value))"
+        self.value = value
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+    }
+}
+
+/// Unified Golden Gate Editorial dropdown menu replacing raw system `Picker(.menu)` boxes.
+public struct GoldenGateDropdownMenu<Value: Hashable>: View {
+    public let title: String
+    public let leadingIcon: String?
+    public let options: [GoldenGateDropdownOption<Value>]
+    @Binding public var selection: Value
+    public let accent: Color
+    public let placeholder: String?
+    public let fullWidth: Bool
+    public let isDisabled: Bool
+    public let onSelect: ((Value) -> Void)?
+
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered: Bool = false
+
+    public init(
+        title: String,
+        leadingIcon: String? = nil,
+        options: [GoldenGateDropdownOption<Value>],
+        selection: Binding<Value>,
+        accent: Color = BrandTheme.editorialBlue,
+        placeholder: String? = nil,
+        fullWidth: Bool = false,
+        isDisabled: Bool = false,
+        onSelect: ((Value) -> Void)? = nil
+    ) {
+        self.title = title
+        self.leadingIcon = leadingIcon
+        self.options = options
+        self._selection = selection
+        self.accent = accent
+        self.placeholder = placeholder
+        self.fullWidth = fullWidth
+        self.isDisabled = isDisabled
+        self.onSelect = onSelect
+    }
+
+    public var body: some View {
+        let isDark = colorScheme == .dark
+        let selectedOption = options.first(where: { $0.value == selection })
+        let displayText = selectedOption?.title ?? placeholder ?? title
+        let cornerRadius: CGFloat = fullWidth ? 11 : GoldenGateMetrics.pillCornerRadius
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let fillAlpha = isHovered && !isDisabled ? 0.08 : 0.048
+        let borderTop = isDark ? Color.white.opacity(isHovered ? 0.22 : 0.16) : Color.black.opacity(isHovered ? 0.14 : 0.09)
+
+        Menu {
+            ForEach(options) { option in
+                let itemText = option.subtitle.map { "\(option.title) — \($0)" } ?? option.title
+                Button {
+                    NativeAudioEngine.shared.playClickSound()
+                    withAnimation(GoldenGateMetrics.snappySpring) {
+                        selection = option.value
+                    }
+                    onSelect?(option.value)
+                } label: {
+                    if option.value == selection {
+                        Label(itemText, systemImage: "checkmark")
+                    } else if let icon = option.icon {
+                        Label(itemText, systemImage: icon)
+                    } else {
+                        Text(itemText)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if let leadingIcon {
+                    Image(systemName: leadingIcon)
+                        .scaledFont(.caption, weight: .semibold)
+                        .foregroundStyle(isDisabled ? Color.secondary : accent)
+                }
+
+                Text(displayText)
+                    .scaledFont(.footnote, weight: .medium)
+                    .foregroundStyle(isDisabled ? .tertiary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if fullWidth {
+                    Spacer(minLength: 8)
+                }
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .scaledFont(.caption2, weight: .semibold)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 8)
+            .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
+            .background {
+                shape.fill(Color.primary.opacity(fillAlpha))
+            }
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(
+                        colors: [borderTop, BrandTheme.editorialHairline],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+            }
+            .contentShape(shape)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .disabled(isDisabled)
+        #if os(macOS)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        #endif
+        .animation(GoldenGateMetrics.snappySpring, value: isHovered)
+        .accessibilityLabel(title)
+        .accessibilityValue(displayText)
     }
 }

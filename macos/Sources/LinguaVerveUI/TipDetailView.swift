@@ -36,193 +36,207 @@ public struct TipDetailView: View {
         let levelDetail = store.levelDetail(for: tip.level)
         let tierColor = BrandTheme.cefrColor(for: tip.level)
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        timeCommitmentLabel
-                        Spacer()
-                        actionButtons(isBookmarked: isBookmarked, isMastered: isMastered)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        timeCommitmentLabel
-                        FlowLayout(spacing: 8, lineSpacing: 6) {
+        ZStack {
+            GoldenGateEditorialBackdrop()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            timeCommitmentLabel
+                            Spacer()
                             actionButtons(isBookmarked: isBookmarked, isMastered: isMastered)
                         }
-                    }
-                }
-
-                FlowLayout(spacing: 8, lineSpacing: 6) {
-                    Text("\(lang?.flag ?? "🌐") \(lang?.name ?? "Polyglot Meta")")
-                        .scaledFont(size: 12.5, weight: .semibold)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(Color.primary.opacity(0.07)))
-                        .fixedSize()
-
-                    Text(levelDetail != nil ? "\(tip.level) · \(levelDetail!.badge)" : "All Levels")
-                        .scaledFont(size: 12.5, weight: .bold, design: .monospaced)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 5)
-                        .foregroundStyle(tierColor)
-                        .background(Capsule().fill(tierColor.opacity(0.14)))
-                        .fixedSize()
-
-                    Label(tip.category.displayName, systemImage: tip.category.systemImage)
-                        .scaledFont(size: 12.5, weight: .medium)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 5)
-                        .foregroundStyle(.secondary)
-                        .background(Capsule().fill(Color.primary.opacity(0.05)))
-                        .fixedSize()
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(tip.title)
-                        .scaledFont(size: 24, weight: .bold, design: .serif)
-                        .textSelection(.enabled)
-                    Text(tip.summary)
-                        .scaledFont(size: 15)
-                        .foregroundStyle(.secondary)
-                        .lineSpacing(4)
-                        .textSelection(.enabled)
-                }
-
-                HStack(spacing: 0) {
-                    Rectangle().fill(BrandTheme.champagneGold).frame(width: 4)
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "lightbulb.max.fill")
-                            .foregroundStyle(BrandTheme.champagneGold)
-                            .scaledFont(size: 18)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("GOLDEN POLYGLOT RULE")
-                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                                .foregroundStyle(BrandTheme.champagneGold)
-                            Text(tip.goldenRule)
-                                .scaledFont(size: 14.5, weight: .semibold)
-                                .lineSpacing(3)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .background(RoundedRectangle(cornerRadius: 11).fill(BrandTheme.champagneGold.opacity(0.10)))
-                .clipShape(RoundedRectangle(cornerRadius: 11))
-
-                if let diagram = tip.diagramType {
-                    DiagramsView(diagramType: diagram, languageId: tip.languageId)
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("ACTIONABLE TACTICS")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .foregroundStyle(.secondary)
-
-                    ForEach(Array(tip.tactics.enumerated()), id: \.offset) { idx, tactic in
-                        HStack(alignment: .top, spacing: 10) {
-                            let badgeSize = max(26, 26 * min(fontScale, 1.4))
-                            Text("\(idx + 1)")
-                                .scaledFont(size: 12, weight: .bold, design: .monospaced)
-                                .frame(width: badgeSize, height: badgeSize)
-                                .background(Circle().fill(BrandTheme.celestialSky.opacity(0.14)))
-                                .foregroundStyle(BrandTheme.celestialSky)
-                            Text(tactic)
-                                .scaledFont(size: 14)
-                                .lineSpacing(3)
-                        }
-                    }
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.03)))
-
-                if let examples = tip.examples, !examples.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("TARGET EXAMPLES · TAP TO HEAR")
-                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Toggle("0.75x", isOn: Bindable(NativeAudioEngine.shared).slowPace)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
-                            Text("0.75x")
-                                .scaledFont(size: 11, design: .monospaced)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        ForEach(Array(examples.enumerated()), id: \.offset) { _, ex in
-                            let isSpeaking = NativeAudioEngine.shared.currentlySpeakingText == ex.speakablePhrase
-                            HStack(alignment: .center, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(ex.source)
-                                        .scaledFont(size: 14, weight: .semibold, design: .monospaced)
-                                    Text(ex.explanation)
-                                        .scaledFont(size: 12.5)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer(minLength: 6)
-                                Button {
-                                    NativeAudioEngine.shared.speak(ex.speakablePhrase, languageId: tip.languageId)
-                                } label: {
-                                    Label(isSpeaking ? "Playing" : "Listen", systemImage: isSpeaking ? "waveform" : "speaker.wave.2.fill")
-                                        .scaledFont(size: 12, weight: .semibold)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(isSpeaking ? BrandTheme.champagneGold : BrandTheme.celestialSky)
-                                .controlSize(.small)
+                        VStack(alignment: .leading, spacing: 10) {
+                            timeCommitmentLabel
+                            FlowLayout(spacing: 8, lineSpacing: 6) {
+                                actionButtons(isBookmarked: isBookmarked, isMastered: isMastered)
                             }
-                            .padding(12)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
                         }
                     }
-                }
 
-                if !tip.commonPitfall.isEmpty {
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("COMMON PITFALL")
-                                .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                                .foregroundStyle(.red)
-                            Text(tip.commonPitfall)
-                                .scaledFont(size: 13.5)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.red.opacity(0.08)))
-                }
+                    FlowLayout(spacing: 8, lineSpacing: 6) {
+                        Text("\(lang?.flag ?? "🌐") \(lang?.name ?? "Polyglot Meta")")
+                            .scaledFont(.caption, weight: .semibold)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 5)
+                            .goldenGateGlassPill()
+                            .fixedSize()
 
-                if let tools = tip.recommendedTools, !tools.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("CURATED TOOLS")
-                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                        Text(levelDetail != nil ? "\(tip.level) · \(levelDetail!.badge)" : "All Levels")
+                            .scaledFont(.caption, weight: .bold, design: .monospaced)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 5)
+                            .foregroundStyle(tierColor)
+                            .background(Capsule().fill(tierColor.opacity(0.14)))
+                            .fixedSize()
+
+                        Label(tip.category.displayName, systemImage: tip.category.systemImage)
+                            .scaledFont(.caption, weight: .medium)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 5)
                             .foregroundStyle(.secondary)
-                        FlowLayout(spacing: 8, lineSpacing: 6) {
-                            ForEach(tools, id: \.name) { tool in
-                                if let url = URL(string: tool.url) {
-                                    Link(destination: url) {
-                                        Label(tool.name, systemImage: "arrow.up.right.square")
-                                            .scaledFont(size: 12.5, weight: .semibold)
+                            .goldenGateGlassPill()
+                            .fixedSize()
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(tip.title)
+                            .scaledFont(.largeTitle, weight: .bold, design: .serif)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(tip.summary)
+                            .scaledFont(.body)
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(4)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    GoldenGateSectionHairline()
+
+                    HStack(spacing: 0) {
+                        Rectangle().fill(BrandTheme.champagneGold).frame(width: 4)
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "lightbulb.max.fill")
+                                .foregroundStyle(BrandTheme.champagneGold)
+                                .scaledFont(.title3)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Golden Polyglot Rule")
+                                    .scaledFont(.caption, weight: .bold, design: .monospaced)
+                                    .foregroundStyle(BrandTheme.deepGold)
+                                Text(tip.goldenRule)
+                                    .scaledFont(.callout, weight: .semibold)
+                                    .lineSpacing(3)
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius, tint: BrandTheme.champagneGold)
+
+                    if let diagram = tip.diagramType {
+                        DiagramsView(diagramType: diagram, languageId: tip.languageId)
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Actionable Tactics")
+                            .scaledFont(.headline, weight: .semibold)
+
+                        ForEach(Array(tip.tactics.enumerated()), id: \.offset) { idx, tactic in
+                            HStack(alignment: .top, spacing: 12) {
+                                let badgeSize = max(26, 26 * min(fontScale, 1.4))
+                                Text("\(idx + 1)")
+                                    .scaledFont(.caption, weight: .bold, design: .monospaced)
+                                    .frame(width: badgeSize, height: badgeSize)
+                                    .background(Circle().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                                    .foregroundStyle(BrandTheme.editorialBlue)
+                                Text(tactic)
+                                    .scaledFont(.body)
+                                    .lineSpacing(4)
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+
+                    if let examples = tip.examples, !examples.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Target Examples · Tap to Hear")
+                                    .scaledFont(.headline, weight: .semibold)
+                                Spacer()
+                                Toggle("0.75x", isOn: Bindable(NativeAudioEngine.shared).slowPace)
+                                    .toggleStyle(.switch)
+                                    .scaledFont(.caption, design: .monospaced)
+                                    .fixedSize()
+                            }
+
+                            ForEach(Array(examples.enumerated()), id: \.offset) { _, ex in
+                                let isSpeaking = NativeAudioEngine.shared.currentlySpeakingText == ex.speakablePhrase
+                                HStack(alignment: .center, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(ex.source)
+                                            .scaledFont(.callout, weight: .semibold, design: .monospaced)
+                                        Text(ex.explanation)
+                                            .scaledFont(.subheadline)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    .buttonStyle(.bordered)
+                                    Spacer(minLength: 6)
+                                    Button {
+                                        NativeAudioEngine.shared.speak(ex.speakablePhrase, languageId: tip.languageId)
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            GoldenGateAudioWaveView(
+                                                isAnimating: isSpeaking,
+                                                color: isSpeaking ? BrandTheme.champagneGold : BrandTheme.editorialBlue
+                                            )
+                                            Text(isSpeaking ? "Playing" : "Listen")
+                                        }
+                                    }
+                                    .buttonStyle(
+                                        GoldenGateGlassPillButtonStyle(
+                                            isSelected: isSpeaking,
+                                            accent: isSpeaking ? BrandTheme.champagneGold : BrandTheme.editorialBlue
+                                        )
+                                    )
+                                }
+                                .padding(14)
+                                .goldenGateSurface(
+                                    cornerRadius: GoldenGateMetrics.nestedCornerRadius,
+                                    tint: isSpeaking ? BrandTheme.champagneGold : nil
+                                )
+                            }
+                        }
+                    }
+
+                    if !tip.commonPitfall.isEmpty {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Common Pitfall")
+                                    .scaledFont(.caption, weight: .bold, design: .monospaced)
+                                    .foregroundStyle(.red)
+                                Text(tip.commonPitfall)
+                                    .scaledFont(.subheadline)
+                                    .lineSpacing(3)
+                            }
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius, tint: .red)
+                    }
+
+                    if let tools = tip.recommendedTools, !tools.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Curated Tools")
+                                .scaledFont(.headline, weight: .semibold)
+                            FlowLayout(spacing: 8, lineSpacing: 8) {
+                                ForEach(tools, id: \.name) { tool in
+                                    if let url = URL(string: tool.url) {
+                                        Link(destination: url) {
+                                            Label(tool.name, systemImage: "arrow.up.right.square")
+                                        }
+                                        .buttonStyle(GoldenGateGlassPillButtonStyle())
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: 880, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(20)
-            .frame(maxWidth: 860, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 
     private var timeCommitmentLabel: some View {
         Label(tip.timeCommitment, systemImage: "clock")
-            .scaledFont(size: 12.5, design: .monospaced)
+            .scaledFont(.footnote, design: .monospaced)
             .foregroundStyle(.secondary)
     }
 
@@ -235,21 +249,16 @@ public struct TipDetailView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { copied = false }
         } label: {
             Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                .scaledFont(size: 12, weight: .medium)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: copied, accent: BrandTheme.emeraldMint))
 
         Button {
             NativeAudioEngine.shared.playClickSound()
             store.toggleBookmark(tip.id)
         } label: {
             Label(isBookmarked ? "Saved" : "Save", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
-                .scaledFont(size: 12, weight: .medium)
         }
-        .buttonStyle(.bordered)
-        .tint(isBookmarked ? BrandTheme.celestialSky : nil)
-        .controlSize(.small)
+        .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: isBookmarked, accent: BrandTheme.editorialBlue))
 
         Button {
             let nowMastered = store.toggleMastered(tip.id)
@@ -263,10 +272,7 @@ public struct TipDetailView: View {
                 isMastered ? "Mastered" : "Master",
                 systemImage: isMastered ? "checkmark.seal.fill" : "checkmark.seal"
             )
-            .scaledFont(size: 12, weight: .semibold)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(isMastered ? BrandTheme.emeraldMint : .accentColor)
-        .controlSize(.small)
+        .buttonStyle(GoldenGatePrimaryButtonStyle(accent: isMastered ? BrandTheme.emeraldMint : BrandTheme.editorialBlue))
     }
 }

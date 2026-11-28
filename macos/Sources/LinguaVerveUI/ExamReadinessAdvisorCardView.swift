@@ -101,19 +101,19 @@ public struct ExamReadinessAdvisorCardView: View {
     // MARK: - Header
 
     private var headerTitle: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
                 Image(systemName: "checkmark.shield.fill")
-                    .foregroundStyle(.purple)
-                Text("REAL EXAM READINESS ADVISOR")
-                    .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(BrandTheme.editorialBlue)
+                Text("Real-Exam Readiness Advisor")
+                    .scaledFont(.footnote, weight: .semibold)
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
             Text("Should You Book the Official Exam or Practice More?")
-                .scaledFont(.headline, weight: .bold)
+                .scaledFont(.headline, weight: .bold, design: .serif)
             if let report = displayedReport {
                 Text("Evaluated by: \(report.providerLabel) · Based on \(report.attemptsAnalyzed) \(report.targetLevel.rawValue) attempt\(report.attemptsAnalyzed == 1 ? "" : "s")")
-                    .scaledFont(.caption2, design: .monospaced)
+                    .scaledFont(.caption2, design: .monospaced, monospacedDigit: true)
                     .foregroundStyle(.secondary)
             }
         }
@@ -125,13 +125,13 @@ public struct ExamReadinessAdvisorCardView: View {
             if isAnalyzing {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Analyzing exam history...")
+                    Text("Analyzing exam history…")
                         .scaledFont(.caption, weight: .semibold)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.purple.opacity(0.14)))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .goldenGateGlassPill(isSelected: true, accent: BrandTheme.editorialBlue)
             } else if store.aiConfig.isReady {
                 Button {
                     NativeAudioEngine.shared.playClickSound()
@@ -142,9 +142,7 @@ public struct ExamReadinessAdvisorCardView: View {
                         systemImage: "sparkles"
                     )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
-                .controlSize(.small)
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.editorialBlue))
             } else {
                 Button {
                     NativeAudioEngine.shared.playClickSound()
@@ -152,32 +150,28 @@ public struct ExamReadinessAdvisorCardView: View {
                 } label: {
                     Label("Connect AI for Readiness Advice", systemImage: "cpu")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(GoldenGateGlassPillButtonStyle())
             }
         }
     }
 
     private var levelSelectorRow: some View {
-        FlowLayout(spacing: 6, lineSpacing: 6) {
+        FlowLayout(spacing: 8, lineSpacing: 6) {
             Text("Target Level:")
-                .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                .scaledFont(.caption2, weight: .semibold, design: .monospaced)
                 .foregroundStyle(.secondary)
-                .padding(.top, 4)
+                .padding(.top, 5)
             ForEach(availableLevels) { lvl in
                 let isSelected = activeTargetLevel == lvl
                 Button {
                     NativeAudioEngine.shared.playClickSound()
-                    selectedLevelOverride = lvl
+                    withAnimation(GoldenGateMetrics.snappySpring) {
+                        selectedLevelOverride = lvl
+                    }
                 } label: {
                     Text(lvl.rawValue)
-                        .scaledFont(.caption2, weight: .bold, design: .monospaced)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(isSelected ? Color.purple : Color.primary.opacity(0.06)))
-                        .foregroundStyle(isSelected ? Color.white : Color.primary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: isSelected, accent: BrandTheme.cefrColor(for: lvl.rawValue)))
             }
         }
     }
@@ -232,13 +226,9 @@ public struct ExamReadinessAdvisorCardView: View {
                 metaPill(icon: "rosette", text: "Pass Rate: \(report.passRatePercent)%", tint: BrandTheme.emeraldMint)
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(tint.opacity(0.09))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(tint.opacity(0.30), lineWidth: 1))
-        )
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: tint)
     }
 
     private func verdictCopy(_ report: ExamHistoryReadinessReport, tint: Color) -> some View {
@@ -247,11 +237,11 @@ public struct ExamReadinessAdvisorCardView: View {
                 .scaledFont(size: 11, weight: .bold, design: .monospaced)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(tint.opacity(0.20)))
+                .background(Capsule().fill(tint.opacity(0.18)))
                 .foregroundStyle(tint)
 
             Text(report.headline)
-                .scaledFont(.title3, weight: .bold)
+                .scaledFont(.title3, weight: .bold, design: .serif)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(report.rationale)
@@ -273,7 +263,7 @@ public struct ExamReadinessAdvisorCardView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.05)))
+        .goldenGateSurface(cornerRadius: 10)
     }
 
     private func metaPill(icon: String, text: String, tint: Color) -> some View {
@@ -291,7 +281,7 @@ public struct ExamReadinessAdvisorCardView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(195, scale: fontScale)), spacing: 10)], spacing: 10) {
             ForEach(SkillType.allCases) { sk in
                 if let stat = report.readiness(for: sk) {
-                    let tint: Color = stat.status == "ready" ? BrandTheme.emeraldMint : stat.status == "borderline" ? BrandTheme.celestialSky : .orange
+                    let tint: Color = stat.status == "ready" ? BrandTheme.emeraldMint : stat.status == "borderline" ? BrandTheme.editorialBlue : BrandTheme.deepGold
                     let statusText = stat.status == "ready" ? "READY" : stat.status == "borderline" ? "BORDERLINE" : "PRACTICE"
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -307,9 +297,9 @@ public struct ExamReadinessAdvisorCardView: View {
                         }
                         HStack(spacing: 8) {
                             Text("Avg \(stat.averageScore)%")
-                                .scaledFont(.caption, weight: .bold, design: .monospaced)
+                                .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
                             Text("Latest \(stat.latestScore)%")
-                                .scaledFont(.caption2, design: .monospaced)
+                                .scaledFont(.caption2, design: .monospaced, monospacedDigit: true)
                                 .foregroundStyle(.secondary)
                         }
                         ProgressView(value: Double(stat.averageScore), total: 100.0)
@@ -319,9 +309,9 @@ public struct ExamReadinessAdvisorCardView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                 }
             }
         }
@@ -336,7 +326,7 @@ public struct ExamReadinessAdvisorCardView: View {
                     listBox(title: "Readiness Proof", icon: "checkmark.circle.fill", tint: BrandTheme.emeraldMint, items: report.strengths)
                 }
                 if !report.blockingRisks.isEmpty {
-                    listBox(title: "Risks to Address Before Booking", icon: "exclamationmark.triangle.fill", tint: .orange, items: report.blockingRisks)
+                    listBox(title: "Risks to Address Before Booking", icon: "exclamationmark.triangle.fill", tint: BrandTheme.deepGold, items: report.blockingRisks)
                 }
             }
 
@@ -344,12 +334,12 @@ public struct ExamReadinessAdvisorCardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Recommended Next Steps", systemImage: "list.number")
                         .scaledFont(.caption, weight: .bold, design: .monospaced)
-                        .foregroundStyle(BrandTheme.celestialSky)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     ForEach(Array(report.nextSteps.enumerated()), id: \.offset) { idx, step in
                         HStack(alignment: .top, spacing: 6) {
                             Text("\(idx + 1).")
                                 .scaledFont(.caption, weight: .bold, design: .monospaced)
-                                .foregroundStyle(BrandTheme.celestialSky)
+                                .foregroundStyle(BrandTheme.editorialBlue)
                             Text(step)
                                 .scaledFont(.caption)
                                 .foregroundStyle(.primary)
@@ -357,9 +347,9 @@ public struct ExamReadinessAdvisorCardView: View {
                         }
                     }
                 }
-                .padding(10)
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.celestialSky.opacity(0.08)))
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue)
             }
         }
     }
@@ -379,9 +369,9 @@ public struct ExamReadinessAdvisorCardView: View {
                 }
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.08)))
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: tint)
     }
 
     // MARK: - Bottom Actions & Empty State
@@ -394,9 +384,7 @@ public struct ExamReadinessAdvisorCardView: View {
             } label: {
                 Label("Take Strict \(report.targetLevel.rawValue) Exam", systemImage: "timer")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(BrandTheme.celestialSky)
-            .controlSize(.small)
+            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
 
             Button {
                 NativeAudioEngine.shared.playClickSound()
@@ -409,12 +397,35 @@ public struct ExamReadinessAdvisorCardView: View {
             } label: {
                 Label("Drill \(report.prioritySkill.shortName) in AI Coach", systemImage: "sparkles")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(GoldenGateGlassPillButtonStyle())
         }
     }
 
     private var emptyStateBanner: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                emptyStateCopy
+                Spacer()
+                Button("Open Exam Arena") {
+                    NativeAudioEngine.shared.playClickSound()
+                    store.openExamSimulator(languageId: filterLang == "all" ? "english" : LearningLanguage.normalize(filterLang), level: .B1)
+                }
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                emptyStateCopy
+                Button("Open Exam Arena") {
+                    NativeAudioEngine.shared.playClickSound()
+                    store.openExamSimulator(languageId: filterLang == "all" ? "english" : LearningLanguage.normalize(filterLang), level: .B1)
+                }
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
+            }
+        }
+        .padding(14)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
+    }
+
+    private var emptyStateCopy: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "chart.bar.doc.horizontal")
                 .scaledFont(.title3)
@@ -422,20 +433,11 @@ public struct ExamReadinessAdvisorCardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Complete at least 1 simulated exam to unlock AI Real-Exam Readiness Analysis.")
                     .scaledFont(.caption, weight: .semibold)
-                Text("Your configured AI provider will evaluate your score trend, strict-mode proof, and 4-skill consistency to tell you if you're ready to book the official test.")
+                Text("Your configured AI provider evaluates your score trend, strict-mode proof, and 4-skill consistency.")
                     .scaledFont(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            Button("Open Exam Arena") {
-                NativeAudioEngine.shared.playClickSound()
-                store.openExamSimulator(languageId: filterLang == "all" ? "english" : LearningLanguage.normalize(filterLang), level: .B1)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
     }
 
     // MARK: - AI Action

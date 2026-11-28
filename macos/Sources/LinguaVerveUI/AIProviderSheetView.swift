@@ -104,10 +104,17 @@ public struct AIProviderSheetView: View {
 
     private var providerSection: some View {
         Section("Provider (On-Device Apple, Local, or Cloud)") {
-            Picker("AI Provider", selection: $draft.provider) {
-                ForEach(AIProviderType.allCases) { p in
-                    Text(p.label).tag(p)
-                }
+            LabeledContent("AI Provider") {
+                GoldenGateDropdownMenu(
+                    title: "AI Provider",
+                    leadingIcon: "cpu",
+                    options: AIProviderType.allCases.map { p in
+                        GoldenGateDropdownOption(value: p, title: p.label)
+                    },
+                    selection: $draft.provider,
+                    fullWidth: true
+                )
+                .frame(maxWidth: 320, alignment: .trailing)
             }
             .onChange(of: draft.provider) { _, newProvider in
                 draft.endpoint = newProvider.defaultEndpoint
@@ -306,23 +313,28 @@ public struct AIProviderSheetView: View {
                 .scaledFont(.caption)
                 .foregroundStyle(.secondary)
         } else {
-            Picker(
-                "Select Ranked Model",
-                selection: Binding(
-                    get: {
-                        visible.contains(where: { $0.model.id == draft.model })
-                            ? draft.model
-                            : visible[0].model.id
+            LabeledContent("Select Ranked Model") {
+                GoldenGateDropdownMenu(
+                    title: "Select Ranked Model",
+                    leadingIcon: "sparkles",
+                    options: visible.map { item in
+                        let badge = item.tier == .ideal ? "★" : (item.isCodingModel ? "⚠︎" : "·")
+                        return GoldenGateDropdownOption(
+                            value: item.model.id,
+                            title: "\(badge) \(item.model.pickerLabel) [\(item.tier.label)]"
+                        )
                     },
-                    set: { draft.model = $0 }
+                    selection: Binding(
+                        get: {
+                            visible.contains(where: { $0.model.id == draft.model })
+                                ? draft.model
+                                : visible[0].model.id
+                        },
+                        set: { draft.model = $0 }
+                    ),
+                    fullWidth: true
                 )
-            ) {
-                ForEach(visible) { item in
-                    let badge = item.tier == .ideal ? "★" : (item.isCodingModel ? "⚠︎" : "·")
-                    Text("\(badge) \(item.model.pickerLabel) [\(item.tier.label)]")
-                        .scaledFont(size: 12, design: .monospaced)
-                        .tag(item.model.id)
-                }
+                .frame(maxWidth: 320, alignment: .trailing)
             }
         }
     }
@@ -331,10 +343,17 @@ public struct AIProviderSheetView: View {
 
     private var languageModelAdvisorSection: some View {
         Section("Language-Matched Model Advisor") {
-            Picker("Language You're Learning", selection: $selectedLanguage) {
-                ForEach(ModelLanguageTarget.allCases) { target in
-                    Text("\(target.flag) \(target.displayName)").tag(target)
-                }
+            LabeledContent("Language You're Learning") {
+                GoldenGateDropdownMenu(
+                    title: "Language You're Learning",
+                    leadingIcon: "globe",
+                    options: ModelLanguageTarget.allCases.map { target in
+                        GoldenGateDropdownOption(value: target, title: "\(target.flag) \(target.displayName)")
+                    },
+                    selection: $selectedLanguage,
+                    fullWidth: true
+                )
+                .frame(maxWidth: 320, alignment: .trailing)
             }
 
             if let pinned = pinnedModelForSelectedLanguage {

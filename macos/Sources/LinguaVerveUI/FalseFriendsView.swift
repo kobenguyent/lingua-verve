@@ -2,6 +2,22 @@ import SwiftUI
 import LinguaVerveCore
 
 public struct FalseFriendsView: View {
+    private enum FalseFriendLanguageFilter: String, CaseIterable, Identifiable, Hashable {
+        case all
+        case german
+        case english
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .all: return "All"
+            case .german: return "🇩🇪 DE"
+            case .english: return "🇬🇧 EN"
+            }
+        }
+    }
+
     @Bindable var store: CurriculumStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appFontScale) private var fontScale
@@ -14,77 +30,102 @@ public struct FalseFriendsView: View {
 
     public var body: some View {
         let items = store.filteredFalseFriends(query: query, languageId: languageFilter)
+        let filterBinding = Binding<FalseFriendLanguageFilter>(
+            get: { FalseFriendLanguageFilter(rawValue: languageFilter) ?? .all },
+            set: { languageFilter = $0.rawValue }
+        )
 
         NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    TextField("Search (Gift, bekommen, aktuell, Chef)...", text: $query)
-                        .textFieldStyle(.roundedBorder)
+            ZStack {
+                GoldenGateEditorialBackdrop()
 
-                    Picker("Language", selection: $languageFilter) {
-                        Text("All").tag("all")
-                        Text("🇩🇪 DE").tag("german")
-                        Text("🇬🇧 EN").tag("english")
+                VStack(alignment: .leading, spacing: 16) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            searchInput
+                            GoldenGateSegmentedControl(
+                                items: FalseFriendLanguageFilter.allCases,
+                                selection: filterBinding
+                            ) { option, selected in
+                                Text(option.title)
+                                    .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            searchInput
+                            GoldenGateSegmentedControl(
+                                items: FalseFriendLanguageFilter.allCases,
+                                selection: filterBinding
+                            ) { option, selected in
+                                Text(option.title)
+                                    .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                            }
+                        }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: AppTypography.scaledControlWidth(210, scale: fontScale, maxCap: 280))
-                }
 
-                if items.isEmpty {
-                    ContentUnavailableView(
-                        "No Matching False Friends",
-                        systemImage: "magnifyingglass",
-                        description: Text("Try searching 'Gift', 'bekommen', or 'aktuell'.")
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 10) {
-                            ForEach(items) { item in
-                                VStack(alignment: .leading, spacing: 7) {
-                                    FlowLayout(spacing: 8, lineSpacing: 4) {
-                                        Text(item.word)
-                                            .scaledFont(size: 16, weight: .bold, design: .monospaced)
-                                        Text("≠ \(item.confusedWith)")
-                                            .scaledFont(size: 12, weight: .bold)
-                                            .foregroundStyle(.red)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Capsule().fill(Color.red.opacity(0.12)))
-                                        Text("✓ \(item.actualMeaning)")
-                                            .scaledFont(size: 12, weight: .bold)
-                                            .foregroundStyle(BrandTheme.emeraldMint)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.12)))
-                                        Button {
-                                            NativeAudioEngine.shared.speak(item.word, languageId: item.languageId)
-                                        } label: {
-                                            Label("Hear", systemImage: "speaker.wave.2.fill")
-                                                .scaledFont(size: 12, weight: .semibold)
+                    GoldenGateSectionHairline()
+
+                    if items.isEmpty {
+                        ContentUnavailableView(
+                            "No Matching False Friends",
+                            systemImage: "magnifyingglass",
+                            description: Text("Try searching 'Gift', 'bekommen', or 'aktuell'.")
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(items) { item in
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        FlowLayout(spacing: 8, lineSpacing: 6) {
+                                            Text(item.word)
+                                                .scaledFont(.headline, weight: .bold, design: .monospaced)
+
+                                            Label("≠ \(item.confusedWith)", systemImage: "xmark.circle.fill")
+                                                .scaledFont(.caption, weight: .bold)
+                                                .foregroundStyle(.red)
+                                                .padding(.horizontal, 9)
+                                                .padding(.vertical, 4)
+                                                .background(Capsule().fill(Color.red.opacity(0.12)))
+
+                                            Label(item.actualMeaning, systemImage: "checkmark.circle.fill")
+                                                .scaledFont(.caption, weight: .bold)
+                                                .foregroundStyle(BrandTheme.emeraldMint)
+                                                .padding(.horizontal, 9)
+                                                .padding(.vertical, 4)
+                                                .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.12)))
+
+                                            Button {
+                                                NativeAudioEngine.shared.speak(item.word, languageId: item.languageId)
+                                            } label: {
+                                                Label("Hear", systemImage: "speaker.wave.2.fill")
+                                            }
+                                            .buttonStyle(GoldenGateGlassPillButtonStyle())
                                         }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                    }
 
-                                    Text("❌ Trap: \(item.mistakeExample)")
-                                        .scaledFont(size: 13)
-                                        .foregroundStyle(.secondary)
-                                    Text("✅ Say instead: \(item.correctAlternative)")
-                                        .scaledFont(size: 13, weight: .medium)
-                                    Text("🧠 Hack: \(item.memoryHack)")
-                                        .scaledFont(size: 13)
-                                        .foregroundStyle(.orange)
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Label("Trap: \(item.mistakeExample)", systemImage: "exclamationmark.triangle.fill")
+                                                .scaledFont(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                            Label("Say instead: \(item.correctAlternative)", systemImage: "checkmark.seal.fill")
+                                                .scaledFont(.subheadline, weight: .medium)
+                                                .foregroundStyle(.primary)
+                                            Label("Hack: \(item.memoryHack)", systemImage: "lightbulb.fill")
+                                                .scaledFont(.subheadline)
+                                                .foregroundStyle(BrandTheme.deepGold)
+                                        }
+                                    }
+                                    .padding(16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
                                 }
-                                .padding(14)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
                             }
                         }
                     }
                 }
+                .padding(20)
             }
-            .padding(16)
             .navigationTitle("False Friends")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -93,7 +134,21 @@ public struct FalseFriendsView: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 500, idealWidth: 680, minHeight: 460, idealHeight: 560)
+        .frame(minWidth: 540, idealWidth: 720, minHeight: 480, idealHeight: 600)
         #endif
+    }
+
+    private var searchInput: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .scaledFont(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Search (Gift, bekommen, aktuell, Chef)…", text: $query)
+                .textFieldStyle(.plain)
+                .scaledFont(.subheadline)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .goldenGateSurface(cornerRadius: 10)
     }
 }

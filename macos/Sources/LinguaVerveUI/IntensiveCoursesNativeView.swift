@@ -183,7 +183,8 @@ public struct IntensiveCoursesNativeView: View {
                 GoldenGateSegmentedControl(
                     items: levels,
                     selection: activeLevelBinding,
-                    accent: BrandTheme.cefrColor(for: store.courseLevel.rawValue)
+                    accent: BrandTheme.cefrColor(for: store.courseLevel.rawValue),
+                    allowHorizontalScroll: false
                 ) { level, selected in
                     Text(level.rawValue)
                         .scaledFont(.footnote, weight: selected ? .bold : .medium, design: .monospaced)
@@ -205,7 +206,8 @@ public struct IntensiveCoursesNativeView: View {
                 GoldenGateSegmentedControl(
                     items: levels,
                     selection: activeLevelBinding,
-                    accent: BrandTheme.cefrColor(for: store.courseLevel.rawValue)
+                    accent: BrandTheme.cefrColor(for: store.courseLevel.rawValue),
+                    allowHorizontalScroll: true
                 ) { level, selected in
                     Text(level.rawValue)
                         .scaledFont(.footnote, weight: selected ? .bold : .medium, design: .monospaced)
@@ -830,25 +832,24 @@ public struct IntensiveCoursesNativeView: View {
     private func accentMenu(for languageId: String) -> some View {
         let accents = NativeAudioEngine.accents(for: languageId)
         let activeCode = NativeAudioEngine.shared.activeAccentCode(for: languageId)
-        let activeOption = NativeAudioEngine.accentOption(for: activeCode) ?? accents.first
-
-        return Menu {
-            ForEach(accents) { acc in
-                Button {
-                    NativeAudioEngine.shared.playClickSound()
-                    NativeAudioEngine.shared.setAccent(for: languageId, accentCode: acc.code)
-                } label: {
-                    if acc.code == activeCode {
-                        Label("\(acc.flag) \(acc.label)", systemImage: "checkmark")
-                    } else {
-                        Text("\(acc.flag) \(acc.label) · \(acc.region)")
-                    }
-                }
-            }
-        } label: {
-            Label("\(activeOption?.flag ?? "🎙️") \(activeOption?.label ?? activeCode)", systemImage: "waveform")
+        let options = accents.map { acc in
+            GoldenGateDropdownOption(
+                value: acc.code,
+                title: "\(acc.flag) \(acc.label)",
+                subtitle: acc.region
+            )
         }
-        .buttonStyle(GoldenGateGlassPillButtonStyle())
+        let binding = Binding<String>(
+            get: { activeCode },
+            set: { NativeAudioEngine.shared.setAccent(for: languageId, accentCode: $0) }
+        )
+
+        return GoldenGateDropdownMenu(
+            title: "Accent",
+            leadingIcon: "waveform",
+            options: options,
+            selection: binding
+        )
     }
 
     private func recommendedUnit(for course: IntensiveCourse) -> (module: CourseModule, ctaLabel: String)? {

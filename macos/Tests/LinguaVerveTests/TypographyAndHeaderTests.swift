@@ -298,4 +298,66 @@ final class TypographyAndHeaderTests: XCTestCase {
             }
         }
     }
+
+    func testExamArenaStatusLabelAndSprintPacingHelpers() {
+        let disabledConfig = AIProviderConfig(provider: .appleFoundation, enabled: false)
+        XCTAssertEqual(
+            ExamSimulatorNativeView.examinerStatusLabel(for: disabledConfig),
+            "Built-in 4-Criterion CEFR Rubric"
+        )
+
+        let appleConfig = AIProviderConfig(provider: .appleFoundation, enabled: true)
+        let appleLabel = ExamSimulatorNativeView.examinerStatusLabel(for: appleConfig)
+        XCTAssertEqual(appleLabel, "Apple Intelligence · On-Device")
+        XCTAssertEqual(appleLabel.components(separatedBy: "On-Device").count - 1, 1)
+
+        let cloudConfig = AIProviderConfig(
+            provider: .openai,
+            model: "gpt-4o-mini",
+            apiKey: "sk-test",
+            enabled: true
+        )
+        XCTAssertEqual(
+            ExamSimulatorNativeView.examinerStatusLabel(for: cloudConfig),
+            "OpenAI (Cloud) · gpt-4o-mini"
+        )
+
+        XCTAssertEqual(ExamSimulatorNativeView.sprintMinutes(for: 85), 43)
+        XCTAssertEqual(ExamSimulatorNativeView.sprintMinutes(for: 20), 15)
+    }
+
+    @MainActor
+    func testGoldenGateDropdownOptionAndSegmentedControlDefaults() {
+        let optWithSubtitle = GoldenGateDropdownOption(
+            value: "Aoede",
+            title: "Aoede",
+            subtitle: "Warm expressive storyteller",
+            icon: "waveform"
+        )
+        XCTAssertEqual(optWithSubtitle.value, "Aoede")
+        XCTAssertEqual(optWithSubtitle.title, "Aoede")
+        XCTAssertEqual(optWithSubtitle.subtitle, "Warm expressive storyteller")
+        XCTAssertEqual(optWithSubtitle.icon, "waveform")
+
+        let optMinimal = GoldenGateDropdownOption(value: CEFRLevel.B1, title: "Level B1")
+        XCTAssertNil(optMinimal.subtitle)
+        XCTAssertNil(optMinimal.icon)
+
+        let segmented = GoldenGateSegmentedControl(
+            items: CEFRLevel.allCases,
+            selection: .constant(CEFRLevel.B1)
+        ) { lvl, _ in
+            Text(lvl.rawValue)
+        }
+        XCTAssertFalse(segmented.allowHorizontalScroll)
+
+        let scrollableSegmented = GoldenGateSegmentedControl(
+            items: CEFRLevel.allCases,
+            selection: .constant(CEFRLevel.B1),
+            allowHorizontalScroll: true
+        ) { lvl, _ in
+            Text(lvl.rawValue)
+        }
+        XCTAssertTrue(scrollableSegmented.allowHorizontalScroll)
+    }
 }

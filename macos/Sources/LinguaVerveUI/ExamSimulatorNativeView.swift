@@ -56,6 +56,54 @@ public struct ExamSimulatorNativeView: View {
         case lobby, running, grading, report
     }
 
+    private enum ExamPressureOption: String, CaseIterable, Identifiable, Hashable {
+        case strict
+        case practice
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .strict: return "Strict"
+            case .practice: return "Practice"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .strict: return "flame"
+            case .practice: return "book.closed"
+            }
+        }
+    }
+
+    private enum ExamClockOption: String, CaseIterable, Identifiable, Hashable {
+        case official
+        case sprint
+
+        var id: String { rawValue }
+    }
+
+    /// Computes sprint pacing duration (50% of official exam time, floored at 15 minutes).
+    public static func sprintMinutes(for officialMinutes: Int) -> Int {
+        max(15, Int((Double(officialMinutes) * 0.5).rounded()))
+    }
+
+    /// Produces a clean, non-redundant examiner status label for display in the Exam Arena.
+    public static func examinerStatusLabel(for config: AIProviderConfig) -> String {
+        guard config.isReady else {
+            return "Built-in 4-Criterion CEFR Rubric"
+        }
+        if config.provider.isOnDeviceApple || config.model.localizedCaseInsensitiveContains("Apple Intelligence") {
+            return "Apple Intelligence · On-Device"
+        }
+        let trimmedModel = config.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedModel.isEmpty {
+            return config.provider.label
+        }
+        return "\(config.provider.label) · \(trimmedModel)"
+    }
+
     public init(store: CurriculumStore, showAISettingsSheet: Binding<Bool>) {
         self.store = store
         self._showAISettingsSheet = showAISettingsSheet
@@ -67,38 +115,46 @@ public struct ExamSimulatorNativeView: View {
         let savedAIExams = store.generatedExams(for: lang, level: store.examTargetLevel)
         let exam = savedAIExams.first(where: { $0.id == selectedExamId }) ?? baseExam
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let exam, let baseExam {
-                    switch phase {
-                    case .lobby:
-                        lobbyView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
-                    case .running:
-                        runningView(exam: exam)
-                    case .grading:
-                        VStack(spacing: 12) {
-                            ProgressView().controlSize(.large)
-                            Text("Grading Multi-Part 4-Skill Certification Exam...")
-                                .scaledFont(.headline)
-                            Text("Scoring 9 Reading items, 9 Multi-Accent Listening items, 2 Weighted Writing tasks, and 3 Speaking parts against CEFR \(exam.level.rawValue).")
-                                .scaledFont(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
+        ZStack {
+            GoldenGateEditorialBackdrop()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    if let exam, let baseExam {
+                        switch phase {
+                        case .lobby:
+                            lobbyView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
+                        case .running:
+                            runningView(exam: exam)
+                        case .grading:
+                            VStack(spacing: 14) {
+                                ProgressView().controlSize(.large)
+                                Text("Grading Multi-Part 4-Skill Exam…")
+                                    .scaledFont(.title3, weight: .bold, design: .serif)
+                                Text("Evaluating \(exam.reading.resolvedParts.reduce(0) { $0 + $1.questions.count }) Reading items, \(exam.listening.resolvedTracks.reduce(0) { $0 + $1.questions.count }) Listening items, \(exam.writing.resolvedTasks.count) Weighted Writing tasks, and \(exam.speaking.resolvedParts.count) Speaking parts against CEFR \(exam.level.rawValue).")
+                                    .scaledFont(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(36)
+                            .frame(maxWidth: .infinity)
+                            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+                        case .report:
+                            if let report {
+                                reportView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams, report: report)
+                            }
                         }
-                        .padding(40)
-                        .frame(maxWidth: .infinity)
-                    case .report:
-                        if let report {
-                            reportView(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams, report: report)
-                        }
+                    } else {
+                        ContentUnavailableView("No Exam Loaded", systemImage: "doc.questionmark")
                     }
-                } else {
-                    ContentUnavailableView("No Exam Loaded", systemImage: "doc.questionmark")
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: GoldenGateMetrics.editorialMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .animation(GoldenGateMetrics.panelAnimation, value: phase)
+                .animation(GoldenGateMetrics.contentFade, value: exam?.id)
             }
-            .padding(16)
-            .frame(maxWidth: 980)
-            .frame(maxWidth: .infinity)
         }
         .task(id: phase) {
             guard phase == .running else { return }
@@ -167,201 +223,308 @@ public struct ExamSimulatorNativeView: View {
         let speakingParts = exam.speaking.resolvedParts
         let totalReadQs = readingParts.reduce(0) { $0 + $1.questions.count }
         let totalListenQs = listeningTracks.reduce(0) { $0 + $1.questions.count }
-        let configuredMins = timingMode == "official" ? exam.totalMinutes : max(15, Int((Double(exam.totalMinutes) * 0.5).rounded()))
+        let configuredMins = timingMode == "official" ? exam.totalMinutes : Self.sprintMinutes(for: exam.totalMinutes)
+        let cefrColor = BrandTheme.cefrColor(for: exam.level.rawValue)
 
-        VStack(alignment: .leading, spacing: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("REAL-WORLD MULTI-PART 4-SKILL EXAM ARENA")
-                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                            .foregroundStyle(.red)
-                        Text("Simulate Official Certification Pressure")
-                            .scaledFont(size: 22, weight: .bold, design: .serif)
-                    }
-                    Spacer()
-                    Picker("Language", selection: $store.courseLanguageId) {
-                        ForEach(LearningLanguage.allCases) { lang in
-                            Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: AppTypography.scaledControlWidth(290, scale: fontScale, maxCap: 370))
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Simulate Official Certification Pressure")
-                        .scaledFont(size: 21, weight: .bold, design: .serif)
-                    Picker("Language", selection: $store.courseLanguageId) {
-                        ForEach(LearningLanguage.allCases) { lang in
-                            Text("\(lang.flag) \(lang.shortCode)").tag(lang.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                }
-            }
+        VStack(alignment: .leading, spacing: 26) {
+            examControlRail
 
-            // Level Strip
-            Picker("Level", selection: $store.examTargetLevel) {
-                ForEach(CEFRLevel.allCases) { lvl in
-                    Text(lvl.rawValue).tag(lvl)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: store.examTargetLevel) { _, _ in
-                selectedExamId = nil
-                genNotice = nil
-                genError = nil
-            }
-            .onChange(of: store.courseLanguageId) { _, _ in
-                selectedExamId = nil
-                selectedTheme = ""
-                genNotice = nil
-                genError = nil
-            }
+            GoldenGateSectionHairline()
 
-            // AI Unlimited Exam Generator & Exam Bank
-            aiExamGeneratorCard(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
-
-            VStack(alignment: .leading, spacing: 12) {
+            // Open, Unboxed Editorial Hero
+            VStack(alignment: .leading, spacing: 14) {
                 FlowLayout(spacing: 8, lineSpacing: 6) {
                     Text(exam.alignedCertificate)
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .foregroundStyle(BrandTheme.celestialSky)
-                    if exam.aiGenerated == true {
-                        Text("✨ AI-Generated · \(exam.generatedByModel ?? store.aiConfig.model)")
-                            .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
-                            .foregroundStyle(.purple)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.purple.opacity(0.14)))
-                    }
-                }
-                Text(exam.title)
-                    .scaledFont(.title3, weight: .bold)
+                        .scaledFont(.footnote, weight: .semibold)
+                        .foregroundStyle(cefrColor)
 
-                FlowLayout(spacing: 8, lineSpacing: 6) {
-                    Text("⏱ \(configuredMins) mins · Pass ≥ \(exam.passingScorePercent)%")
-                        .scaledFont(.caption, weight: .bold, design: .monospaced)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    Text("· \(configuredMins) min · Pass ≥ \(exam.passingScorePercent)%")
+                        .scaledFont(.footnote, design: .monospaced, monospacedDigit: true)
+                        .foregroundStyle(.secondary)
+
                     if exam.requireAllSkillsPass == true {
-                        Text("Modular Gate: All 4 Skills Must Pass")
-                            .scaledFont(.caption, weight: .bold, design: .monospaced)
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.orange.opacity(0.14)))
+                        Label("All 4 Skills Required", systemImage: "checkmark.shield")
+                            .scaledFont(.caption2, weight: .semibold)
+                            .foregroundStyle(BrandTheme.deepGold)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(BrandTheme.champagneGold.opacity(0.12)))
+                            .overlay(Capsule().strokeBorder(BrandTheme.champagneGold.opacity(0.28), lineWidth: 1))
+                    }
+
+                    if exam.aiGenerated == true {
+                        Label("AI Paper · \(exam.generatedByModel ?? store.aiConfig.model)", systemImage: "sparkles")
+                            .scaledFont(.caption2, weight: .semibold)
+                            .foregroundStyle(BrandTheme.editorialBlue)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.12)))
                     }
                 }
 
-                // Multi-Part Blueprint Grid
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(200, scale: fontScale)), spacing: 10)], spacing: 10) {
-                    blueprintCard(
-                        title: "1. Reading",
-                        badge: "\(readingParts.count) Parts · \(totalReadQs) Qs",
-                        detail: "Comprehension + \(LearningLanguage.from(exam.languageId).readingFormatSummary)",
-                        tint: BrandTheme.celestialSky
-                    )
-                    blueprintCard(
-                        title: "2. Listening",
-                        badge: "\(listeningTracks.count) Tracks · \(totalListenQs) Qs",
-                        detail: listeningTracks.map { accentBadge($0.accentCode, languageId: exam.languageId) }.joined(separator: " · "),
-                        tint: .purple
-                    )
-                    blueprintCard(
-                        title: "3. Writing",
-                        badge: "\(writingTasks.count) Weighted Tasks",
-                        detail: "Weights: \(writingTasks.map { "\($0.weightPercent)%" }.joined(separator: " + ")) · 4-Criterion Rubric",
-                        tint: .orange
-                    )
-                    blueprintCard(
-                        title: "4. Speaking",
-                        badge: "\(speakingParts.count) Oral Parts",
-                        detail: "Warm-Up + Cue Card + Examiner Pushback",
-                        tint: BrandTheme.emeraldMint
-                    )
-                }
+                Text(exam.title)
+                    .scaledFont(.largeTitle, weight: .bold, design: .serif)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                // Mode & Pacing Pickers
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        Picker("Pressure Mode", selection: $mode) {
-                            Text("🔥 Strict Pressure").tag("strict")
-                            Text("🧘 Guided Practice").tag("practice")
-                        }
-                        .pickerStyle(.segmented)
-
-                        Picker("Clock", selection: $timingMode) {
-                            Text("Official (\(exam.totalMinutes)m)").tag("official")
-                            Text("Sprint (\(max(15, Int((Double(exam.totalMinutes) * 0.5).rounded())))m)").tag("sprint")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    VStack(spacing: 8) {
-                        Picker("Pressure Mode", selection: $mode) {
-                            Text("🔥 Strict Pressure").tag("strict")
-                            Text("🧘 Guided Practice").tag("practice")
-                        }
-                        .pickerStyle(.segmented)
-
-                        Picker("Clock", selection: $timingMode) {
-                            Text("Official (\(exam.totalMinutes)m)").tag("official")
-                            Text("Sprint (\(max(15, Int((Double(exam.totalMinutes) * 0.5).rounded())))m)").tag("sprint")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                }
-
-                HStack {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(store.aiConfig.isReady ? BrandTheme.emeraldMint : .secondary)
-                    if store.aiConfig.isReady {
-                        Text("AI Examiner Active: \(store.aiConfig.provider.label) (\(store.aiConfig.model))")
-                            .scaledFont(.caption)
-                    } else {
-                        Text("Built-in 4-Criterion CEFR Rubric active.")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.secondary)
-                        Button("Connect Local/Cloud AI") { showAISettingsSheet = true }
-                            .scaledFont(.caption, weight: .bold)
-                    }
-                }
-
-                Button {
-                    startExam(exam)
-                } label: {
-                    Label("Begin \(exam.level.rawValue) Multi-Part Simulated Exam", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(mode == "strict" ? .red : BrandTheme.celestialSky)
-                .controlSize(.large)
+                aiExamBankStrip(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.04)))
+
+            // 4-Skill Blueprint Grid
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(205, scale: fontScale)), spacing: 12)], spacing: 12) {
+                blueprintCard(
+                    step: "01",
+                    icon: "book.closed",
+                    title: "Reading",
+                    metric: "\(readingParts.count) Parts · \(totalReadQs) Qs",
+                    detail: "Comprehension + \(LearningLanguage.from(exam.languageId).readingFormatSummary)",
+                    tint: BrandTheme.editorialBlue
+                )
+                blueprintCard(
+                    step: "02",
+                    icon: "headphones",
+                    title: "Listening",
+                    metric: "\(listeningTracks.count) Tracks · \(totalListenQs) Qs",
+                    detail: listeningTracks.map { accentBadge($0.accentCode, languageId: exam.languageId) }.joined(separator: " · "),
+                    tint: .indigo
+                )
+                blueprintCard(
+                    step: "03",
+                    icon: "square.and.pencil",
+                    title: "Writing",
+                    metric: "\(writingTasks.count) Tasks · \(writingTasks.map { "\($0.weightPercent)%" }.joined(separator: "/"))",
+                    detail: "Weighted prompts · 4-criterion rubric",
+                    tint: BrandTheme.champagneGold
+                )
+                blueprintCard(
+                    step: "04",
+                    icon: "mic",
+                    title: "Speaking",
+                    metric: "\(speakingParts.count) Oral Parts",
+                    detail: "Warm-Up + Cue Card + Examiner Pushback",
+                    tint: BrandTheme.emeraldMint
+                )
+            }
+
+            // Session Setup & Primary Launch Card
+            sessionSetupCard(exam: exam)
+
+            // Quiet Secondary AI Exam Studio Card
+            aiExamGeneratorCard(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+        .onChange(of: store.examTargetLevel) { _, _ in
+            selectedExamId = nil
+            genNotice = nil
+            genError = nil
+        }
+        .onChange(of: store.courseLanguageId) { _, _ in
+            selectedExamId = nil
+            selectedTheme = ""
+            genNotice = nil
+            genError = nil
+        }
+    }
+
+    private var examControlRail: some View {
+        let languageBinding = Binding<LearningLanguage>(
+            get: { LearningLanguage.from(store.courseLanguageId) },
+            set: { newLang in
+                store.courseLanguageId = newLang.rawValue
+            }
+        )
+
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) {
+                GoldenGateSegmentedControl(
+                    items: CEFRLevel.allCases,
+                    selection: $store.examTargetLevel,
+                    accent: BrandTheme.cefrColor(for: store.examTargetLevel.rawValue),
+                    allowHorizontalScroll: false
+                ) { level, selected in
+                    Text(level.rawValue)
+                        .scaledFont(.footnote, weight: selected ? .bold : .medium, design: .monospaced)
+                }
+
+                Spacer(minLength: 12)
+
+                GoldenGateSegmentedControl(
+                    items: LearningLanguage.allCases,
+                    selection: languageBinding,
+                    allowHorizontalScroll: false
+                ) { option, selected in
+                    Text("\(option.flag) \(option.shortCode)")
+                        .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                GoldenGateSegmentedControl(
+                    items: LearningLanguage.allCases,
+                    selection: languageBinding,
+                    allowHorizontalScroll: true
+                ) { option, selected in
+                    Text("\(option.flag) \(option.shortCode)")
+                        .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                }
+
+                GoldenGateSegmentedControl(
+                    items: CEFRLevel.allCases,
+                    selection: $store.examTargetLevel,
+                    accent: BrandTheme.cefrColor(for: store.examTargetLevel.rawValue),
+                    allowHorizontalScroll: true
+                ) { level, selected in
+                    Text(level.rawValue)
+                        .scaledFont(.footnote, weight: selected ? .bold : .medium, design: .monospaced)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sessionSetupCard(exam: MockExam) -> some View {
+        let modeBinding = Binding<ExamPressureOption>(
+            get: { mode == "practice" ? .practice : .strict },
+            set: { mode = $0.rawValue }
+        )
+        let clockBinding = Binding<ExamClockOption>(
+            get: { timingMode == "sprint" ? .sprint : .official },
+            set: { timingMode = $0.rawValue }
+        )
+        let sprintMins = Self.sprintMinutes(for: exam.totalMinutes)
+
+        VStack(alignment: .leading, spacing: 16) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mode")
+                            .scaledFont(.caption, weight: .medium)
+                            .foregroundStyle(.secondary)
+                        GoldenGateSegmentedControl(
+                            items: ExamPressureOption.allCases,
+                            selection: modeBinding
+                        ) { option, selected in
+                            Label(option.title, systemImage: option.systemImage)
+                                .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Pacing")
+                            .scaledFont(.caption, weight: .medium)
+                            .foregroundStyle(.secondary)
+                        GoldenGateSegmentedControl(
+                            items: ExamClockOption.allCases,
+                            selection: clockBinding
+                        ) { option, selected in
+                            Text(option == .official ? "Official · \(exam.totalMinutes)m" : "Sprint · \(sprintMins)m")
+                                .scaledFont(.footnote, weight: selected ? .semibold : .medium, monospacedDigit: true)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mode")
+                            .scaledFont(.caption, weight: .medium)
+                            .foregroundStyle(.secondary)
+                        GoldenGateSegmentedControl(
+                            items: ExamPressureOption.allCases,
+                            selection: modeBinding
+                        ) { option, selected in
+                            Label(option.title, systemImage: option.systemImage)
+                                .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Pacing")
+                            .scaledFont(.caption, weight: .medium)
+                            .foregroundStyle(.secondary)
+                        GoldenGateSegmentedControl(
+                            items: ExamClockOption.allCases,
+                            selection: clockBinding
+                        ) { option, selected in
+                            Text(option == .official ? "Official · \(exam.totalMinutes)m" : "Sprint · \(sprintMins)m")
+                                .scaledFont(.footnote, weight: selected ? .semibold : .medium, monospacedDigit: true)
+                        }
+                    }
+                }
+            }
+
+            GoldenGateSectionHairline()
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    examinerStatusCluster
+                    Spacer(minLength: 12)
+                    Button {
+                        startExam(exam)
+                    } label: {
+                        Label("Begin \(exam.level.rawValue) Exam", systemImage: "play.fill")
+                    }
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    examinerStatusCluster
+                    Button {
+                        startExam(exam)
+                    } label: {
+                        Label("Begin \(exam.level.rawValue) Exam", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
+                }
+            }
+        }
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+    }
+
+    private var examinerStatusCluster: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(store.aiConfig.isReady ? BrandTheme.emeraldMint : Color.secondary.opacity(0.45))
+                .frame(width: 7, height: 7)
+            Text(Self.examinerStatusLabel(for: store.aiConfig))
+                .scaledFont(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if !store.aiConfig.isReady {
+                Button("Connect AI") {
+                    NativeAudioEngine.shared.playClickSound()
+                    showAISettingsSheet = true
+                }
+                .buttonStyle(.plain)
+                .scaledFont(.footnote, weight: .semibold)
+                .foregroundStyle(BrandTheme.editorialBlue)
+            }
+        }
     }
 
     @ViewBuilder
     private func aiExamGeneratorCard(exam: MockExam, baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label("AI Exam Generator", systemImage: "wand.and.stars")
-                        .scaledFont(.footnote, weight: .semibold)
-                        .foregroundStyle(BrandTheme.editorialBlue)
-                    Text("Generate brand-new unseen 4-skill \(baseExam.level.rawValue) exams (9 Reading Qs, 3 Multi-Accent Listening Tracks, 2 Writing Tasks & 3 Speaking Parts) using your connected AI provider.")
-                        .scaledFont(.subheadline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wand.and.stars")
+                            .scaledFont(.subheadline, weight: .semibold)
+                            .foregroundStyle(BrandTheme.editorialBlue)
+                        Text("AI Exam Studio")
+                            .scaledFont(.headline, weight: .semibold)
+                            .foregroundStyle(.primary)
+                    }
+                    Text("Craft an unseen 4-skill \(baseExam.level.rawValue) paper using your connected AI provider.")
+                        .scaledFont(.footnote)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 if !store.aiConfig.isReady {
                     Button {
+                        NativeAudioEngine.shared.playClickSound()
                         showAISettingsSheet = true
                     } label: {
                         Label("Connect AI", systemImage: "sparkles")
@@ -370,27 +533,25 @@ public struct ExamSimulatorNativeView: View {
                 }
             }
 
-            aiExamBankStrip(exam: exam, baseExam: baseExam, savedAIExams: savedAIExams)
             aiExamControlsRow(baseExam: baseExam, savedAIExams: savedAIExams)
 
-            if isGeneratingExam {
+            GoldenGateCollapsiblePanel(isExpanded: isGeneratingExam) {
                 aiExamProgressGrid()
             }
 
             if let genNotice {
-                Text("✨ \(genNotice)")
+                Label(genNotice, systemImage: "checkmark.circle.fill")
                     .scaledFont(.caption)
                     .foregroundStyle(BrandTheme.emeraldMint)
             }
             if let genError {
-                Text("⚠️ \(genError)")
+                Label(genError, systemImage: "exclamationmark.triangle.fill")
                     .scaledFont(.caption)
                     .foregroundStyle(.red)
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.purple.opacity(0.07)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.purple.opacity(0.22), lineWidth: 1))
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     @ViewBuilder
@@ -399,54 +560,49 @@ public struct ExamSimulatorNativeView: View {
         FlowLayout(spacing: 8, lineSpacing: 8) {
             Button {
                 NativeAudioEngine.shared.playClickSound()
-                selectedExamId = nil
+                withAnimation(GoldenGateMetrics.snappySpring) {
+                    selectedExamId = nil
+                }
             } label: {
-                Text("📚 Official Built-in (\(baseExam.level.rawValue))")
-                    .scaledFont(.caption, weight: .bold)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(builtInActive ? BrandTheme.celestialSky : Color.primary.opacity(0.06))
-                    )
-                    .foregroundStyle(builtInActive ? Color.white : Color.primary)
+                Label("Official \(baseExam.level.rawValue) Paper", systemImage: "doc.text")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: builtInActive, accent: BrandTheme.editorialBlue))
 
             ForEach(Array(savedAIExams.enumerated()), id: \.element.id) { idx, gExam in
                 let isSelected = exam.id == gExam.id
                 let shortTopic = String((gExam.generatedTheme ?? "Custom").prefix(26))
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Button {
                         NativeAudioEngine.shared.playClickSound()
-                        selectedExamId = gExam.id
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            selectedExamId = gExam.id
+                        }
                     } label: {
-                        Text("✨ AI #\(savedAIExams.count - idx): \(shortTopic)")
-                            .scaledFont(.caption, weight: .bold)
-                            .padding(.leading, 10)
-                            .padding(.vertical, 6)
+                        Label("AI #\(savedAIExams.count - idx) · \(shortTopic)", systemImage: "sparkles")
+                            .scaledFont(.footnote, weight: isSelected ? .semibold : .medium)
+                            .foregroundStyle(isSelected ? BrandTheme.editorialBlue : .primary)
                     }
                     .buttonStyle(.plain)
 
                     Button {
                         NativeAudioEngine.shared.playClickSound()
-                        store.deleteGeneratedExam(id: gExam.id)
-                        if selectedExamId == gExam.id {
-                            selectedExamId = nil
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            store.deleteGeneratedExam(id: gExam.id)
+                            if selectedExamId == gExam.id {
+                                selectedExamId = nil
+                            }
                         }
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .scaledFont(.caption)
-                            .padding(.trailing, 8)
-                            .padding(.vertical, 6)
+                        Image(systemName: "xmark")
+                            .scaledFont(.caption2, weight: .semibold)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Delete AI exam")
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? Color.purple : Color.primary.opacity(0.06))
-                )
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 8)
+                .goldenGateGlassPill(isSelected: isSelected, accent: BrandTheme.editorialBlue)
             }
         }
     }
@@ -454,23 +610,38 @@ public struct ExamSimulatorNativeView: View {
     @ViewBuilder
     private func aiExamControlsRow(baseExam: MockExam, savedAIExams: [MockExam]) -> some View {
         let themes = AIExamGeneratorService.themes(for: baseExam.languageId)
+        let themeOptions = [
+            GoldenGateDropdownOption(value: "", title: "Random Theme", icon: "shuffle")
+        ] + themes.map { t in
+            GoldenGateDropdownOption(value: t, title: t)
+        }
         let placeholder = "Optional: \(LearningLanguage.from(baseExam.languageId).topicPlaceholder)"
 
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                Picker("Theme", selection: $selectedTheme) {
-                    Text("🎲 Surprise Me (Random Theme)").tag("")
-                    ForEach(themes, id: \.self) { t in
-                        Text(t).tag(t)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
-                .disabled(isGeneratingExam)
+            HStack(spacing: 10) {
+                GoldenGateDropdownMenu(
+                    title: "Theme",
+                    leadingIcon: "sparkles",
+                    options: themeOptions,
+                    selection: $selectedTheme,
+                    fullWidth: true,
+                    isDisabled: isGeneratingExam
+                )
+                .frame(maxWidth: AppTypography.scaledControlWidth(240, scale: fontScale, maxCap: 310))
 
                 TextField(placeholder, text: $customTopic)
-                    .textFieldStyle(.roundedBorder)
-                    .scaledFont(.caption)
+                    .textFieldStyle(.plain)
+                    .scaledFont(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(BrandTheme.editorialHairline, lineWidth: 1)
+                    )
                     .disabled(isGeneratingExam)
 
                 Button {
@@ -479,40 +650,57 @@ public struct ExamSimulatorNativeView: View {
                     HStack(spacing: 6) {
                         if isGeneratingExam {
                             ProgressView().controlSize(.small)
+                            Text("Crafting…")
                         } else {
                             Image(systemName: "sparkles")
+                            Text("Generate \(baseExam.level.rawValue) Paper")
                         }
-                        Text(isGeneratingExam ? "Crafting…" : "Generate Fresh \(baseExam.level.rawValue) AI Exam")
                     }
                 }
-                .buttonStyle(GoldenGatePrimaryButtonStyle())
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.editorialBlue))
                 .disabled(isGeneratingExam)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("Theme", selection: $selectedTheme) {
-                    Text("🎲 Surprise Me (Random Theme)").tag("")
-                    ForEach(themes, id: \.self) { t in
-                        Text(t).tag(t)
-                    }
-                }
-                .disabled(isGeneratingExam)
+            VStack(alignment: .leading, spacing: 10) {
+                GoldenGateDropdownMenu(
+                    title: "Theme",
+                    leadingIcon: "sparkles",
+                    options: themeOptions,
+                    selection: $selectedTheme,
+                    fullWidth: true,
+                    isDisabled: isGeneratingExam
+                )
 
                 TextField(placeholder, text: $customTopic)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .scaledFont(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(BrandTheme.editorialHairline, lineWidth: 1)
+                    )
                     .disabled(isGeneratingExam)
 
                 Button {
                     Task { await generateFreshExam(baseExam: baseExam, savedAIExams: savedAIExams) }
                 } label: {
-                    Label(
-                        isGeneratingExam ? "Crafting Exam…" : "Generate Fresh \(baseExam.level.rawValue) AI Exam",
-                        systemImage: "sparkles"
-                    )
+                    HStack(spacing: 6) {
+                        if isGeneratingExam {
+                            ProgressView().controlSize(.small)
+                            Text("Crafting…")
+                        } else {
+                            Image(systemName: "sparkles")
+                            Text("Generate \(baseExam.level.rawValue) Paper")
+                        }
+                    }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(GoldenGatePrimaryButtonStyle())
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.editorialBlue))
                 .disabled(isGeneratingExam)
             }
         }
@@ -523,42 +711,78 @@ public struct ExamSimulatorNativeView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(160, scale: fontScale)), spacing: 8)], spacing: 8) {
             ForEach(SkillType.allCases) { sk in
                 let st = genProgress[sk] ?? .pending
-                let statusText: String = {
+                let statusInfo: (label: String, icon: String, tint: Color) = {
                     switch st {
-                    case .done: return "✓ Ready"
-                    case .loading: return "⏳ Writing…"
-                    case .fallback: return "Base"
-                    case .pending: return "Queued"
+                    case .done: return ("Ready", "checkmark.circle.fill", BrandTheme.emeraldMint)
+                    case .loading: return ("Writing…", "hourglass", BrandTheme.editorialBlue)
+                    case .fallback: return ("Base", "doc", .secondary)
+                    case .pending: return ("Queued", "clock", .secondary)
                     }
                 }()
-                let bgColor: Color = st == .done
-                    ? BrandTheme.emeraldMint.opacity(0.16)
-                    : (st == .loading ? Color.purple.opacity(0.16) : Color.primary.opacity(0.05))
 
-                HStack {
-                    Text(sk.shortName).scaledFont(.caption2, weight: .bold, design: .monospaced)
+                HStack(spacing: 6) {
+                    Text(sk.shortName)
+                        .scaledFont(.caption2, weight: .semibold, design: .monospaced)
                     Spacer()
-                    Text(statusText).scaledFont(.caption2, design: .monospaced)
+                    Label(statusInfo.label, systemImage: statusInfo.icon)
+                        .scaledFont(.caption2, design: .monospaced)
+                        .foregroundStyle(statusInfo.tint)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 7).fill(bgColor))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .goldenGateSurface(
+                    cornerRadius: 9,
+                    tint: st == .done ? BrandTheme.emeraldMint : (st == .loading ? BrandTheme.editorialBlue : nil)
+                )
             }
         }
     }
 
-    private func blueprintCard(title: String, badge: String, detail: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title).scaledFont(.caption, weight: .bold).foregroundStyle(tint)
-                Spacer()
-                Text(badge).scaledFont(size: 10, weight: .semibold, design: .monospaced).foregroundStyle(.secondary)
+    private func blueprintCard(
+        step: String,
+        icon: String,
+        title: String,
+        metric: String,
+        detail: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tint.opacity(0.13))
+                    .frame(width: 26, height: 26)
+                    .overlay {
+                        Image(systemName: icon)
+                            .scaledFont(.caption2, weight: .semibold)
+                            .foregroundStyle(tint)
+                    }
+
+                Text(title)
+                    .scaledFont(.subheadline, weight: .semibold)
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 4)
+
+                Text(step)
+                    .scaledFont(.caption2, design: .monospaced)
+                    .foregroundStyle(.tertiary)
             }
-            Text(detail).scaledFont(.caption2).foregroundStyle(.secondary).lineLimit(3)
+
+            Text(metric)
+                .scaledFont(.caption, weight: .semibold, design: .monospaced, monospacedDigit: true)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.88)
+
+            Text(detail)
+                .scaledFont(.caption)
+                .foregroundStyle(.secondary)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
     }
 
     // MARK: - Running Exam View
@@ -583,64 +807,82 @@ public struct ExamSimulatorNativeView: View {
 
         // Countdown Bar
         ViewThatFits(in: .horizontal) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
-                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
-                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
-                    Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(2)
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(mode == "strict" ? "Strict Pressure" : "Guided Practice") · \(exam.alignedCertificate)")
+                        .scaledFont(.caption, weight: .semibold)
+                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.editorialBlue)
+                    Text(exam.title)
+                        .scaledFont(.headline, weight: .bold, design: .serif)
+                        .lineLimit(2)
                 }
                 Spacer()
                 Label(formatClock(remainingSeconds), systemImage: "timer")
-                    .scaledFont(size: 16, weight: .bold, design: .monospaced)
-                    .monospacedDigit()
+                    .scaledFont(.subheadline, weight: .bold, design: .monospaced, monospacedDigit: true)
                     .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
-                Button("Submit All") {
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .goldenGateGlassPill(isSelected: remainingSeconds <= 120 && mode == "strict", accent: .red)
+
+                Button {
                     Task { await submitExam(exam) }
+                } label: {
+                    Text("Submit All")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(BrandTheme.emeraldMint)
-                .controlSize(.small)
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
             }
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(mode == "strict" ? "STRICT EXAM PRESSURE" : "PRACTICE SIMULATION") · \(exam.alignedCertificate)")
-                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
-                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.celestialSky)
-                    Text(exam.title).scaledFont(.subheadline, weight: .bold).lineLimit(2)
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(mode == "strict" ? "Strict Pressure" : "Guided Practice") · \(exam.alignedCertificate)")
+                        .scaledFont(.caption, weight: .semibold)
+                        .foregroundStyle(mode == "strict" ? .red : BrandTheme.editorialBlue)
+                    Text(exam.title)
+                        .scaledFont(.headline, weight: .bold, design: .serif)
+                        .lineLimit(2)
                 }
                 HStack {
                     Label(formatClock(remainingSeconds), systemImage: "timer")
-                        .scaledFont(size: 16, weight: .bold, design: .monospaced)
-                        .monospacedDigit()
+                        .scaledFont(.subheadline, weight: .bold, design: .monospaced, monospacedDigit: true)
                         .foregroundStyle(remainingSeconds <= 120 && mode == "strict" ? .red : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .goldenGateGlassPill(isSelected: remainingSeconds <= 120 && mode == "strict", accent: .red)
                     Spacer()
-                    Button("Submit All") {
+                    Button {
                         Task { await submitExam(exam) }
+                    } label: {
+                        Text("Submit All")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.emeraldMint)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
                 }
             }
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.06)))
+        .padding(16)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
         // 4-Skill Switcher with live progress summary
-        Picker("Skill", selection: Binding(
+        let sectionBinding = Binding<SkillType>(
             get: { activeSection },
             set: { next in
                 stopAudioAndMic()
                 activeSection = next
             }
-        )) {
-            Text("Read \(readAnswered)/\(readTotal)").tag(SkillType.reading)
-            Text("Listen \(listenAnswered)/\(listenTotal)").tag(SkillType.listening)
-            Text("Write \(totalWrittenWords)w").tag(SkillType.writing)
-            Text("Speak \(totalSpokenWords)w").tag(SkillType.speaking)
+        )
+        GoldenGateSegmentedControl(
+            items: SkillType.allCases,
+            selection: sectionBinding
+        ) { skill, selected in
+            let label: String = {
+                switch skill {
+                case .reading: return "Read \(readAnswered)/\(readTotal)"
+                case .listening: return "Listen \(listenAnswered)/\(listenTotal)"
+                case .writing: return "Write \(totalWrittenWords)w"
+                case .speaking: return "Speak \(totalSpokenWords)w"
+                }
+            }()
+            Text(label)
+                .scaledFont(.footnote, weight: selected ? .semibold : .medium, monospacedDigit: true)
         }
-        .pickerStyle(.segmented)
 
         switch activeSection {
         case .reading:
@@ -659,7 +901,7 @@ public struct ExamSimulatorNativeView: View {
         let safeIdx = min(activeReadingIdx, max(0, parts.count - 1))
         let part = parts[safeIdx]
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Reading Part", selection: $activeReadingIdx) {
                 ForEach(Array(parts.enumerated()), id: \.element.id) { idx, p in
                     let done = p.questions.filter { readingAnswers[$0.id] != nil }.count
@@ -669,17 +911,19 @@ public struct ExamSimulatorNativeView: View {
             .pickerStyle(.segmented)
 
             HStack {
-                Text(part.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(BrandTheme.celestialSky)
+                Text(part.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(BrandTheme.editorialBlue)
                 Spacer()
                 Text(readingFormatLabel(part.format))
-                    .scaledFont(size: 10, weight: .bold, design: .monospaced)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
+                    .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.12)))
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
 
-            Text(part.passageTitle).scaledFont(.headline)
-            Text(part.instruction).scaledFont(.caption).foregroundStyle(.secondary)
+            Text(part.passageTitle)
+                .scaledFont(.title3, weight: .bold, design: .serif)
+            Text(part.instruction).scaledFont(.subheadline).foregroundStyle(.secondary)
 
             readingPassageView(part: part)
 
@@ -694,20 +938,24 @@ public struct ExamSimulatorNativeView: View {
                 if safeIdx < parts.count - 1 {
                     Button("Next: Reading Part \(safeIdx + 2) →") {
                         NativeAudioEngine.shared.playClickSound()
-                        activeReadingIdx = safeIdx + 1
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeReadingIdx = safeIdx + 1
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 } else {
                     Button("Next: Listening / Hearing →") {
                         stopAudioAndMic()
-                        activeSection = .listening
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeSection = .listening
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     @ViewBuilder
@@ -717,7 +965,7 @@ public struct ExamSimulatorNativeView: View {
         let playsUsed = listeningPlaysByTrack[track.id] ?? 0
         let locked = mode == "strict" && playsUsed >= track.maxPlaysStrict
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Listening Track", selection: Binding(
                 get: { safeIdx },
                 set: { next in
@@ -736,33 +984,34 @@ public struct ExamSimulatorNativeView: View {
 
             let dialogueTurns = NativeAudioEngine.parseDialogueTurns(track.audioScript)
             FlowLayout(spacing: 8, lineSpacing: 6) {
-                Text(track.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(.purple)
+                Text(track.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(.indigo)
                 if !dialogueTurns.isEmpty {
-                    Text("💬 2-Speaker Conversation")
-                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                    Label("2-Speaker Conversation", systemImage: "bubble.left.and.bubble.right")
+                        .scaledFont(.caption2, weight: .semibold, design: .monospaced)
                         .foregroundStyle(BrandTheme.emeraldMint)
-                        .padding(.horizontal, 7)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.14)))
                 }
                 if let speaker = NativeAudioEngine.shared.activeSpeakerName, !speaker.isEmpty {
-                    Text("🎙️ Speaking: \(speaker)")
-                        .scaledFont(size: 10, weight: .bold, design: .monospaced)
+                    Label("Speaking: \(speaker)", systemImage: "waveform")
+                        .scaledFont(.caption2, weight: .semibold, design: .monospaced)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 9)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.purple))
+                        .background(Capsule().fill(Color.indigo))
                 }
                 Text(accentBadge(track.accentCode, languageId: exam.languageId))
-                    .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                    .scaledFont(.caption2, weight: .semibold, design: .monospaced)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.purple.opacity(0.15)))
+                    .background(Capsule().fill(Color.indigo.opacity(0.14)))
+                    .foregroundStyle(.indigo)
             }
 
             Text(track.contextNote).scaledFont(.subheadline).foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 FlowLayout(spacing: 8, lineSpacing: 8) {
                     Button {
                         if locked { return }
@@ -790,30 +1039,29 @@ public struct ExamSimulatorNativeView: View {
                             systemImage: "timer"
                         )
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: isPreReading))
 
                     Text("Track \(safeIdx + 1) Plays: \(playsUsed)/\(mode == "strict" ? "\(track.maxPlaysStrict)" : "∞")")
-                        .scaledFont(.caption, weight: .bold, design: .monospaced)
+                        .scaledFont(.caption, weight: .semibold, design: .monospaced, monospacedDigit: true)
+                        .foregroundStyle(.secondary)
                         .padding(.vertical, 6)
                 }
 
-                Text("⚠️ Hearing Focus: \(track.hearingFocusTrap)")
+                Label("Hearing Focus: \(track.hearingFocusTrap)", systemImage: "ear")
                     .scaledFont(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(BrandTheme.deepGold)
 
                 if mode == "strict" {
                     Label("Transcript locked in Strict Mode — unlocked in Score Report.", systemImage: "lock.fill")
                         .scaledFont(.caption2, design: .monospaced)
                         .foregroundStyle(.secondary)
                 } else {
-                    DisclosureGroup("Practice Mode: Peek Track \(safeIdx + 1) Transcript") {
+                    GoldenGateEditorialDisclosure("Practice Mode: Peek Track \(safeIdx + 1) Transcript") {
                         transcriptTurnsView(script: track.audioScript)
-                            .padding(.top, 4)
                     }
-                    .scaledFont(.caption)
                 }
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue)
 
@@ -830,20 +1078,24 @@ public struct ExamSimulatorNativeView: View {
                         NativeAudioEngine.shared.stopSpeech()
                         isPreReading = false
                         NativeAudioEngine.shared.playClickSound()
-                        activeListeningIdx = safeIdx + 1
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeListeningIdx = safeIdx + 1
+                        }
                     }
                     .buttonStyle(GoldenGatePrimaryButtonStyle())
                 } else {
                     Button("Next: Writing →") {
                         stopAudioAndMic()
-                        activeSection = .writing
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeSection = .writing
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     @ViewBuilder
@@ -852,7 +1104,7 @@ public struct ExamSimulatorNativeView: View {
         let task = tasks[safeIdx]
         let wc = wordCount(writingByTask[task.id] ?? "")
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Writing Task", selection: $activeWritingIdx) {
                 ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, t in
                     let words = wordCount(writingByTask[t.id] ?? "")
@@ -863,31 +1115,33 @@ public struct ExamSimulatorNativeView: View {
 
             Text("\(task.partLabel) · Weight \(task.weightPercent)%")
                 .scaledFont(.caption, weight: .bold, design: .monospaced)
-                .foregroundStyle(.orange)
-            Text(task.scenario).scaledFont(.headline)
+                .foregroundStyle(BrandTheme.deepGold)
+            Text(task.scenario)
+                .scaledFont(.title3, weight: .bold, design: .serif)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 ForEach(task.taskRequirements, id: \.self) { req in
-                    Text("• \(req)").scaledFont(.caption)
+                    Text("• \(req)").scaledFont(.subheadline)
                 }
             }
-            .padding(10)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.12)))
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.champagneGold)
 
             HStack {
                 Text("Task \(safeIdx + 1) Written Submission").scaledFont(.caption, weight: .bold)
                 Spacer()
                 Text("\(wc) words (Target: \(task.minWords)–\(task.maxWords))")
-                    .scaledFont(.caption, weight: .bold, design: .monospaced)
-                    .foregroundStyle(wc >= task.minWords ? BrandTheme.emeraldMint : .orange)
+                    .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
+                    .foregroundStyle(wc >= task.minWords ? BrandTheme.emeraldMint : BrandTheme.deepGold)
             }
 
             TextEditor(text: writingBinding(for: task.id))
                 .scaledFont(.body)
                 .frame(minHeight: 190)
-                .padding(6)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.18)))
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.03)))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(BrandTheme.editorialHairline, lineWidth: 1))
 
             HStack {
                 Text("4-Criterion CEFR Rubric: Task, Coherence, Lexis, Grammar")
@@ -897,21 +1151,24 @@ public struct ExamSimulatorNativeView: View {
                 if safeIdx < tasks.count - 1 {
                     Button("Next: Writing Task \(safeIdx + 2) →") {
                         NativeAudioEngine.shared.playClickSound()
-                        activeWritingIdx = safeIdx + 1
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeWritingIdx = safeIdx + 1
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 } else {
                     Button("Next: Speaking →") {
                         stopAudioAndMic()
-                        activeSection = .speaking
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeSection = .speaking
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 }
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     @ViewBuilder
@@ -920,7 +1177,7 @@ public struct ExamSimulatorNativeView: View {
         let part = parts[safeIdx]
         let wc = wordCount(speakingByPart[part.id] ?? "")
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Speaking Part", selection: Binding(
                 get: { safeIdx },
                 set: { next in
@@ -938,17 +1195,18 @@ public struct ExamSimulatorNativeView: View {
             .pickerStyle(.segmented)
 
             Text(part.partLabel).scaledFont(.caption, weight: .bold, design: .monospaced).foregroundStyle(BrandTheme.emeraldMint)
-            Text(part.instruction).scaledFont(.headline)
+            Text(part.instruction)
+                .scaledFont(.title3, weight: .bold, design: .serif)
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(part.prompts.enumerated()), id: \.offset) { i, pt in
-                    Text("\(i + 1). \(pt)").scaledFont(.caption)
+                    Text("\(i + 1). \(pt)").scaledFont(.subheadline)
                 }
                 if let promptAudio = part.examinerPromptAudio, !promptAudio.isEmpty {
-                    Divider()
+                    GoldenGateSectionHairline()
                     HStack(alignment: .top, spacing: 8) {
                         Text("“\(promptAudio)”")
-                            .scaledFont(.caption, italic: true)
+                            .scaledFont(.subheadline, italic: true)
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
@@ -957,14 +1215,13 @@ public struct ExamSimulatorNativeView: View {
                         } label: {
                             Label("Play Examiner", systemImage: "speaker.wave.2.fill")
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .buttonStyle(GoldenGateGlassPillButtonStyle())
                     }
                 }
             }
-            .padding(12)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.emeraldMint.opacity(0.10)))
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.emeraldMint)
 
             FlowLayout(spacing: 8, lineSpacing: 8) {
                 Button {
@@ -974,7 +1231,7 @@ public struct ExamSimulatorNativeView: View {
                 } label: {
                     Label(isPrepping ? "Prep: \(prepSecondsLeft)s" : "Start \(part.prepSeconds)s Prep", systemImage: "timer")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: isPrepping))
 
                 Button {
                     if speechRecognizer.isRecording {
@@ -993,8 +1250,7 @@ public struct ExamSimulatorNativeView: View {
                         systemImage: speechRecognizer.isRecording ? "mic.slash.fill" : "mic.fill"
                     )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(speechRecognizer.isRecording ? .red : BrandTheme.emeraldMint)
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: speechRecognizer.isRecording ? .red : BrandTheme.emeraldMint))
             }
 
             if let msg = speechRecognizer.statusMessage {
@@ -1005,23 +1261,26 @@ public struct ExamSimulatorNativeView: View {
                 Text("Part \(safeIdx + 1) Spoken Transcript (Auto-captured via Mic or Type Manually)")
                     .scaledFont(.caption, weight: .bold)
                 Spacer()
-                Text("\(wc) words").scaledFont(.caption, design: .monospaced).foregroundStyle(.secondary)
+                Text("\(wc) words").scaledFont(.caption, design: .monospaced, monospacedDigit: true).foregroundStyle(.secondary)
             }
 
             TextEditor(text: speakingBinding(for: part.id))
                 .scaledFont(.body)
                 .frame(minHeight: 130)
-                .padding(6)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.18)))
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.03)))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(BrandTheme.editorialHairline, lineWidth: 1))
 
             HStack {
                 if safeIdx < parts.count - 1 {
                     Button("Next: Speaking Part \(safeIdx + 2) →") {
                         stopAudioAndMic()
                         NativeAudioEngine.shared.playClickSound()
-                        activeSpeakingIdx = safeIdx + 1
+                        withAnimation(GoldenGateMetrics.snappySpring) {
+                            activeSpeakingIdx = safeIdx + 1
+                        }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle())
                 }
                 Spacer()
                 Button {
@@ -1029,13 +1288,11 @@ public struct ExamSimulatorNativeView: View {
                 } label: {
                     Label("Finish & Grade All 4 Skills", systemImage: "checkmark.seal.fill")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(BrandTheme.emeraldMint)
-                .controlSize(.large)
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
             }
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+        .padding(20)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     // MARK: - Report View
@@ -1047,35 +1304,36 @@ public struct ExamSimulatorNativeView: View {
         let writingTasks = exam.writing.resolvedTasks
         let speakingParts = exam.speaking.resolvedParts
 
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
                     FlowLayout(spacing: 8, lineSpacing: 6) {
-                        Text(report.passed ? "CERTIFICATION READY · PASSED" : "BELOW PASS MARK · REVIEW & RETRY")
-                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                            .foregroundStyle(report.passed ? BrandTheme.emeraldMint : .orange)
+                        Text(report.passed ? "Certification Ready · Passed" : "Below Pass Mark · Review & Retry")
+                            .scaledFont(.footnote, weight: .semibold)
+                            .foregroundStyle(report.passed ? BrandTheme.emeraldMint : BrandTheme.deepGold)
                         if let label = report.officialGradeLabel {
                             Text(label)
-                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                                .scaledFont(.caption2, weight: .bold, design: .monospaced)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.16)))
-                                .foregroundStyle(BrandTheme.celestialSky)
+                                .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                                .foregroundStyle(BrandTheme.editorialBlue)
                         }
                     }
                     Text("\(report.examTitle) — \(report.overallScore)%")
-                        .scaledFont(.title2, weight: .bold)
+                        .scaledFont(.largeTitle, weight: .bold, design: .serif)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("Mode: \(report.mode.uppercased()) · Time: \(formatClock(report.durationUsedSeconds)) · Saved to History")
-                        .scaledFont(.caption, design: .monospaced)
+                        .scaledFont(.caption, design: .monospaced, monospacedDigit: true)
                         .foregroundStyle(.secondary)
                     if exam.requireAllSkillsPass == true && report.overallScore >= exam.passingScorePercent && !allModulesPassed {
-                        Text("⚠️ Overall average met \(exam.passingScorePercent)%, but modular certification requires passing EVERY skill (≥ \(exam.passingScorePercent)%).")
+                        Label("Overall average met \(exam.passingScorePercent)%, but modular certification requires passing every skill (≥ \(exam.passingScorePercent)%).", systemImage: "exclamationmark.triangle")
                             .scaledFont(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(BrandTheme.deepGold)
                     }
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
+                VStack(alignment: .trailing, spacing: 8) {
                     if store.aiConfig.isReady {
                         Button {
                             phase = .lobby
@@ -1085,10 +1343,16 @@ public struct ExamSimulatorNativeView: View {
                         }
                         .buttonStyle(GoldenGateGlassPillButtonStyle())
                     }
-                    Button("New Exam") { phase = .lobby }
-                        .buttonStyle(.bordered)
+                    Button("New Exam") {
+                        withAnimation(GoldenGateMetrics.panelAnimation) {
+                            phase = .lobby
+                        }
+                    }
+                    .buttonStyle(GoldenGatePrimaryButtonStyle())
                 }
             }
+
+            GoldenGateSectionHairline()
 
             // Celebratory Official LinguaVerve Certificate Unlock Banner (when PASSED)
             if report.passed {
@@ -1103,69 +1367,54 @@ public struct ExamSimulatorNativeView: View {
                         Spacer()
                         certificateOpenButton
                     }
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         certificateCelebrationText(certPreview)
                         certificateOpenButton
                     }
                 }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    BrandTheme.champagneGold.opacity(0.18),
-                                    BrandTheme.emeraldMint.opacity(0.10)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(BrandTheme.deepGold.opacity(0.45), lineWidth: 1.2)
-                        )
-                )
+                .padding(18)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius, tint: BrandTheme.champagneGold)
             }
 
             // 4-Skill Score Cards + 4-Criterion CEFR Rubric Bars
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(210, scale: fontScale)), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(210, scale: fontScale)), spacing: 12)], spacing: 12) {
                 ForEach(SkillType.allCases) { sk in
                     if let s = report.skills[sk.rawValue] {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text(sk.shortName.uppercased()).scaledFont(.caption, weight: .bold, design: .monospaced)
+                                Text(sk.shortName)
+                                    .scaledFont(.subheadline, weight: .semibold)
                                 Spacer()
                                 if s.aiGraded {
                                     Text("AI")
-                                        .scaledFont(size: 9, weight: .bold, design: .monospaced)
-                                        .padding(.horizontal, 5)
+                                        .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                                        .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(Capsule().fill(Color.purple.opacity(0.18)))
-                                        .foregroundStyle(.purple)
+                                        .background(Capsule().fill(Color.indigo.opacity(0.16)))
+                                        .foregroundStyle(.indigo)
                                 }
                                 Text(s.passed ? "PASS" : "FAIL")
-                                    .scaledFont(size: 9.5, weight: .bold, design: .monospaced)
-                                    .padding(.horizontal, 5)
+                                    .scaledFont(.caption2, weight: .bold, design: .monospaced)
+                                    .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Capsule().fill((s.passed ? BrandTheme.emeraldMint : Color.red).opacity(0.16)))
+                                    .background(Capsule().fill((s.passed ? BrandTheme.emeraldMint : Color.red).opacity(0.14)))
                                     .foregroundStyle(s.passed ? BrandTheme.emeraldMint : .red)
                                 Text("\(s.score)%")
-                                    .scaledFont(.headline, design: .monospaced)
+                                    .scaledFont(.headline, weight: .bold, design: .monospaced, monospacedDigit: true)
                                     .foregroundStyle(s.passed ? BrandTheme.emeraldMint : .red)
                             }
                             Text(s.feedback).scaledFont(.caption).foregroundStyle(.secondary)
                             if let rubric = s.rubric {
-                                Divider()
+                                GoldenGateSectionHairline()
                                 rubricBarRow("Task Fulfillment", value: rubric.taskFulfillment)
                                 rubricBarRow("Coherence & Cohesion", value: rubric.coherenceCohesion)
                                 rubricBarRow("Lexical Range", value: rubric.lexicalRange)
                                 rubricBarRow("Grammar Accuracy", value: rubric.grammaticalAccuracy)
                             }
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                        .padding(14)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                     }
                 }
             }
@@ -1188,8 +1437,8 @@ public struct ExamSimulatorNativeView: View {
                 }
             )
 
-            // Unlocked Multi-Accent Transcripts + Full 18-Item Answer Key
-            DisclosureGroup("Unlocked Multi-Accent Transcripts & Answer Key (\(readingParts.reduce(0) { $0 + $1.questions.count } + listeningTracks.reduce(0) { $0 + $1.questions.count }) Items)") {
+            // Unlocked Multi-Accent Transcripts + Full Answer Key
+            GoldenGateEditorialDisclosure("Unlocked Multi-Accent Transcripts & Answer Key (\(readingParts.reduce(0) { $0 + $1.questions.count } + listeningTracks.reduce(0) { $0 + $1.questions.count }) Items)") {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(listeningTracks.enumerated()), id: \.element.id) { idx, track in
                         VStack(alignment: .leading, spacing: 4) {
@@ -1207,17 +1456,16 @@ public struct ExamSimulatorNativeView: View {
                                 } label: {
                                     Label("Replay", systemImage: "speaker.wave.2.fill")
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .buttonStyle(GoldenGateGlassPillButtonStyle())
                             }
                             transcriptTurnsView(script: track.audioScript)
                         }
-                        .padding(10)
+                        .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.08)))
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: .indigo)
                     }
 
-                    Divider()
+                    GoldenGateSectionHairline()
 
                     ForEach(Array(readingParts.enumerated()), id: \.element.id) { pIdx, part in
                         ForEach(part.questions) { q in
@@ -1230,17 +1478,17 @@ public struct ExamSimulatorNativeView: View {
                         }
                     }
                 }
-                .padding(.top, 8)
             }
-            .scaledFont(.subheadline, weight: .semibold)
+            .padding(18)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
             // Writing Tasks & 3-Part Speaking Model Benchmarks
-            DisclosureGroup("Official Model Benchmarks (Writing Tasks & 3-Part Speaking)") {
+            GoldenGateEditorialDisclosure("Official Model Benchmarks (Writing Tasks & 3-Part Speaking)") {
                 VStack(alignment: .leading, spacing: 10) {
                     if !writingNotes.isEmpty {
                         Text("Writing Action Notes: \(writingNotes.joined(separator: " • "))")
                             .scaledFont(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(BrandTheme.deepGold)
                     }
                     if !speakingNotes.isEmpty {
                         Text("Speaking Action Notes: \(speakingNotes.joined(separator: " • "))")
@@ -1254,9 +1502,9 @@ public struct ExamSimulatorNativeView: View {
                                 .scaledFont(.caption, weight: .bold)
                             Text(task.modelAnswer).scaledFont(.caption).foregroundStyle(.secondary)
                         }
-                        .padding(10)
+                        .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                     }
 
                     ForEach(Array(speakingParts.enumerated()), id: \.element.id) { idx, part in
@@ -1270,22 +1518,19 @@ public struct ExamSimulatorNativeView: View {
                                 } label: {
                                     Label("Hear Model", systemImage: "speaker.wave.2.fill")
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .buttonStyle(GoldenGateGlassPillButtonStyle())
                             }
                             Text(part.modelResponseScript).scaledFont(.caption).foregroundStyle(.secondary)
                         }
-                        .padding(10)
+                        .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                     }
                 }
-                .padding(.top, 8)
             }
-            .scaledFont(.subheadline, weight: .semibold)
+            .padding(18)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
     }
 
     @ViewBuilder
@@ -1385,27 +1630,27 @@ public struct ExamSimulatorNativeView: View {
     }
 
     private func certificateCelebrationText(_ cert: LinguaVerveCertificate) -> some View {
-        HStack(alignment: .top, spacing: 11) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "rosette")
                 .scaledFont(.title2, weight: .bold)
                 .foregroundStyle(BrandTheme.deepGold)
                 .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 FlowLayout(spacing: 6, lineSpacing: 4) {
-                    Text("🎉 OFFICIAL LINGUAVERVE CERTIFICATE UNLOCKED · \(cert.honorsTitle)")
-                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                    Text("Official LinguaVerve Certificate Unlocked · \(cert.honorsTitle)")
+                        .scaledFont(.caption, weight: .bold, design: .monospaced)
                         .foregroundStyle(BrandTheme.deepGold)
                     Text(cert.certificateId)
-                        .scaledFont(size: 10, weight: .semibold, design: .monospaced)
-                        .padding(.horizontal, 6)
+                        .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                        .padding(.horizontal, 7)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(Color.primary.opacity(0.08)))
                         .foregroundStyle(.secondary)
                 }
                 Text(cert.encouragementHeadline)
-                    .scaledFont(.headline, weight: .bold)
+                    .scaledFont(.headline, weight: .bold, design: .serif)
                 Text(cert.encouragementMessage)
-                    .scaledFont(.caption)
+                    .scaledFont(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1419,9 +1664,7 @@ public struct ExamSimulatorNativeView: View {
         } label: {
             Label("View & Export Certificate", systemImage: "checkmark.seal.fill")
         }
-        .buttonStyle(.borderedProminent)
-        .tint(BrandTheme.deepGold)
-        .controlSize(.regular)
+        .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.deepGold))
     }
 
     private func rubricBarRow(_ title: String, value: Int) -> some View {
@@ -1464,28 +1707,34 @@ public struct ExamSimulatorNativeView: View {
         selection: Int?,
         onSelect: @escaping (Int) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Q\(index). \(question.prompt)").scaledFont(.subheadline, weight: .semibold)
             ForEach(Array(question.options.enumerated()), id: \.offset) { idx, opt in
                 let chosen = selection == idx
                 Button {
                     NativeAudioEngine.shared.playClickSound()
-                    onSelect(idx)
+                    withAnimation(GoldenGateMetrics.snappySpring) {
+                        onSelect(idx)
+                    }
                 } label: {
-                    HStack {
+                    HStack(spacing: 10) {
                         Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(chosen ? BrandTheme.celestialSky : .secondary)
-                        Text(opt).scaledFont(.caption).foregroundStyle(.primary).multilineTextAlignment(.leading)
+                            .foregroundStyle(chosen ? BrandTheme.editorialBlue : .secondary)
+                        Text(opt).scaledFont(.subheadline).foregroundStyle(.primary).multilineTextAlignment(.leading)
                         Spacer()
                     }
-                    .padding(9)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(chosen ? BrandTheme.celestialSky.opacity(0.16) : Color.primary.opacity(0.04)))
+                    .padding(11)
+                    .goldenGateSurface(
+                        cornerRadius: 10,
+                        tint: chosen ? BrandTheme.editorialBlue : nil,
+                        interactive: true
+                    )
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.03)))
+        .padding(14)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
     }
 
     // MARK: - Actions & Multi-Part Grading
@@ -1544,7 +1793,7 @@ public struct ExamSimulatorNativeView: View {
         activeListeningIdx = 0
         activeWritingIdx = 0
         activeSpeakingIdx = 0
-        let mins = timingMode == "official" ? exam.totalMinutes : max(15, Int((Double(exam.totalMinutes) * 0.5).rounded()))
+        let mins = timingMode == "official" ? exam.totalMinutes : Self.sprintMinutes(for: exam.totalMinutes)
         remainingSeconds = mins * 60
         elapsedSeconds = 0
         activeSection = .reading

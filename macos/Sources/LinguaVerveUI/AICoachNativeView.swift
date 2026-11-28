@@ -25,298 +25,59 @@ public struct AICoachNativeView: View {
         let langName = langEnum.name
         let effectiveConfig = store.aiConfig.resolved(for: lang)
 
-        VStack(spacing: 0) {
-            // Controls Header
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("4-Skill Mastery Studio")
-                            .scaledFont(.footnote, weight: .semibold)
-                            .foregroundStyle(BrandTheme.emeraldMint)
-                        Text("\(langName) \(store.aiCoachLevel.rawValue) · \(store.aiCoachSkill.displayName)")
-                            .scaledFont(.title3, weight: .bold, design: .serif)
-                    }
-                    Spacer()
-                    Button {
-                        showAISettingsSheet = true
-                    } label: {
-                        Label(
-                            effectiveConfig.isReady ? effectiveConfig.model : "Setup AI",
-                            systemImage: "cpu"
-                        )
-                    }
-                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: effectiveConfig.isReady, accent: BrandTheme.emeraldMint))
-                }
+        ZStack {
+            GoldenGateEditorialBackdrop()
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        Picker("Lang", selection: $store.courseLanguageId) {
-                            ForEach(LearningLanguage.allCases) { item in
-                                Text("\(item.flag) \(item.shortCode)").tag(item.rawValue)
-                            }
+            VStack(spacing: 0) {
+                headerControls(langName: langName, effectiveConfig: effectiveConfig)
+
+                GoldenGateSectionHairline()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        if messages.isEmpty && offlineEval == nil {
+                            emptyWelcomeCard(langName: langName, effectiveConfig: effectiveConfig)
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
 
-                        Picker("Level", selection: $store.aiCoachLevel) {
-                            ForEach(CEFRLevel.allCases) { lvl in
-                                Text(lvl.rawValue).tag(lvl)
-                            }
+                        ForEach(messages) { msg in
+                            messageRow(msg, languageId: lang, langName: langName)
                         }
-                        .pickerStyle(.menu)
 
-                        Spacer()
-
-                        Toggle("Auto-Speak", isOn: $autoSpeak)
-                            .toggleStyle(.switch)
-                            .scaledFont(.caption)
-                            .fixedSize()
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Picker("Lang", selection: $store.courseLanguageId) {
-                                ForEach(LearningLanguage.allCases) { item in
-                                    Text("\(item.flag) \(item.shortCode)").tag(item.rawValue)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(maxWidth: AppTypography.scaledControlWidth(275, scale: fontScale, maxCap: 350))
-
-                            Picker("Level", selection: $store.aiCoachLevel) {
-                                ForEach(CEFRLevel.allCases) { lvl in
-                                    Text(lvl.rawValue).tag(lvl)
-                                }
-                            }
-                            .pickerStyle(.menu)
+                        if let eval = offlineEval {
+                            offlineEvaluationCard(eval)
                         }
-                        Toggle("Auto-Speak", isOn: $autoSpeak)
-                            .toggleStyle(.switch)
-                            .scaledFont(.caption)
-                            .fixedSize()
-                    }
-                }
 
-                Picker("Skill", selection: $store.aiCoachSkill) {
-                    ForEach(SkillType.allCases) { sk in
-                        Text(sk.shortName).tag(sk)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: store.aiCoachSkill) { _, _ in
-                    NativeAudioEngine.shared.stopSpeech()
-                    messages = []
-                    offlineEval = nil
-                    errorMessage = nil
-                }
-
-                // Quick Starter Prompts
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(starterPrompts(langName: langName, level: store.aiCoachLevel, skill: store.aiCoachSkill), id: \.self) { prompt in
-                            Button(prompt) {
-                                Task { await sendMessage(prompt) }
+                        if isLoading {
+                            HStack(spacing: 10) {
+                                ProgressView().controlSize(.small)
+                                Text("AI Coach is composing…")
+                                    .scaledFont(.subheadline)
+                                    .foregroundStyle(.secondary)
                             }
-                            .scaledFont(.caption)
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .goldenGateSurface(cornerRadius: 12)
+                        }
+
+                        if let err = errorMessage {
+                            Label(err, systemImage: "exclamationmark.triangle.fill")
+                                .scaledFont(.footnote)
+                                .foregroundStyle(.red)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .goldenGateSurface(cornerRadius: 12, tint: .red)
                         }
                     }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: GoldenGateMetrics.editorialMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
+
+                GoldenGateSectionHairline()
+
+                composerBar(languageId: lang, langName: langName)
             }
-            .padding(14)
-            .background(.bar)
-
-            Divider()
-
-            // Chat Feed
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if messages.isEmpty && offlineEval == nil {
-                        VStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .scaledFont(.largeTitle)
-                                .foregroundStyle(BrandTheme.celestialSky)
-                            Text(effectiveConfig.isReady
-                                 ? "Connected to \(effectiveConfig.provider.label) (\(effectiveConfig.model))"
-                                 : "Connect Local (Ollama/LM Studio) or Cloud AI, or paste Writing/Speaking below for offline CEFR rubric grading.")
-                                .scaledFont(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(32)
-                        .frame(maxWidth: .infinity)
-                    }
-
-                    ForEach(messages) { msg in
-                        let parsed = msg.role == "assistant"
-                            ? AIClientService.parseCoachReply(msg.content, skill: store.aiCoachSkill)
-                            : nil
-                        HStack {
-                            if msg.role == "user" { Spacer(minLength: 40) }
-                            VStack(alignment: .leading, spacing: 8) {
-                                if let parsed {
-                                    if let speaker = parsed.speakerLabel, !speaker.isEmpty {
-                                        Text("\(speaker) · \(langName)")
-                                            .scaledFont(.caption2, weight: .semibold)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    if !parsed.displayBody.isEmpty {
-                                        Text(parsed.displayBody)
-                                            .scaledFont(.subheadline)
-                                            .textSelection(.enabled)
-                                    }
-                                    if !parsed.spokenText.isEmpty {
-                                        HStack(spacing: 6) {
-                                            Button {
-                                                NativeAudioEngine.shared.speak(
-                                                    String(parsed.spokenText.prefix(1200)),
-                                                    languageId: lang
-                                                )
-                                            } label: {
-                                                Label(
-                                                    parsed.audioScript != nil ? "Listen Script (\(langName))" : "Listen (\(langName))",
-                                                    systemImage: "speaker.wave.2.fill"
-                                                )
-                                                .scaledFont(.caption2, weight: .semibold)
-                                            }
-                                            .buttonStyle(.bordered)
-                                            .controlSize(.mini)
-
-                                            Button {
-                                                NativeAudioEngine.shared.speak(
-                                                    String(parsed.spokenText.prefix(1200)),
-                                                    languageId: lang,
-                                                    slow: true
-                                                )
-                                            } label: {
-                                                Label("0.8x", systemImage: "tortoise.fill")
-                                                    .scaledFont(.caption2, weight: .semibold)
-                                            }
-                                            .buttonStyle(.bordered)
-                                            .controlSize(.mini)
-
-                                            Button {
-                                                NativeAudioEngine.shared.stopSpeech()
-                                            } label: {
-                                                Image(systemName: "stop.fill")
-                                                    .scaledFont(.caption2)
-                                            }
-                                            .buttonStyle(.bordered)
-                                            .controlSize(.mini)
-                                            .help("Stop Audio")
-                                        }
-                                    }
-                                    if let note = parsed.coachNote, !note.isEmpty {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            HStack(spacing: 5) {
-                                                Image(systemName: "lightbulb.fill")
-                                                    .scaledFont(.caption2)
-                                                    .foregroundStyle(.orange)
-                                                Text("Coach Note")
-                                                    .scaledFont(.caption2, weight: .bold)
-                                                    .foregroundStyle(.orange)
-                                                Spacer()
-                                                Text("Written tip · skipped in audio")
-                                                    .scaledFont(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            Text(note)
-                                                .scaledFont(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .textSelection(.enabled)
-                                        }
-                                        .padding(9)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.orange.opacity(0.09))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .strokeBorder(Color.orange.opacity(0.24), lineWidth: 1)
-                                        )
-                                    }
-                                } else {
-                                    Text(msg.content)
-                                        .scaledFont(.subheadline)
-                                        .textSelection(.enabled)
-                                }
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(msg.role == "user" ? BrandTheme.celestialSky.opacity(0.22) : Color.primary.opacity(0.06))
-                            )
-                            if msg.role != "user" { Spacer(minLength: 40) }
-                        }
-                    }
-
-                    if let eval = offlineEval {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("\(eval.providerLabel) · Est. \(eval.cefrEstimate.rawValue)")
-                                    .scaledFont(.caption, weight: .bold)
-                                Spacer()
-                                Text("\(eval.score)/100")
-                                    .scaledFont(.headline, design: .monospaced)
-                                    .foregroundStyle(BrandTheme.celestialSky)
-                            }
-                            Text(eval.examinerSummary).scaledFont(.caption)
-                            ForEach(eval.strengths, id: \.self) { s in
-                                Text("✓ \(s)").scaledFont(.caption).foregroundStyle(BrandTheme.emeraldMint)
-                            }
-                            ForEach(eval.corrections, id: \.self) { c in
-                                Text("• \(c)").scaledFont(.caption).foregroundStyle(.orange)
-                            }
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(BrandTheme.celestialSky.opacity(0.10)))
-                    }
-
-                    if isLoading {
-                        ProgressView("AI Coach thinking...")
-                            .scaledFont(.caption)
-                    }
-
-                    if let err = errorMessage {
-                        Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .scaledFont(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-                .padding(16)
-            }
-
-            Divider()
-
-            // Composer Bar with Mic Support
-            HStack(spacing: 8) {
-                Button {
-                    if speechRecognizer.isRecording {
-                        speechRecognizer.stop()
-                    } else {
-                        speechRecognizer.start(languageId: lang, existingText: inputText)
-                    }
-                } label: {
-                    Image(systemName: speechRecognizer.isRecording ? "mic.slash.fill" : "mic.fill")
-                }
-                .buttonStyle(.bordered)
-                .tint(speechRecognizer.isRecording ? .red : BrandTheme.emeraldMint)
-
-                TextField("Ask AI Coach or paste \(langName) \(store.aiCoachLevel.rawValue) text...", text: $inputText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-
-                Button {
-                    Task { await sendMessage(inputText) }
-                } label: {
-                    Image(systemName: "paperplane.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isLoading || inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding(12)
-            .background(.bar)
         }
         .onAppear {
             if !store.aiCoachSeedPrompt.isEmpty {
@@ -334,6 +95,396 @@ public struct AICoachNativeView: View {
             NativeAudioEngine.shared.stopSpeech()
         }
     }
+
+    // MARK: - Top Controls Header
+
+    private func headerControls(langName: String, effectiveConfig: AIProviderConfig) -> some View {
+        let langBinding = Binding<LearningLanguage>(
+            get: { LearningLanguage.from(store.courseLanguageId) },
+            set: { store.courseLanguageId = $0.rawValue }
+        )
+        let levelOptions = CEFRLevel.allCases.map { lvl in
+            GoldenGateDropdownOption(value: lvl, title: "Level \(lvl.rawValue)")
+        }
+
+        return VStack(alignment: .leading, spacing: 14) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 12) {
+                    coachTitleBlock(langName: langName)
+                    Spacer(minLength: 12)
+                    coachHeaderActions(effectiveConfig: effectiveConfig)
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    coachTitleBlock(langName: langName)
+                    coachHeaderActions(effectiveConfig: effectiveConfig)
+                }
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    GoldenGateSegmentedControl(
+                        items: SkillType.allCases,
+                        selection: $store.aiCoachSkill,
+                        allowHorizontalScroll: false
+                    ) { skill, selected in
+                        Text(skill.shortName)
+                            .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    GoldenGateDropdownMenu(
+                        title: "CEFR Level",
+                        leadingIcon: "chart.bar.fill",
+                        options: levelOptions,
+                        selection: $store.aiCoachLevel,
+                        accent: BrandTheme.cefrColor(for: store.aiCoachLevel.rawValue)
+                    )
+
+                    GoldenGateSegmentedControl(
+                        items: LearningLanguage.allCases,
+                        selection: langBinding,
+                        allowHorizontalScroll: false
+                    ) { option, selected in
+                        Text("\(option.flag) \(option.shortCode)")
+                            .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    GoldenGateSegmentedControl(
+                        items: SkillType.allCases,
+                        selection: $store.aiCoachSkill,
+                        allowHorizontalScroll: true
+                    ) { skill, selected in
+                        Text(skill.shortName)
+                            .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                    }
+
+                    FlowLayout(spacing: 10, lineSpacing: 8) {
+                        GoldenGateSegmentedControl(
+                            items: LearningLanguage.allCases,
+                            selection: langBinding,
+                            allowHorizontalScroll: true
+                        ) { option, selected in
+                            Text("\(option.flag) \(option.shortCode)")
+                                .scaledFont(.footnote, weight: selected ? .semibold : .medium)
+                        }
+
+                        GoldenGateDropdownMenu(
+                            title: "CEFR Level",
+                            leadingIcon: "chart.bar.fill",
+                            options: levelOptions,
+                            selection: $store.aiCoachLevel,
+                            accent: BrandTheme.cefrColor(for: store.aiCoachLevel.rawValue)
+                        )
+                    }
+                }
+            }
+            .onChange(of: store.aiCoachSkill) { _, _ in
+                NativeAudioEngine.shared.stopSpeech()
+                withAnimation(GoldenGateMetrics.contentFade) {
+                    messages = []
+                    offlineEval = nil
+                    errorMessage = nil
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 16)
+        .frame(maxWidth: GoldenGateMetrics.editorialMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func coachTitleBlock(langName: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("AI 4-Skill Coach")
+                .scaledFont(.footnote, weight: .semibold)
+                .foregroundStyle(BrandTheme.emeraldMint)
+            Text("\(langName) \(store.aiCoachLevel.rawValue) · \(store.aiCoachSkill.displayName)")
+                .scaledFont(.title2, weight: .bold, design: .serif)
+        }
+    }
+
+    private func coachHeaderActions(effectiveConfig: AIProviderConfig) -> some View {
+        FlowLayout(spacing: 8, lineSpacing: 8) {
+            Button {
+                NativeAudioEngine.shared.playClickSound()
+                withAnimation(GoldenGateMetrics.snappySpring) {
+                    autoSpeak.toggle()
+                }
+            } label: {
+                Label("Auto-Speak", systemImage: autoSpeak ? "speaker.wave.2.fill" : "speaker.slash")
+            }
+            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: autoSpeak, accent: BrandTheme.emeraldMint))
+
+            if !messages.isEmpty || offlineEval != nil {
+                Button {
+                    NativeAudioEngine.shared.playClickSound()
+                    withAnimation(GoldenGateMetrics.panelAnimation) {
+                        messages = []
+                        offlineEval = nil
+                        errorMessage = nil
+                    }
+                } label: {
+                    Label("Clear", systemImage: "trash")
+                }
+                .buttonStyle(GoldenGateGlassPillButtonStyle())
+            }
+
+            Button {
+                NativeAudioEngine.shared.playClickSound()
+                showAISettingsSheet = true
+            } label: {
+                Label(
+                    effectiveConfig.isReady ? ExamSimulatorNativeView.examinerStatusLabel(for: effectiveConfig) : "Connect AI",
+                    systemImage: "cpu"
+                )
+            }
+            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: effectiveConfig.isReady, accent: BrandTheme.emeraldMint))
+        }
+    }
+
+    // MARK: - Chat Feed Subviews
+
+    private func emptyWelcomeCard(langName: String, effectiveConfig: AIProviderConfig) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(BrandTheme.editorialBlue.opacity(0.13))
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: store.aiCoachSkill.systemImage)
+                            .scaledFont(.caption, weight: .semibold)
+                            .foregroundStyle(BrandTheme.editorialBlue)
+                    }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(store.aiCoachSkill.displayName) Studio")
+                        .scaledFont(.headline, weight: .bold, design: .serif)
+                    Text(
+                        effectiveConfig.isReady
+                            ? "Active model: \(ExamSimulatorNativeView.examinerStatusLabel(for: effectiveConfig))"
+                            : "Connect an AI provider for live sessions, or paste Writing/Speaking below for offline CEFR rubric grading."
+                    )
+                    .scaledFont(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            GoldenGateSectionHairline()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Suggested Prompts")
+                    .scaledFont(.caption, weight: .semibold)
+                    .foregroundStyle(.secondary)
+
+                FlowLayout(spacing: 8, lineSpacing: 8) {
+                    ForEach(starterPrompts(langName: langName, level: store.aiCoachLevel, skill: store.aiCoachSkill), id: \.self) { prompt in
+                        Button {
+                            Task { await sendMessage(prompt) }
+                        } label: {
+                            Label(prompt, systemImage: "sparkles")
+                                .multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(GoldenGateGlassPillButtonStyle())
+                    }
+                }
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+    }
+
+    private func messageRow(_ msg: AIChatMessage, languageId: String, langName: String) -> some View {
+        let isUser = msg.role == "user"
+        let parsed = !isUser
+            ? AIClientService.parseCoachReply(msg.content, skill: store.aiCoachSkill)
+            : nil
+
+        return HStack {
+            if isUser { Spacer(minLength: 48) }
+
+            VStack(alignment: .leading, spacing: 10) {
+                if let parsed {
+                    if let speaker = parsed.speakerLabel, !speaker.isEmpty {
+                        Text("\(speaker) · \(langName)")
+                            .scaledFont(.caption2, weight: .semibold)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if !parsed.displayBody.isEmpty {
+                        Text(parsed.displayBody)
+                            .scaledFont(.body)
+                            .lineSpacing(4)
+                            .textSelection(.enabled)
+                    }
+
+                    if !parsed.spokenText.isEmpty {
+                        FlowLayout(spacing: 8, lineSpacing: 6) {
+                            Button {
+                                NativeAudioEngine.shared.speak(
+                                    String(parsed.spokenText.prefix(1200)),
+                                    languageId: languageId
+                                )
+                            } label: {
+                                Label(
+                                    parsed.audioScript != nil ? "Listen Script (\(langName))" : "Listen (\(langName))",
+                                    systemImage: "speaker.wave.2.fill"
+                                )
+                            }
+                            .buttonStyle(GoldenGateGlassPillButtonStyle())
+
+                            Button {
+                                NativeAudioEngine.shared.speak(
+                                    String(parsed.spokenText.prefix(1200)),
+                                    languageId: languageId,
+                                    slow: true
+                                )
+                            } label: {
+                                Label("0.8x", systemImage: "tortoise.fill")
+                            }
+                            .buttonStyle(GoldenGateGlassPillButtonStyle())
+
+                            Button {
+                                NativeAudioEngine.shared.stopSpeech()
+                            } label: {
+                                Image(systemName: "stop.fill")
+                            }
+                            .buttonStyle(GoldenGateGlassPillButtonStyle())
+                            .help("Stop Audio")
+                        }
+                    }
+
+                    if let note = parsed.coachNote, !note.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "lightbulb.fill")
+                                    .scaledFont(.caption2)
+                                    .foregroundStyle(BrandTheme.deepGold)
+                                Text("Coach Note")
+                                    .scaledFont(.caption2, weight: .bold)
+                                    .foregroundStyle(BrandTheme.deepGold)
+                                Spacer()
+                                Text("Written tip · skipped in audio")
+                                    .scaledFont(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(note)
+                                .scaledFont(.footnote)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .goldenGateSurface(cornerRadius: 10, tint: BrandTheme.champagneGold)
+                    }
+                } else {
+                    Text(msg.content)
+                        .scaledFont(.body)
+                        .lineSpacing(4)
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(16)
+            .goldenGateSurface(
+                cornerRadius: 16,
+                tint: isUser ? BrandTheme.editorialBlue : nil
+            )
+
+            if !isUser { Spacer(minLength: 48) }
+        }
+    }
+
+    private func offlineEvaluationCard(_ eval: AIEvaluationResult) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("\(eval.providerLabel) · Est. \(eval.cefrEstimate.rawValue)")
+                    .scaledFont(.footnote, weight: .semibold)
+                    .foregroundStyle(BrandTheme.editorialBlue)
+                Spacer()
+                Text("\(eval.score)/100")
+                    .scaledFont(.title3, weight: .bold, design: .monospaced, monospacedDigit: true)
+                    .foregroundStyle(BrandTheme.editorialBlue)
+            }
+
+            Text(eval.examinerSummary)
+                .scaledFont(.subheadline)
+                .lineSpacing(3)
+
+            if !eval.strengths.isEmpty {
+                GoldenGateSectionHairline()
+                ForEach(eval.strengths, id: \.self) { s in
+                    Label(s, systemImage: "checkmark.circle.fill")
+                        .scaledFont(.footnote)
+                        .foregroundStyle(BrandTheme.emeraldMint)
+                }
+            }
+
+            if !eval.corrections.isEmpty {
+                ForEach(eval.corrections, id: \.self) { c in
+                    Label(c, systemImage: "arrow.up.right.circle")
+                        .scaledFont(.footnote)
+                        .foregroundStyle(BrandTheme.deepGold)
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
+    }
+
+    // MARK: - Composer Bar
+
+    private func composerBar(languageId: String, langName: String) -> some View {
+        HStack(alignment: .bottom, spacing: 10) {
+            Button {
+                if speechRecognizer.isRecording {
+                    speechRecognizer.stop()
+                } else {
+                    speechRecognizer.start(languageId: languageId, existingText: inputText)
+                }
+            } label: {
+                Image(systemName: speechRecognizer.isRecording ? "mic.slash.fill" : "mic.fill")
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(
+                GoldenGateGlassPillButtonStyle(
+                    isSelected: speechRecognizer.isRecording,
+                    accent: speechRecognizer.isRecording ? .red : BrandTheme.emeraldMint
+                )
+            )
+
+            TextField(
+                "Ask AI Coach or paste \(langName) \(store.aiCoachLevel.rawValue) text…",
+                text: $inputText,
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .scaledFont(.body)
+            .lineLimit(1...4)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .goldenGateSurface(cornerRadius: 14)
+
+            Button {
+                Task { await sendMessage(inputText) }
+            } label: {
+                Image(systemName: "arrow.up")
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue, cornerRadius: 12))
+            .disabled(isLoading || inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 14)
+        .frame(maxWidth: GoldenGateMetrics.editorialMaxWidth)
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Coach Actions
 
     private func starterPrompts(langName: String, level: CEFRLevel, skill: SkillType) -> [String] {
         switch skill {
@@ -358,7 +509,8 @@ public struct AICoachNativeView: View {
         offlineEval = nil
         NativeAudioEngine.shared.playClickSound()
 
-        if !store.aiConfig.isReady {
+        let effectiveConfig = store.aiConfig.resolved(for: lang)
+        if !effectiveConfig.isReady {
             if store.aiCoachSkill == .writing || store.aiCoachSkill == .speaking {
                 let eval = AIClientService.evaluateOffline(
                     text: prompt,
@@ -380,13 +532,15 @@ public struct AICoachNativeView: View {
                     )
                 )
             } else {
-                errorMessage = "Tap 'Setup AI' above to connect Local (Ollama / LM Studio) or Cloud AI for live Reading & Listening labs."
+                errorMessage = "Select 'Connect AI' above for live Reading & Listening labs."
             }
             return
         }
 
         let userMsg = AIChatMessage(role: "user", content: prompt)
-        messages.append(userMsg)
+        withAnimation(GoldenGateMetrics.snappySpring) {
+            messages.append(userMsg)
+        }
         inputText = ""
         isLoading = true
         defer { isLoading = false }
@@ -397,13 +551,14 @@ public struct AICoachNativeView: View {
             skill: store.aiCoachSkill
         )
 
-        let effectiveConfig = store.aiConfig.resolved(for: lang)
         do {
             let reply = try await AIClientService().chat(
                 config: effectiveConfig,
                 messages: [AIChatMessage(role: "system", content: sysPrompt)] + messages.suffix(10)
             )
-            messages.append(AIChatMessage(role: "assistant", content: reply))
+            withAnimation(GoldenGateMetrics.snappySpring) {
+                messages.append(AIChatMessage(role: "assistant", content: reply))
+            }
             store.recordAISession(
                 AISessionRecord(
                     languageId: lang,

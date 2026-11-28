@@ -11,7 +11,7 @@ public struct UnitLessonPlayerView: View {
     public let nextModule: CourseModule?
     public let nextLevelCourse: IntensiveCourse?
 
-    private enum LessonStep: Int, CaseIterable, Identifiable {
+    private enum LessonStep: Int, CaseIterable, Identifiable, Hashable {
         case learn = 0
         case vocab = 1
         case quiz = 2
@@ -155,24 +155,32 @@ public struct UnitLessonPlayerView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                headerAndStepperCard
+        ZStack {
+            GoldenGateEditorialBackdrop()
 
-                switch currentStep {
-                case .learn:
-                    learnStepView
-                case .vocab:
-                    vocabStepView
-                case .quiz:
-                    quizStepView
-                case .drills:
-                    drillsStepView
-                case .checkpoint:
-                    checkpointStepView
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    headerAndStepperCard
+
+                    switch currentStep {
+                    case .learn:
+                        learnStepView
+                    case .vocab:
+                        vocabStepView
+                    case .quiz:
+                        quizStepView
+                    case .drills:
+                        drillsStepView
+                    case .checkpoint:
+                        checkpointStepView
+                    }
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: GoldenGateMetrics.editorialMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .animation(GoldenGateMetrics.panelAnimation, value: currentStep)
             }
-            .padding(20)
         }
         .onChange(of: speechRecognizer.transcript) { _, newValue in
             guard !newValue.isEmpty else { return }
@@ -193,107 +201,84 @@ public struct UnitLessonPlayerView: View {
     private var headerAndStepperCard: some View {
         let isDone = store.isModuleCompleted(module.id)
         let pct = Int((Double(completedSteps.count) / Double(LessonStep.allCases.count) * 100.0).rounded())
+        let levelColor = BrandTheme.cefrColor(for: course.level.rawValue)
+        let stepBinding = Binding<LessonStep>(
+            get: { currentStep },
+            set: { next in goToStep(next) }
+        )
 
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 18) {
             ViewThatFits(in: .horizontal) {
                 HStack {
                     backButton
                     Spacer()
                     audioControls
                 }
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     backButton
                     audioControls
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                FlowLayout(spacing: 6, lineSpacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
+                FlowLayout(spacing: 8, lineSpacing: 4) {
                     Text("\(course.level.rawValue) · Unit \(unitIndex) of \(totalUnits)")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(BrandTheme.celestialSky))
-                        .foregroundStyle(.white)
+                        .scaledFont(.footnote, weight: .semibold)
+                        .foregroundStyle(levelColor)
 
-                    Text(module.weekLabel)
-                        .scaledFont(.caption, design: .monospaced)
+                    Text("· \(module.weekLabel)")
+                        .scaledFont(.footnote, design: .monospaced)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.primary.opacity(0.06)))
 
                     if isDone {
                         Label("Unit Mastered", systemImage: "checkmark.circle.fill")
-                            .scaledFont(.caption, weight: .bold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                            .scaledFont(.caption2, weight: .bold)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.15)))
                             .foregroundStyle(BrandTheme.emeraldMint)
                     }
                 }
 
                 Text(module.title)
-                    .scaledFont(size: 21, weight: .bold, design: .serif)
+                    .scaledFont(.largeTitle, weight: .bold, design: .serif)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(lesson.overview)
-                    .scaledFont(.subheadline)
+                    .scaledFont(.body)
+                    .lineSpacing(4)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Guided Lesson Progress")
                         .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text("\(completedSteps.count)/\(LessonStep.allCases.count) steps (\(pct)%)")
-                        .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
-                        .monospacedDigit()
+                        .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
                 }
                 ProgressView(value: Double(max(8, pct)), total: 100.0)
                     .tint(BrandTheme.emeraldMint)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(LessonStep.allCases) { step in
-                            let isActive = currentStep == step
-                            let isStepDone = completedSteps.contains(step.rawValue)
-                            Button {
-                                goToStep(step)
-                            } label: {
-                                Label(
-                                    step.shortTitle,
-                                    systemImage: (isStepDone && !isActive) ? "checkmark.circle.fill" : step.systemImage
-                                )
-                                .scaledFont(.caption, weight: .bold)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(
-                                            isActive
-                                                ? BrandTheme.celestialSky
-                                                : isStepDone
-                                                    ? BrandTheme.emeraldMint.opacity(0.15)
-                                                    : Color.primary.opacity(0.05)
-                                        )
-                                )
-                                .foregroundStyle(
-                                    isActive
-                                        ? Color.white
-                                        : isStepDone
-                                            ? BrandTheme.emeraldMint
-                                            : Color.primary
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                GoldenGateSegmentedControl(
+                    items: LessonStep.allCases,
+                    selection: stepBinding,
+                    allowHorizontalScroll: true
+                ) { step, selected in
+                    let isStepDone = completedSteps.contains(step.rawValue)
+                    Label(
+                        step.shortTitle,
+                        systemImage: (isStepDone && !selected) ? "checkmark.circle.fill" : step.systemImage
+                    )
+                    .scaledFont(.caption, weight: selected ? .semibold : .medium)
+                    .foregroundStyle(!selected && isStepDone ? BrandTheme.emeraldMint : (selected ? Color.primary : Color.secondary))
                 }
             }
+            .padding(16)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
         }
-        .padding(18)
-        .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
     }
 
     private var backButton: some View {
@@ -304,40 +289,38 @@ public struct UnitLessonPlayerView: View {
             store.closeUnitLesson()
         } label: {
             Label("Back to \(course.level.rawValue) Syllabus", systemImage: "chevron.left")
-                .scaledFont(.caption, weight: .bold)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(GoldenGateGlassPillButtonStyle())
     }
 
     private var audioControls: some View {
         let accents = NativeAudioEngine.accents(for: course.languageId)
         let activeCode = NativeAudioEngine.shared.activeAccentCode(for: course.languageId)
-        let activeOpt = NativeAudioEngine.accentOption(for: activeCode) ?? accents.first
+        let options = accents.map { acc in
+            GoldenGateDropdownOption(
+                value: acc.code,
+                title: "\(acc.flag) \(acc.label)",
+                subtitle: acc.region
+            )
+        }
+        let accentBinding = Binding<String>(
+            get: { activeCode },
+            set: { NativeAudioEngine.shared.setAccent(for: course.languageId, accentCode: $0) }
+        )
 
-        return HStack(spacing: 10) {
+        return FlowLayout(spacing: 10, lineSpacing: 8) {
             Label("~\(lesson.estimatedMins)m", systemImage: "clock")
-                .scaledFont(.caption, design: .monospaced)
+                .scaledFont(.caption, design: .monospaced, monospacedDigit: true)
                 .foregroundStyle(.secondary)
-            Menu {
-                ForEach(accents) { acc in
-                    Button {
-                        NativeAudioEngine.shared.playClickSound()
-                        NativeAudioEngine.shared.setAccent(for: course.languageId, accentCode: acc.code)
-                    } label: {
-                        if acc.code == activeCode {
-                            Label("\(acc.flag) \(acc.label)", systemImage: "checkmark")
-                        } else {
-                            Text("\(acc.flag) \(acc.label)")
-                        }
-                    }
-                }
-            } label: {
-                Label("\(activeOpt?.flag ?? "🎙️") \(activeOpt?.label ?? activeCode)", systemImage: "waveform")
-                    .scaledFont(.caption, design: .monospaced)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+                .padding(.vertical, 6)
+
+            GoldenGateDropdownMenu(
+                title: "Accent",
+                leadingIcon: "waveform",
+                options: options,
+                selection: accentBinding
+            )
+
             Toggle("0.75x Slow", isOn: Bindable(NativeAudioEngine.shared).slowPace)
                 .toggleStyle(.switch)
                 .scaledFont(.caption, design: .monospaced)
@@ -348,50 +331,51 @@ public struct UnitLessonPlayerView: View {
     // MARK: - Step 1: Learn (Concept & Grammar)
 
     private var learnStepView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("WHAT YOU WILL MASTER IN UNIT \(unitIndex)")
-                    .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                    .foregroundStyle(BrandTheme.celestialSky)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("What You Will Master in Unit \(unitIndex)")
+                    .scaledFont(.caption, weight: .bold, design: .monospaced)
+                    .foregroundStyle(BrandTheme.editorialBlue)
                 ForEach(module.objectives, id: \.self) { obj in
-                    HStack(alignment: .top, spacing: 7) {
+                    HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .scaledFont(.caption)
-                            .foregroundStyle(BrandTheme.celestialSky)
+                            .foregroundStyle(BrandTheme.editorialBlue)
                             .padding(.top, 2)
                         Text(obj)
                             .scaledFont(.subheadline)
                     }
                 }
             }
-            .padding(15)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 13).fill(BrandTheme.celestialSky.opacity(0.08)))
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius, tint: BrandTheme.editorialBlue)
 
             ForEach(Array(lesson.sections.enumerated()), id: \.element.id) { idx, section in
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("CORE CONCEPT \(idx + 1) OF \(lesson.sections.count)")
-                        .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                        .foregroundStyle(BrandTheme.celestialSky)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Concept \(idx + 1) of \(lesson.sections.count)")
+                        .scaledFont(.caption, weight: .bold, design: .monospaced)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     Text(section.heading)
-                        .scaledFont(.headline)
+                        .scaledFont(.title3, weight: .bold, design: .serif)
                     Text(section.explanation)
-                        .scaledFont(.subheadline)
+                        .scaledFont(.body)
+                        .lineSpacing(4)
                         .foregroundStyle(.secondary)
 
                     if let formula = section.formula {
                         Text(formula)
-                            .scaledFont(size: 12.5, weight: .semibold, design: .monospaced)
-                            .padding(11)
+                            .scaledFont(.subheadline, weight: .semibold, design: .monospaced)
+                            .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.08)))
+                            .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                     }
 
-                    Text("LIVE EXAMPLES (TAP TO LISTEN)")
-                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                    Text("Live Examples · Tap to Listen")
+                        .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(.secondary)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(265, scale: fontScale)), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: AppTypography.scaledGridMinimum(265, scale: fontScale)), spacing: 12)], spacing: 12) {
                         ForEach(section.examples) { ex in
                             Button {
                                 NativeAudioEngine.shared.playClickSound()
@@ -406,7 +390,7 @@ public struct UnitLessonPlayerView: View {
                                         Spacer(minLength: 4)
                                         Image(systemName: "speaker.wave.2.fill")
                                             .scaledFont(.caption)
-                                            .foregroundStyle(BrandTheme.celestialSky)
+                                            .foregroundStyle(BrandTheme.editorialBlue)
                                     }
                                     Text(ex.translation)
                                         .scaledFont(.caption)
@@ -414,16 +398,16 @@ public struct UnitLessonPlayerView: View {
                                         .multilineTextAlignment(.leading)
                                     if let highlight = ex.highlight {
                                         Text("Pattern: \(highlight)")
-                                            .scaledFont(size: 11, weight: .semibold, design: .monospaced)
-                                            .padding(.horizontal, 7)
+                                            .scaledFont(.caption2, weight: .semibold, design: .monospaced)
+                                            .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
-                                            .background(RoundedRectangle(cornerRadius: 6).fill(BrandTheme.celestialSky.opacity(0.14)))
-                                            .foregroundStyle(BrandTheme.celestialSky)
+                                            .background(RoundedRectangle(cornerRadius: 6).fill(BrandTheme.editorialBlue.opacity(0.12)))
+                                            .foregroundStyle(BrandTheme.editorialBlue)
                                     }
                                 }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                                .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.04)))
+                                .padding(13)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, interactive: true)
                             }
                             .buttonStyle(.plain)
                         }
@@ -435,16 +419,15 @@ public struct UnitLessonPlayerView: View {
                                 .foregroundStyle(BrandTheme.deepGold)
                                 .padding(.top, 2)
                             Text("Exam Pro Tip: \(tip)")
-                                .scaledFont(.caption)
+                                .scaledFont(.subheadline)
                         }
-                        .padding(11)
+                        .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.champagneGold.opacity(0.14)))
+                        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.champagneGold)
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                .padding(20)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
             }
 
             HStack {
@@ -453,10 +436,8 @@ public struct UnitLessonPlayerView: View {
                     goToStep(.vocab, markCurrentDone: true)
                 } label: {
                     Label("Continue to Vocabulary Flashcards", systemImage: "arrow.right")
-                        .scaledFont(.subheadline, weight: .bold)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(BrandTheme.celestialSky)
+                .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
             }
         }
     }
@@ -468,33 +449,33 @@ public struct UnitLessonPlayerView: View {
         let safeIdx = min(vocabIndex, max(0, cards.count - 1))
         let card = cards.isEmpty ? nil : cards[safeIdx]
 
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 16) {
             if let card {
                 let isMastered = masteredVocab.contains(card.term)
 
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("AUDIO FLASHCARD DECK · CARD \(safeIdx + 1) OF \(cards.count)")
-                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                                .foregroundStyle(BrandTheme.celestialSky)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Card \(safeIdx + 1) of \(cards.count)")
+                                .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
+                                .foregroundStyle(BrandTheme.editorialBlue)
                             Text("High-Yield Exam Vocabulary Studio")
-                                .scaledFont(.headline)
+                                .scaledFont(.headline, weight: .bold, design: .serif)
                         }
                         Spacer()
                         Text("Mastered \(masteredVocab.count)/\(cards.count)")
-                            .scaledFont(size: 11.5, weight: .bold, design: .monospaced)
+                            .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.16)))
+                            .background(Capsule().fill(BrandTheme.emeraldMint.opacity(0.15)))
                             .foregroundStyle(BrandTheme.emeraldMint)
                     }
 
                     // Flashcard Surface
-                    VStack(spacing: 14) {
+                    VStack(spacing: 16) {
                         HStack(spacing: 8) {
-                            Text(isCardFlipped ? "MEANING & CONTEXT" : "TARGET EXPRESSION")
-                                .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                            Text(isCardFlipped ? "Meaning & Context" : "Target Expression")
+                                .scaledFont(.caption, weight: .semibold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             if isMastered {
                                 Label("Got It", systemImage: "checkmark.circle.fill")
@@ -504,42 +485,43 @@ public struct UnitLessonPlayerView: View {
                         }
 
                         Text(card.term)
-                            .scaledFont(size: 26, weight: .bold, design: .serif)
+                            .scaledFont(.largeTitle, weight: .bold, design: .serif)
                             .multilineTextAlignment(.center)
 
                         if let pron = card.pronunciation {
                             Text(pron)
-                                .scaledFont(.caption, design: .monospaced)
+                                .scaledFont(.subheadline, design: .monospaced)
                                 .foregroundStyle(.secondary)
                         }
 
-                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                        FlowLayout(spacing: 10, lineSpacing: 8) {
                             Button {
                                 NativeAudioEngine.shared.playClickSound()
                                 NativeAudioEngine.shared.speak(card.term, languageId: course.languageId)
                             } label: {
                                 Label("Listen", systemImage: "speaker.wave.2.fill")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(BrandTheme.celestialSky)
+                            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
 
                             Button {
                                 NativeAudioEngine.shared.playClickSound()
-                                isCardFlipped.toggle()
+                                withAnimation(GoldenGateMetrics.snappySpring) {
+                                    isCardFlipped.toggle()
+                                }
                             } label: {
                                 Label(isCardFlipped ? "Hide Answer" : "Reveal Meaning & Example", systemImage: "arrow.triangle.2.circlepath")
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(GoldenGateGlassPillButtonStyle())
                         }
 
-                        if isCardFlipped {
-                            Divider()
+                        GoldenGateCollapsiblePanel(isExpanded: isCardFlipped) {
                             VStack(alignment: .leading, spacing: 10) {
+                                GoldenGateSectionHairline()
                                 Text(card.meaning)
                                     .scaledFont(.headline)
                                 HStack(alignment: .top, spacing: 8) {
                                     Text("“\(card.example)”")
-                                        .scaledFont(.subheadline)
+                                        .scaledFont(.body)
                                     Spacer()
                                     Button {
                                         NativeAudioEngine.shared.playClickSound()
@@ -547,8 +529,7 @@ public struct UnitLessonPlayerView: View {
                                     } label: {
                                         Image(systemName: "speaker.wave.2.fill")
                                     }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
+                                    .buttonStyle(GoldenGateGlassPillButtonStyle())
                                 }
                                 if let note = card.exampleNote {
                                     Text(note)
@@ -565,62 +546,51 @@ public struct UnitLessonPlayerView: View {
                             } label: {
                                 Label("Need Review", systemImage: "arrow.counterclockwise")
                             }
-                            .buttonStyle(.bordered)
-                            .tint(BrandTheme.deepGold)
+                            .buttonStyle(GoldenGateGlassPillButtonStyle(accent: BrandTheme.deepGold))
 
                             Button {
                                 handleVocabDecision(mastered: true, card: card, total: cards.count)
                             } label: {
                                 Label("Got It! Next Card", systemImage: "checkmark.circle.fill")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(BrandTheme.emeraldMint)
+                            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
                         }
                     }
-                    .padding(20)
+                    .padding(24)
                     .frame(maxWidth: .infinity)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.04)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(BrandTheme.celestialSky.opacity(0.25), lineWidth: 1))
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue)
 
                     // Deck Pills
-                    FlowLayout(spacing: 6, lineSpacing: 6) {
+                    FlowLayout(spacing: 8, lineSpacing: 8) {
                         ForEach(Array(cards.enumerated()), id: \.element.id) { idx, item in
                             let selected = idx == safeIdx
                             let itemMastered = masteredVocab.contains(item.term)
                             Button {
                                 NativeAudioEngine.shared.playClickSound()
-                                vocabIndex = idx
-                                isCardFlipped = false
+                                withAnimation(GoldenGateMetrics.snappySpring) {
+                                    vocabIndex = idx
+                                    isCardFlipped = false
+                                }
                             } label: {
-                                HStack(spacing: 4) {
+                                HStack(spacing: 5) {
                                     if itemMastered {
                                         Image(systemName: "checkmark.circle.fill")
                                             .scaledFont(.caption2)
                                     }
                                     Text(item.term)
-                                        .scaledFont(size: 11.5, design: .monospaced)
                                 }
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 5)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(
-                                            selected
-                                                ? BrandTheme.celestialSky
-                                                : itemMastered
-                                                    ? BrandTheme.emeraldMint.opacity(0.15)
-                                                    : Color.primary.opacity(0.05)
-                                        )
-                                )
-                                .foregroundStyle(selected ? .white : itemMastered ? BrandTheme.emeraldMint : .primary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(
+                                GoldenGateGlassPillButtonStyle(
+                                    isSelected: selected || itemMastered,
+                                    accent: selected ? BrandTheme.editorialBlue : BrandTheme.emeraldMint
+                                )
+                            )
                         }
                     }
                 }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                .padding(20)
+                .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
             }
 
             stepFooterButtons(back: .learn, backLabel: "Back to Concept", next: .quiz, nextLabel: "Continue to Quiz")
@@ -633,31 +603,30 @@ public struct UnitLessonPlayerView: View {
         let questions = lesson.practiceQuestions
         let correctCount = questions.filter { quizAnswers[$0.id] == $0.correctIndex }.count
 
-        return VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("INTERACTIVE CHECK · INSTANT EXPLANATIONS")
-                            .scaledFont(size: 11, weight: .bold, design: .monospaced)
-                            .foregroundStyle(BrandTheme.celestialSky)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Interactive Check · Instant Explanations")
+                            .scaledFont(.caption, weight: .semibold, design: .monospaced)
+                            .foregroundStyle(BrandTheme.editorialBlue)
                         Text("Test Your Unit \(unitIndex) Mastery")
-                            .scaledFont(.headline)
+                            .scaledFont(.headline, weight: .bold, design: .serif)
                     }
                     Spacer()
                     Text("Score \(correctCount)/\(questions.count)")
-                        .scaledFont(size: 12, weight: .bold, design: .monospaced)
+                        .scaledFont(.caption, weight: .bold, design: .monospaced, monospacedDigit: true)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.15)))
-                        .foregroundStyle(BrandTheme.celestialSky)
+                        .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.14)))
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     if !quizAnswers.isEmpty {
                         Button("Retry") {
                             NativeAudioEngine.shared.playClickSound()
                             quizAnswers = [:]
                             persistProgress()
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .buttonStyle(GoldenGateGlassPillButtonStyle())
                     }
                 }
 
@@ -665,9 +634,8 @@ public struct UnitLessonPlayerView: View {
                     quizQuestionCard(idx: idx, q: q, totalCount: questions.count)
                 }
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .padding(20)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
             stepFooterButtons(back: .vocab, backLabel: "Back to Vocab", next: .drills, nextLabel: "Continue to Drills")
         }
@@ -679,27 +647,27 @@ public struct UnitLessonPlayerView: View {
         let isAnswered = chosen != nil
         let isCorrect = chosen == q.correctIndex
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Question \(idx + 1) of \(totalCount)")
-                    .scaledFont(.caption, design: .monospaced)
+                    .scaledFont(.caption, design: .monospaced, monospacedDigit: true)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Label(q.skill.shortName, systemImage: q.skill.systemImage)
                     .scaledFont(.caption2, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
-                    .foregroundStyle(BrandTheme.celestialSky)
+                    .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.12)))
+                    .foregroundStyle(BrandTheme.editorialBlue)
             }
 
             if let passage = q.passage {
                 Text(passage)
-                    .scaledFont(.caption)
+                    .scaledFont(.subheadline)
                     .italic()
-                    .padding(10)
+                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+                    .goldenGateSurface(cornerRadius: 10)
             }
 
             if let audioScript = q.audioScript {
@@ -712,38 +680,40 @@ public struct UnitLessonPlayerView: View {
                 .buttonStyle(GoldenGateGlassPillButtonStyle())
 
                 if isAnswered {
-                    DisclosureGroup("View Audio Transcript") {
+                    GoldenGateEditorialDisclosure("View Audio Transcript") {
                         Text(audioScript)
-                            .scaledFont(.caption)
-                            .padding(.top, 4)
+                            .scaledFont(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .scaledFont(.caption)
                 }
             }
 
             Text(q.prompt)
-                .scaledFont(.subheadline, weight: .semibold)
+                .scaledFont(.headline, weight: .semibold)
 
-            VStack(spacing: 7) {
+            VStack(spacing: 8) {
                 ForEach(Array(q.options.enumerated()), id: \.offset) { optIdx, opt in
                     quizOptionButton(q: q, optIdx: optIdx, opt: opt, chosen: chosen, isAnswered: isAnswered)
                 }
             }
 
             if isAnswered {
-                Text("\(isCorrect ? "✓ Correct: " : "Key Takeaway: ")\(q.explanation)")
-                    .scaledFont(.caption)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(isCorrect ? BrandTheme.emeraldMint.opacity(0.12) : BrandTheme.champagneGold.opacity(0.16))
-                    )
+                Label(
+                    "\(isCorrect ? "Correct: " : "Key Takeaway: ")\(q.explanation)",
+                    systemImage: isCorrect ? "checkmark.circle.fill" : "lightbulb.fill"
+                )
+                .scaledFont(.subheadline)
+                .foregroundStyle(isCorrect ? BrandTheme.emeraldMint : BrandTheme.deepGold)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .goldenGateSurface(
+                    cornerRadius: 10,
+                    tint: isCorrect ? BrandTheme.emeraldMint : BrandTheme.champagneGold
+                )
             }
         }
-        .padding(13)
-        .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.035)))
+        .padding(16)
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
     }
 
     @ViewBuilder
@@ -756,19 +726,18 @@ public struct UnitLessonPlayerView: View {
     ) -> some View {
         let selected = chosen == optIdx
         let optionIsRight = optIdx == q.correctIndex
-        let fillColor: Color = isAnswered && optionIsRight
-            ? BrandTheme.emeraldMint.opacity(0.16)
-            : (isAnswered && selected && !optionIsRight ? Color.red.opacity(0.14) : Color.primary.opacity(0.04))
-        let strokeColor: Color = isAnswered && optionIsRight
+        let tint: Color? = isAnswered && optionIsRight
             ? BrandTheme.emeraldMint
-            : (isAnswered && selected && !optionIsRight ? Color.red : Color.primary.opacity(0.1))
+            : (isAnswered && selected && !optionIsRight ? .red : nil)
 
         Button {
-            handleAnswerQuiz(question: q, optionIndex: optIdx)
+            withAnimation(GoldenGateMetrics.snappySpring) {
+                handleAnswerQuiz(question: q, optionIndex: optIdx)
+            }
         } label: {
             HStack {
                 Text(opt)
-                    .scaledFont(.caption)
+                    .scaledFont(.subheadline)
                     .multilineTextAlignment(.leading)
                 Spacer()
                 if isAnswered && optionIsRight {
@@ -779,10 +748,9 @@ public struct UnitLessonPlayerView: View {
                         .foregroundStyle(.red)
                 }
             }
-            .padding(10)
+            .padding(11)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 9).fill(fillColor))
-            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(strokeColor, lineWidth: 1))
+            .goldenGateSurface(cornerRadius: 10, tint: tint, interactive: true)
         }
         .buttonStyle(.plain)
     }
@@ -790,10 +758,10 @@ public struct UnitLessonPlayerView: View {
     // MARK: - Step 4: Interactive 4-Skill Drills Workbench
 
     private var drillsStepView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 Text("Active Skill Workbench · \(completedDrills.count)/\(module.drills.count) practiced")
-                    .scaledFont(.footnote, weight: .semibold, design: .monospaced)
+                    .scaledFont(.footnote, weight: .semibold, design: .monospaced, monospacedDigit: true)
                     .foregroundStyle(BrandTheme.editorialBlue)
 
                 if let msg = speechRecognizer.statusMessage {
@@ -801,16 +769,15 @@ public struct UnitLessonPlayerView: View {
                         .scaledFont(.caption)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
+                        .goldenGateSurface(cornerRadius: 10, tint: BrandTheme.champagneGold)
                 }
 
                 ForEach(Array(module.drills.enumerated()), id: \.element.id) { idx, drill in
                     drillCard(idx: idx, drill: drill)
                 }
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .padding(20)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
             stepFooterButtons(back: .quiz, backLabel: "Back to Quiz", next: .checkpoint, nextLabel: "Continue to Checkpoint")
         }
@@ -825,38 +792,37 @@ public struct UnitLessonPlayerView: View {
             set: { drillNotes[idx] = $0 }
         )
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Label("\(drill.skill.displayName) · \(drill.durationMins)m", systemImage: drill.skill.systemImage)
                         .scaledFont(.caption, weight: .bold)
-                        .foregroundStyle(BrandTheme.celestialSky)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     Text(drill.title)
-                        .scaledFont(.subheadline, weight: .bold)
+                        .scaledFont(.headline, weight: .bold, design: .serif)
                 }
                 Spacer()
                 Button {
-                    toggleDrillPracticed(idx)
+                    withAnimation(GoldenGateMetrics.snappySpring) {
+                        toggleDrillPracticed(idx)
+                    }
                 } label: {
                     Label(practiced ? "Practiced" : "Mark Practiced", systemImage: practiced ? "checkmark.circle.fill" : "circle")
-                        .scaledFont(.caption2, weight: .bold)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(practiced ? BrandTheme.emeraldMint : .accentColor)
-                .controlSize(.mini)
+                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: practiced, accent: BrandTheme.emeraldMint))
             }
 
             Text(drill.instruction)
-                .scaledFont(.caption)
+                .scaledFont(.subheadline)
                 .foregroundStyle(.secondary)
 
             if let passage = drill.samplePassage {
                 Text(passage)
-                    .scaledFont(.caption)
+                    .scaledFont(.subheadline)
                     .italic()
-                    .padding(10)
+                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+                    .goldenGateSurface(cornerRadius: 10)
             }
 
             if let script = drill.audioScript {
@@ -872,29 +838,27 @@ public struct UnitLessonPlayerView: View {
 
                     if let count = drillAudioPlays[idx], count > 0 {
                         Text("Played \(count)×")
-                            .scaledFont(.caption2, design: .monospaced)
+                            .scaledFont(.caption2, design: .monospaced, monospacedDigit: true)
                             .foregroundStyle(.secondary)
                     }
                 }
-                DisclosureGroup("Reveal Audio Transcript") {
+                GoldenGateEditorialDisclosure("Reveal Audio Transcript") {
                     Text(script)
-                        .scaledFont(.caption)
-                        .padding(.top, 4)
+                        .scaledFont(.subheadline)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .scaledFont(.caption)
             }
 
             Text(isProductive ? "Your Practice Response:" : "Your Notes & Comprehension Answers:")
-                .scaledFont(.caption2, weight: .bold)
+                .scaledFont(.caption, weight: .semibold)
                 .foregroundStyle(.secondary)
 
             TextEditor(text: noteBinding)
-                .scaledFont(.caption)
-                .frame(minHeight: isProductive ? 84 : 56)
-                .padding(6)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                .scaledFont(.body)
+                .frame(minHeight: isProductive ? 88 : 60)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.03)))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(BrandTheme.editorialHairline, lineWidth: 1))
 
             FlowLayout(spacing: 8, lineSpacing: 8) {
                 if drill.skill == .speaking {
@@ -906,11 +870,8 @@ public struct UnitLessonPlayerView: View {
                             recordingThis ? "Stop Mic" : "Dictate Live Voice",
                             systemImage: recordingThis ? "mic.slash.fill" : "mic.fill"
                         )
-                        .scaledFont(.caption, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(recordingThis ? .red : BrandTheme.emeraldMint)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: recordingThis ? .red : BrandTheme.emeraldMint))
                 }
 
                 if isProductive {
@@ -918,14 +879,11 @@ public struct UnitLessonPlayerView: View {
                         Task { await evaluateDrill(idx: idx, drill: drill) }
                     } label: {
                         Label(
-                            evaluatingDrillIdx == idx ? "Evaluating..." : "Evaluate Drill",
+                            evaluatingDrillIdx == idx ? "Evaluating…" : "Evaluate Drill",
                             systemImage: "sparkles"
                         )
-                        .scaledFont(.caption, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.celestialSky)
-                    .controlSize(.small)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
                     .disabled(evaluatingDrillIdx == idx || (drillNotes[idx] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
@@ -938,24 +896,18 @@ public struct UnitLessonPlayerView: View {
                     )
                 } label: {
                     Label("Open in AI Coach", systemImage: "bubble.left.and.sparkles")
-                        .scaledFont(.caption, weight: .semibold)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(GoldenGateGlassPillButtonStyle())
             }
 
             if let result = drillEvaluations[idx] {
                 evaluationBox(result)
             }
         }
-        .padding(13)
-        .background(
-            RoundedRectangle(cornerRadius: 11)
-                .fill(practiced ? BrandTheme.emeraldMint.opacity(0.06) : Color.primary.opacity(0.035))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 11)
-                .strokeBorder(practiced ? BrandTheme.emeraldMint.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
+        .padding(16)
+        .goldenGateSurface(
+            cornerRadius: GoldenGateMetrics.nestedCornerRadius,
+            tint: practiced ? BrandTheme.emeraldMint : nil
         )
     }
 
@@ -964,38 +916,38 @@ public struct UnitLessonPlayerView: View {
     private var checkpointStepView: some View {
         let wordCount = LearningLanguage.countUnits(in: checkpointText, languageId: course.languageId)
 
-        return VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Label("UNIT \(unitIndex) MILESTONE CHECKPOINT", systemImage: "rosette")
-                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            Label("Unit \(unitIndex) Milestone Checkpoint", systemImage: "rosette")
+                                .scaledFont(.caption, weight: .bold, design: .monospaced)
                                 .foregroundStyle(BrandTheme.deepGold)
                             Text(lesson.checkpointSkill.displayName)
                                 .scaledFont(.caption2, weight: .bold)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(BrandTheme.celestialSky.opacity(0.14)))
-                                .foregroundStyle(BrandTheme.celestialSky)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(BrandTheme.editorialBlue.opacity(0.12)))
+                                .foregroundStyle(BrandTheme.editorialBlue)
                         }
                         Text(module.checkpointPrompt)
-                            .scaledFont(.headline)
+                            .scaledFont(.title3, weight: .bold, design: .serif)
                     }
                     Spacer()
                     Text("\(wordCount) / \(lesson.checkpointMinWords)+ words")
-                        .scaledFont(.caption, design: .monospaced)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.primary.opacity(0.07)))
+                        .scaledFont(.caption, weight: .semibold, design: .monospaced, monospacedDigit: true)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .goldenGateGlassPill()
                 }
 
                 // Vocabulary hints
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("TRY USING THESE UNIT \(unitIndex) TERMS (TAP TO HEAR)")
-                        .scaledFont(size: 10.5, weight: .bold, design: .monospaced)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Try using these Unit \(unitIndex) terms · Tap to hear")
+                        .scaledFont(.caption, weight: .semibold)
                         .foregroundStyle(.secondary)
-                    FlowLayout(spacing: 6, lineSpacing: 6) {
+                    FlowLayout(spacing: 8, lineSpacing: 8) {
                         ForEach(module.keyVocabulary, id: \.self) { word in
                             let used = checkpointText.localizedCaseInsensitiveContains(word)
                             Button {
@@ -1003,16 +955,13 @@ public struct UnitLessonPlayerView: View {
                                 NativeAudioEngine.shared.speak(word, languageId: course.languageId)
                             } label: {
                                 Label(word, systemImage: used ? "checkmark.circle.fill" : "speaker.wave.2.fill")
-                                    .scaledFont(size: 11.5, design: .monospaced)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 7)
-                                            .fill(used ? BrandTheme.emeraldMint.opacity(0.18) : BrandTheme.celestialSky.opacity(0.12))
-                                    )
-                                    .foregroundStyle(used ? BrandTheme.emeraldMint : .primary)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(
+                                GoldenGateGlassPillButtonStyle(
+                                    isSelected: used,
+                                    accent: used ? BrandTheme.emeraldMint : BrandTheme.editorialBlue
+                                )
+                            )
                         }
                     }
                 }
@@ -1022,17 +971,17 @@ public struct UnitLessonPlayerView: View {
                         .scaledFont(.caption)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(BrandTheme.champagneGold.opacity(0.16)))
+                        .goldenGateSurface(cornerRadius: 10, tint: BrandTheme.champagneGold)
                 }
 
                 TextEditor(text: $checkpointText)
-                    .scaledFont(.subheadline)
-                    .frame(minHeight: 130)
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
+                    .scaledFont(.body)
+                    .frame(minHeight: 140)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.03)))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(BrandTheme.editorialHairline, lineWidth: 1))
 
-                FlowLayout(spacing: 8, lineSpacing: 8) {
+                FlowLayout(spacing: 10, lineSpacing: 8) {
                     Button {
                         toggleCheckpointMic()
                     } label: {
@@ -1041,39 +990,39 @@ public struct UnitLessonPlayerView: View {
                             systemImage: isRecordingCheckpoint ? "mic.slash.fill" : "mic.fill"
                         )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(isRecordingCheckpoint ? .red : BrandTheme.emeraldMint)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: isRecordingCheckpoint, accent: isRecordingCheckpoint ? .red : BrandTheme.emeraldMint))
 
                     Button {
                         Task { await evaluateCheckpoint() }
                     } label: {
                         Label(
-                            isEvaluatingCheckpoint ? "Evaluating..." : "Evaluate Checkpoint",
+                            isEvaluatingCheckpoint ? "Evaluating…" : "Evaluate Checkpoint",
                             systemImage: "sparkles"
                         )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.celestialSky)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
                     .disabled(isEvaluatingCheckpoint || checkpointText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     Button {
                         NativeAudioEngine.shared.playClickSound()
-                        showModelAnswer.toggle()
+                        withAnimation(GoldenGateMetrics.panelAnimation) {
+                            showModelAnswer.toggle()
+                        }
                     } label: {
                         Label(showModelAnswer ? "Hide Model Answer" : "Compare with Model Answer", systemImage: "doc.text.magnifyingglass")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: showModelAnswer))
                 }
 
                 if let eval = checkpointEvaluation {
                     evaluationBox(eval)
                 }
 
-                if showModelAnswer {
-                    VStack(alignment: .leading, spacing: 8) {
+                GoldenGateCollapsiblePanel(isExpanded: showModelAnswer) {
+                    VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("REFERENCE \(course.level.rawValue) MODEL RESPONSE")
-                                .scaledFont(size: 11, weight: .bold, design: .monospaced)
+                            Text("Reference \(course.level.rawValue) Model Response")
+                                .scaledFont(.caption, weight: .bold, design: .monospaced)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button {
@@ -1081,34 +1030,31 @@ public struct UnitLessonPlayerView: View {
                                 NativeAudioEngine.shared.speak(lesson.checkpointModelAnswer, languageId: course.languageId)
                             } label: {
                                 Label("Listen to Model", systemImage: "speaker.wave.2.fill")
-                                    .scaledFont(.caption, weight: .bold)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(BrandTheme.celestialSky)
-                            .controlSize(.small)
+                            .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.editorialBlue))
                         }
                         Text(lesson.checkpointModelAnswer)
-                            .scaledFont(.subheadline)
+                            .scaledFont(.body)
+                            .lineSpacing(3)
                     }
-                    .padding(13)
+                    .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(0.04)))
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius)
                 }
 
                 if justCompletedUnit {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Label("Unit \(unitIndex) Completed! Progress saved.", systemImage: "graduationcap.fill")
-                            .scaledFont(.headline)
+                            .scaledFont(.headline, weight: .bold, design: .serif)
                             .foregroundStyle(BrandTheme.emeraldMint)
-                        FlowLayout(spacing: 8, lineSpacing: 8) {
+                        FlowLayout(spacing: 10, lineSpacing: 8) {
                             Button {
                                 store.closeUnitLesson()
                                 store.openExamSimulator(languageId: course.languageId, level: course.level)
                             } label: {
                                 Label("Simulate \(course.level.rawValue) 4-Skill Exam", systemImage: "timer")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(BrandTheme.celestialSky)
+                            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
 
                             if let nextLvl = nextLevelCourse {
                                 Button {
@@ -1117,19 +1063,17 @@ public struct UnitLessonPlayerView: View {
                                 } label: {
                                     Label("Start \(nextLvl.level.rawValue) Course", systemImage: "arrow.right.circle.fill")
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(BrandTheme.emeraldMint)
+                                .buttonStyle(GoldenGateGlassPillButtonStyle(isSelected: true, accent: BrandTheme.emeraldMint))
                             }
                         }
                     }
-                    .padding(14)
+                    .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(BrandTheme.emeraldMint.opacity(0.14)))
+                    .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.emeraldMint)
                 }
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .padding(20)
+            .goldenGateSurface(cornerRadius: GoldenGateMetrics.cardCornerRadius)
 
             HStack {
                 Button {
@@ -1137,7 +1081,7 @@ public struct UnitLessonPlayerView: View {
                 } label: {
                     Label("Back to Drills", systemImage: "chevron.left")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GoldenGateGlassPillButtonStyle())
 
                 Spacer()
 
@@ -1146,19 +1090,15 @@ public struct UnitLessonPlayerView: View {
                         finishUnit(advanceTo: nextMod)
                     } label: {
                         Label("Complete Unit & Continue to Unit \(unitIndex + 1)", systemImage: "checkmark.circle.fill")
-                            .scaledFont(.subheadline, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.emeraldMint)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
                 } else {
                     Button {
                         finishUnit(advanceTo: nil)
                     } label: {
                         Label("Complete Unit \(unitIndex) & Finish \(course.level.rawValue)", systemImage: "checkmark.circle.fill")
-                            .scaledFont(.subheadline, weight: .bold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(BrandTheme.emeraldMint)
+                    .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.emeraldMint))
                 }
             }
         }
@@ -1173,7 +1113,7 @@ public struct UnitLessonPlayerView: View {
             } label: {
                 Label(backLabel, systemImage: "chevron.left")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(GoldenGateGlassPillButtonStyle())
 
             Spacer()
 
@@ -1181,10 +1121,8 @@ public struct UnitLessonPlayerView: View {
                 goToStep(next, markCurrentDone: true)
             } label: {
                 Label(nextLabel, systemImage: "arrow.right")
-                    .scaledFont(.subheadline, weight: .bold)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(BrandTheme.celestialSky)
+            .buttonStyle(GoldenGatePrimaryButtonStyle(accent: BrandTheme.editorialBlue))
         }
     }
 
@@ -1197,7 +1135,7 @@ public struct UnitLessonPlayerView: View {
                     .scaledFont(.caption, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(BrandTheme.celestialSky))
+                    .background(Capsule().fill(BrandTheme.editorialBlue))
                     .foregroundStyle(.white)
                 Spacer()
                 Text(result.providerLabel)
@@ -1205,7 +1143,7 @@ public struct UnitLessonPlayerView: View {
                     .foregroundStyle(.secondary)
             }
             Text(result.examinerSummary)
-                .scaledFont(.caption)
+                .scaledFont(.subheadline)
 
             if !result.strengths.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
@@ -1231,15 +1169,14 @@ public struct UnitLessonPlayerView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Upgraded \(course.level.rawValue)+ Version")
                         .scaledFont(.caption2, weight: .bold)
-                        .foregroundStyle(BrandTheme.celestialSky)
+                        .foregroundStyle(BrandTheme.editorialBlue)
                     Text(result.upgradedVersion).scaledFont(.caption)
                 }
             }
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(BrandTheme.celestialSky.opacity(0.09)))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(BrandTheme.celestialSky.opacity(0.3), lineWidth: 1))
+        .goldenGateSurface(cornerRadius: GoldenGateMetrics.nestedCornerRadius, tint: BrandTheme.editorialBlue)
     }
 
     private func stopSpeech() {
